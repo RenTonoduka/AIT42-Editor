@@ -13,7 +13,7 @@ function App() {
   const [activePanel, setActivePanel] = useState<'editor' | 'terminal' | 'settings'>('editor');
   const { addTab } = useEditorStore();
   const { toggleSettingsPanel } = useSettingsStore();
-  const { toggleVisibility } = useTerminalStore();
+  const { toggleTerminal } = useTerminalStore();
 
   const handleFileOpen = async (path: string) => {
     try {
@@ -49,7 +49,7 @@ function App() {
         <button
           onClick={() => {
             setActivePanel('terminal');
-            toggleVisibility();
+            toggleTerminal();
           }}
           className={`p-3 rounded-lg transition-colors ${
             activePanel === 'terminal'
