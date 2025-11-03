@@ -79,6 +79,9 @@ ait42-config = { path = "crates/ait42-config" }
 # Dev dependencies
 [workspace.dev-dependencies]
 criterion = "0.5"
+proptest = "1.4"
+tempfile = "3.8"
+insta = "1.34"
 
 [profile.dev]
 opt-level = 0
