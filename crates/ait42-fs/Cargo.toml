@@ -1,0 +1,28 @@
+[package]
+name = "ait42-fs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "File system operations for AIT42"
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true, features = ["fs", "io-util"] }
+
+# File system watching
+notify = { workspace = true }
+ignore = { workspace = true }
+walkdir = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }

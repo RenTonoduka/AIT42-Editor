@@ -1,0 +1,20 @@
+# Clippy configuration
+# Linter rules and strictness levels
+
+# Lint levels
+msrv = "1.75"
+
+# Allowed lints (too pedantic for our use case)
+allow-unwrap-in-tests = true
+allow-dbg-in-tests = true
+
+# Disallowed methods (security/performance)
+disallowed-methods = [
+    { path = "std::env::set_var", reason = "Prefer config system" },
+]
+
+# Cognitive complexity threshold
+cognitive-complexity-threshold = 30
+
+# Documentation
+missing-docs-in-crate-items = false

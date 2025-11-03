@@ -1,0 +1,32 @@
+[package]
+name = "ait42-tui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "TUI rendering layer for AIT42"
+
+[dependencies]
+# Internal crates
+ait42-core = { workspace = true }
+ait42-config = { workspace = true }
+
+# TUI
+ratatui = { workspace = true }
+crossterm = { workspace = true }
+tui-textarea = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+
+# Logging
+tracing = { workspace = true }

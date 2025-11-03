@@ -1,0 +1,39 @@
+[package]
+name = "ait42"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "AIT42 Editor - AI-powered TUI code editor"
+keywords.workspace = true
+categories.workspace = true
+
+[[bin]]
+name = "ait42"
+path = "src/main.rs"
+
+[dependencies]
+# Internal crates
+ait42-core = { workspace = true }
+ait42-tui = { workspace = true }
+ait42-config = { workspace = true }
+ait42-ait42 = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-appender = { workspace = true }
+
+# CLI
+clap = { workspace = true }
+
+# TUI
+crossterm = { workspace = true }

@@ -1,0 +1,41 @@
+[package]
+name = "ait42-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Core editor logic for AIT42"
+
+[dependencies]
+# Internal crates
+ait42-config = { workspace = true }
+ait42-fs = { workspace = true }
+ait42-lsp = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# Text buffer
+ropey = { workspace = true }
+unicode-width = { workspace = true }
+unicode-segmentation = { workspace = true }
+
+# UUID generation
+uuid = { version = "1.6", features = ["v4"] }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio-test = "0.4"

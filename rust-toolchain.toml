@@ -1,0 +1,8 @@
+# Rust toolchain configuration
+# Pins the Rust version for consistent builds
+
+[toolchain]
+channel = "1.75.0"
+components = ["rustfmt", "clippy", "rust-analyzer"]
+targets = ["x86_64-apple-darwin", "aarch64-apple-darwin"]
+profile = "minimal"

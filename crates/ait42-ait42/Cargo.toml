@@ -1,0 +1,24 @@
+[package]
+name = "ait42-ait42"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "AIT42 agent system integration"
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true, features = ["process"] }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }

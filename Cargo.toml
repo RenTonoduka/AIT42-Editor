@@ -1,0 +1,104 @@
+# AIT42 Editor - Workspace Root Configuration
+# A modern TUI code editor with AI agent integration
+
+[workspace]
+members = [
+    "ait42-bin",
+    "crates/ait42-core",
+    "crates/ait42-tui",
+    "crates/ait42-lsp",
+    "crates/ait42-ait42",
+    "crates/ait42-fs",
+    "crates/ait42-config",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["AIT42 Team"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/RenTonoduka/AIT42"
+keywords = ["editor", "tui", "ai", "agent"]
+categories = ["command-line-utilities", "text-editors"]
+
+[workspace.dependencies]
+# Core async runtime
+tokio = { version = "1.35", features = ["full"] }
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-appender = "0.2"
+
+# TUI libraries
+ratatui = "0.25"
+crossterm = { version = "0.27", features = ["event-stream"] }
+tui-textarea = "0.4"
+
+# File system
+notify = "6.1"
+ignore = "0.4"
+walkdir = "2.4"
+
+# Text processing
+ropey = "1.6"
+unicode-width = "0.1"
+unicode-segmentation = "1.10"
+
+# LSP
+tower-lsp = "0.20"
+lsp-types = "0.95"
+
+# Configuration
+config = "0.14"
+directories = "5.0"
+
+# CLI
+clap = { version = "4.4", features = ["derive", "cargo", "env"] }
+
+# Internal workspace crates
+ait42-core = { path = "crates/ait42-core" }
+ait42-tui = { path = "crates/ait42-tui" }
+ait42-lsp = { path = "crates/ait42-lsp" }
+ait42-ait42 = { path = "crates/ait42-ait42" }
+ait42-fs = { path = "crates/ait42-fs" }
+ait42-config = { path = "crates/ait42-config" }
+
+# Dev dependencies
+[workspace.dev-dependencies]
+criterion = "0.5"
+
+[profile.dev]
+opt-level = 0
+debug = true
+split-debuginfo = "unpacked"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[profile.bench]
+inherits = "release"
+strip = false
+
+[profile.test]
+opt-level = 1
+
+[[bench]]
+name = "buffer_bench"
+harness = false

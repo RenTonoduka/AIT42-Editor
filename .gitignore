@@ -1,0 +1,38 @@
+# Rust
+/target
+Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Config
+.env
+.env.local
+config.local.toml
+
+# Editor session data
+.ait42-session/
+.ait42-state/
+
+# Test artifacts
+/tmp/
+/test-output/
+
+# Benchmarks
+/criterion/
+
+# MacOS
+.DS_Store
+.AppleDouble
+.LSOverride

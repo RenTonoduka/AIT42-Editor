@@ -1,0 +1,35 @@
+feat: complete system architecture design for AIT42 Editor
+
+- Add comprehensive ARCHITECTURE.md with system overview, components, data flow
+- Add detailed COMPONENT_DESIGN.md with specs for all 6 crates
+- Add CARGO_WORKSPACE.md with workspace structure and dependency management
+- Add ARCHITECTURE_SUMMARY.md as high-level overview
+- Add README.md with project overview and documentation index
+
+Architecture highlights:
+- Rust + ratatui + crossterm for native TUI performance
+- 6 workspace crates: core, tui, lsp, ait42, fs, config
+- Event-driven architecture with tokio async runtime
+- Rope-based text buffer for O(log n) operations
+- LSP integration via tower-lsp
+- AIT42 49 agents + Coordinator + Tmux session management
+
+Design patterns:
+- Command pattern for undoable operations
+- Strategy pattern for modal editing
+- Observer pattern for file watching
+- Facade pattern for LSP integration
+- Factory pattern for agent creation
+
+Performance targets:
+- Startup time: <500ms
+- LSP completion: <100ms
+- Memory (active): <200MB
+- Render: 60 FPS (16ms per frame)
+
+Status: Week 1-2 Design Phase COMPLETE
+Next: Week 3-5 Core Implementation
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
