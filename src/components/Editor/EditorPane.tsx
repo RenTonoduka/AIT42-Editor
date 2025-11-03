@@ -14,10 +14,13 @@ import React, { useRef, useCallback, useEffect } from 'react';
 import Editor, { Monaco, OnMount } from '@monaco-editor/react';
 import type { editor as MonacoEditor } from 'monaco-editor';
 import { registerCursorDarkTheme } from '@/themes/monaco-cursor-dark';
+import { useMonacoLsp } from '@/hooks/useMonacoLsp';
 
 export interface EditorPaneProps {
   /** Buffer/tab ID */
   bufferId: string;
+  /** File path (for LSP) */
+  filePath: string;
   /** Editor content */
   content: string;
   /** Language identifier */
@@ -33,6 +36,7 @@ export interface EditorPaneProps {
  */
 export const EditorPane: React.FC<EditorPaneProps> = ({
   bufferId,
+  filePath,
   content,
   language,
   onChange,
@@ -40,6 +44,17 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
 }) => {
   const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
+
+  /**
+   * LSP Integration
+   */
+  const { notifyDidSave } = useMonacoLsp({
+    monaco: monacoRef.current,
+    editor: editorRef.current,
+    filePath,
+    content,
+    language,
+  });
 
   /**
    * Handle editor mount
@@ -54,6 +69,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     // Add save keyboard shortcut (Cmd+S / Ctrl+S)
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       onSave();
+      // Notify LSP of save
+      notifyDidSave();
     });
 
     // Focus editor

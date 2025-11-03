@@ -26,6 +26,9 @@ ait42-lsp = { path = "../crates/ait42-lsp" }
 ait42-fs = { path = "../crates/ait42-fs" }
 ait42-config = { path = "../crates/ait42-config" }
 
+# LSP support
+lsp-types = "0.95"
+
 # Error handling
 anyhow = "1.0"
 thiserror = "1.0"

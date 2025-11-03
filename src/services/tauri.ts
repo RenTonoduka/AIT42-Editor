@@ -34,6 +34,50 @@ export interface TerminalInfo {
 }
 
 /**
+ * LSP diagnostic information
+ */
+export interface LspDiagnostic {
+  message: string;
+  severity: number; // 1=Error, 2=Warning, 3=Information, 4=Hint
+  startLine: number;
+  startCharacter: number;
+  endLine: number;
+  endCharacter: number;
+  code?: string;
+  source?: string;
+}
+
+/**
+ * LSP completion item
+ */
+export interface LspCompletionItem {
+  label: string;
+  kind?: number;
+  detail?: string;
+  documentation?: string;
+  insertText?: string;
+  sortText?: string;
+}
+
+/**
+ * LSP hover information
+ */
+export interface LspHoverInfo {
+  contents: string;
+}
+
+/**
+ * LSP location information
+ */
+export interface LspLocation {
+  uri: string;
+  startLine: number;
+  startCharacter: number;
+  endLine: number;
+  endCharacter: number;
+}
+
+/**
  * Type-safe Tauri command wrappers
  */
 export const tauriApi = {
@@ -209,6 +253,160 @@ export const tauriApi = {
       return info;
     } catch (error) {
       throw new Error(`Failed to get terminal info: ${error}`);
+    }
+  },
+
+  // ===== LSP Commands =====
+
+  /**
+   * Start LSP server for a specific language
+   */
+  async startLspServer(language: string): Promise<void> {
+    try {
+      await invoke('start_lsp_server', { language });
+    } catch (error) {
+      throw new Error(`Failed to start LSP server for ${language}: ${error}`);
+    }
+  },
+
+  /**
+   * Stop LSP server for a specific language
+   */
+  async stopLspServer(language: string): Promise<void> {
+    try {
+      await invoke('stop_lsp_server', { language });
+    } catch (error) {
+      throw new Error(`Failed to stop LSP server for ${language}: ${error}`);
+    }
+  },
+
+  /**
+   * Get list of running LSP servers
+   */
+  async getRunningLspServers(): Promise<string[]> {
+    try {
+      const servers = await invoke<string[]>('get_running_lsp_servers');
+      return servers;
+    } catch (error) {
+      throw new Error(`Failed to get running LSP servers: ${error}`);
+    }
+  },
+
+  /**
+   * Notify LSP server that a document was opened
+   */
+  async lspDidOpen(filePath: string, content: string, languageId: string): Promise<void> {
+    try {
+      await invoke('lsp_did_open', { filePath, content, languageId });
+    } catch (error) {
+      throw new Error(`Failed to notify LSP of file open: ${error}`);
+    }
+  },
+
+  /**
+   * Notify LSP server of document changes
+   */
+  async lspDidChange(filePath: string, content: string, version: number): Promise<void> {
+    try {
+      await invoke('lsp_did_change', { filePath, content, version });
+    } catch (error) {
+      throw new Error(`Failed to notify LSP of changes: ${error}`);
+    }
+  },
+
+  /**
+   * Notify LSP server that a document was saved
+   */
+  async lspDidSave(filePath: string, content?: string): Promise<void> {
+    try {
+      await invoke('lsp_did_save', { filePath, content });
+    } catch (error) {
+      throw new Error(`Failed to notify LSP of save: ${error}`);
+    }
+  },
+
+  /**
+   * Notify LSP server that a document was closed
+   */
+  async lspDidClose(filePath: string): Promise<void> {
+    try {
+      await invoke('lsp_did_close', { filePath });
+    } catch (error) {
+      throw new Error(`Failed to notify LSP of close: ${error}`);
+    }
+  },
+
+  /**
+   * Get completion suggestions at a specific position
+   */
+  async lspCompletion(
+    filePath: string,
+    line: number,
+    character: number
+  ): Promise<LspCompletionItem[]> {
+    try {
+      const completions = await invoke<LspCompletionItem[]>('lsp_completion', {
+        filePath,
+        line,
+        character,
+      });
+      return completions;
+    } catch (error) {
+      throw new Error(`Failed to get completions: ${error}`);
+    }
+  },
+
+  /**
+   * Get hover information at a specific position
+   */
+  async lspHover(
+    filePath: string,
+    line: number,
+    character: number
+  ): Promise<LspHoverInfo | null> {
+    try {
+      const hover = await invoke<LspHoverInfo | null>('lsp_hover', {
+        filePath,
+        line,
+        character,
+      });
+      return hover;
+    } catch (error) {
+      throw new Error(`Failed to get hover info: ${error}`);
+    }
+  },
+
+  /**
+   * Go to definition of symbol at a specific position
+   */
+  async lspGotoDefinition(
+    filePath: string,
+    line: number,
+    character: number
+  ): Promise<LspLocation[]> {
+    try {
+      const locations = await invoke<LspLocation[]>('lsp_goto_definition', {
+        filePath,
+        line,
+        character,
+      });
+      return locations;
+    } catch (error) {
+      throw new Error(`Failed to get definition: ${error}`);
+    }
+  },
+
+  /**
+   * Get diagnostics for a specific file
+   */
+  async lspDiagnostics(filePath: string): Promise<LspDiagnostic[]> {
+    try {
+      const diagnostics = await invoke<LspDiagnostic[]>('lsp_diagnostics', {
+        filePath,
+      });
+      return diagnostics;
+    } catch (error) {
+      throw new Error(`Failed to get diagnostics: ${error}`);
     }
   },
 };

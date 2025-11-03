@@ -4,6 +4,7 @@
 
 pub mod file;
 pub mod editor;
+pub mod lsp;
 
 #[cfg(feature = "terminal")]
 pub mod terminal;
@@ -11,6 +12,7 @@ pub mod terminal;
 // Re-export commands
 pub use file::*;
 pub use editor::*;
+pub use lsp::*;
 
 #[cfg(feature = "terminal")]
 pub use terminal::*;

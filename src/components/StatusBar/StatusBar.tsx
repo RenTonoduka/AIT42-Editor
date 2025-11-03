@@ -10,7 +10,9 @@
  */
 
 import React from 'react';
+import { AlertCircle, AlertTriangle } from 'lucide-react';
 import { useEditorStore } from '@/store/editorStore';
+import { useLspStore } from '@/store/lspStore';
 import { getFileIcon } from '@/utils/monaco';
 
 /**
@@ -19,6 +21,17 @@ import { getFileIcon } from '@/utils/monaco';
 export const StatusBar: React.FC = () => {
   const { getActiveTab } = useEditorStore();
   const activeTab = getActiveTab();
+
+  const {
+    getTotalErrorCount,
+    getTotalWarningCount,
+    toggleDiagnosticsPanel,
+    showDiagnosticsPanel,
+  } = useLspStore();
+
+  const errorCount = getTotalErrorCount();
+  const warningCount = getTotalWarningCount();
+  const hasProblems = errorCount > 0 || warningCount > 0;
 
   return (
     <div className="h-8 bg-[#007ACC] flex items-center justify-between px-4 text-sm text-white">
@@ -36,6 +49,30 @@ export const StatusBar: React.FC = () => {
           </>
         ) : (
           <span>Ready</span>
+        )}
+
+        {/* Diagnostics button */}
+        {hasProblems && (
+          <button
+            className={`flex items-center gap-2 px-2 py-1 rounded hover:bg-white/20 transition-colors ${
+              showDiagnosticsPanel ? 'bg-white/10' : ''
+            }`}
+            onClick={toggleDiagnosticsPanel}
+            title="Toggle Problems Panel"
+          >
+            {errorCount > 0 && (
+              <div className="flex items-center gap-1">
+                <AlertCircle size={14} />
+                <span className="text-xs">{errorCount}</span>
+              </div>
+            )}
+            {warningCount > 0 && (
+              <div className="flex items-center gap-1">
+                <AlertTriangle size={14} />
+                <span className="text-xs">{warningCount}</span>
+              </div>
+            )}
+          </button>
         )}
       </div>
 

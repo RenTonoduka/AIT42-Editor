@@ -31,6 +31,18 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::get_buffer_info,
             commands::close_buffer,
             commands::list_buffers,
+            // LSP operations
+            commands::start_lsp_server,
+            commands::stop_lsp_server,
+            commands::get_running_lsp_servers,
+            commands::lsp_did_open,
+            commands::lsp_did_change,
+            commands::lsp_did_save,
+            commands::lsp_did_close,
+            commands::lsp_completion,
+            commands::lsp_hover,
+            commands::lsp_goto_definition,
+            commands::lsp_diagnostics,
             // Terminal operations
             commands::execute_command,
             commands::get_terminal_output,
@@ -63,7 +75,19 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::get_buffer_content,
             commands::get_buffer_info,
             commands::close_buffer,
-            commands::list_buffers
+            commands::list_buffers,
+            // LSP operations
+            commands::start_lsp_server,
+            commands::stop_lsp_server,
+            commands::get_running_lsp_servers,
+            commands::lsp_did_open,
+            commands::lsp_did_change,
+            commands::lsp_did_save,
+            commands::lsp_did_close,
+            commands::lsp_completion,
+            commands::lsp_hover,
+            commands::lsp_goto_definition,
+            commands::lsp_diagnostics
         ]
     }
 }

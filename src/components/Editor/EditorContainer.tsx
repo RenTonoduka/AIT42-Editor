@@ -10,8 +10,10 @@ import { FileText } from 'lucide-react';
 import { TabBar } from './TabBar';
 import { EditorPane } from './EditorPane';
 import { Terminal } from '@/components/Terminal';
+import { DiagnosticsPanel } from '@/components/Diagnostics';
 import { useEditorStore } from '@/store/editorStore';
 import { useTerminalStore, MIN_TERMINAL_HEIGHT } from '@/store/terminalStore';
+import { useLspStore } from '@/store/lspStore';
 
 /**
  * Empty state when no files are open
@@ -70,6 +72,7 @@ export const EditorContainer: React.FC = () => {
     setResizing,
     setXTermInstance,
   } = useTerminalStore();
+  const { showDiagnosticsPanel } = useLspStore();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const isResizing = useRef(false);
@@ -135,10 +138,18 @@ export const EditorContainer: React.FC = () => {
     document.addEventListener('mouseup', handleMouseUp);
   }, [setTerminalHeight, setResizing]);
 
+  // Calculate diagnostics panel height
+  const diagnosticsPanelHeight = 200; // Fixed height for diagnostics panel
+
   // Calculate editor height
-  const editorHeight = isTerminalVisible
-    ? `calc(100% - ${terminalHeight}px - 1px)` // -1px for resize handle
-    : '100%';
+  let editorHeight = '100%';
+  if (isTerminalVisible && showDiagnosticsPanel) {
+    editorHeight = `calc(100% - ${terminalHeight}px - ${diagnosticsPanelHeight}px - 2px)`; // -2px for resize handles
+  } else if (isTerminalVisible) {
+    editorHeight = `calc(100% - ${terminalHeight}px - 1px)`; // -1px for resize handle
+  } else if (showDiagnosticsPanel) {
+    editorHeight = `calc(100% - ${diagnosticsPanelHeight}px - 1px)`; // -1px for resize handle
+  }
 
   return (
     <div ref={containerRef} className="flex flex-col h-full">
@@ -151,6 +162,7 @@ export const EditorContainer: React.FC = () => {
           <EditorPane
             key={activeTab.id}
             bufferId={activeTab.id}
+            filePath={activeTab.path}
             content={activeTab.content}
             language={activeTab.language}
             onChange={handleContentChange}
@@ -160,6 +172,16 @@ export const EditorContainer: React.FC = () => {
           <EmptyState />
         )}
       </div>
+
+      {/* Diagnostics Panel section */}
+      {showDiagnosticsPanel && (
+        <>
+          <div className="h-1 bg-[#2D2D30]" />
+          <div style={{ height: diagnosticsPanelHeight }}>
+            <DiagnosticsPanel />
+          </div>
+        </>
+      )}
 
       {/* Terminal section */}
       {isTerminalVisible && (

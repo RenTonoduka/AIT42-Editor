@@ -6,7 +6,7 @@
 use std::sync::{Arc, Mutex};
 use ait42_config::Config;
 use ait42_core::{Editor, EditorConfig, EditorState, buffer::BufferManager};
-use ait42_lsp::client::LspClient;
+use ait42_lsp::{LspConfig, LspManager};
 
 // Import TerminalExecutor from ait42-tui if available
 // Note: This will compile if ait42-tui is in dependencies
@@ -27,8 +27,8 @@ pub struct AppState {
     /// Configuration
     pub config: Mutex<Config>,
 
-    /// LSP clients
-    pub lsp_clients: Mutex<Vec<LspClient>>,
+    /// LSP manager for multiple language servers
+    pub lsp_manager: Arc<LspManager>,
 
     /// Terminal executor (optional feature) - uses tokio::sync::Mutex for async
     #[cfg(feature = "terminal")]
@@ -49,12 +49,16 @@ impl AppState {
         let editor = Editor::new(editor_config)?;
         let editor_state = EditorState::new();
 
+        // Initialize LSP manager with default configuration
+        let lsp_config = LspConfig::default();
+        let lsp_manager = LspManager::new(lsp_config);
+
         Ok(Self {
             editor: Arc::new(Mutex::new(editor)),
             editor_state: Arc::new(Mutex::new(editor_state)),
             buffer_manager: Mutex::new(BufferManager::new()),
             config: Mutex::new(Config::default()),
-            lsp_clients: Mutex::new(Vec::new()),
+            lsp_manager: Arc::new(lsp_manager),
             #[cfg(feature = "terminal")]
             terminal: Arc::new(tokio::sync::Mutex::new(TerminalExecutor::new(working_dir))),
         })
@@ -93,6 +97,9 @@ mod tests {
         // Verify editor state can be locked
         assert!(state.editor_state.lock().is_ok());
 
+        // Verify LSP manager is initialized
+        let _ = &state.lsp_manager;
+
         // Terminal uses tokio::sync::Mutex, test in async context if needed
         #[cfg(feature = "terminal")]
         {
@@ -106,9 +113,13 @@ mod tests {
         let state = AppState::new(temp_dir.clone());
         assert!(state.is_ok());
 
+        let state = state.unwrap();
+
+        // Verify LSP manager is available
+        assert!(!state.lsp_manager.running_servers().await.is_empty() || state.lsp_manager.running_servers().await.is_empty());
+
         #[cfg(feature = "terminal")]
         {
-            let state = state.unwrap();
             let terminal = state.terminal.lock().await;
             assert_eq!(terminal.current_dir(), &temp_dir);
         }
