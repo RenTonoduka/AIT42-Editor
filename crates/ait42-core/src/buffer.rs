@@ -394,6 +394,20 @@ impl BufferManager {
         id
     }
 
+    /// Add an existing buffer to the manager
+    ///
+    /// Returns the buffer ID.
+    pub fn add_buffer(&mut self, buffer: Buffer) -> BufferId {
+        let id = buffer.id();
+        self.buffers.push(buffer);
+
+        if self.active_buffer.is_none() {
+            self.active_buffer = Some(id);
+        }
+
+        id
+    }
+
     /// Open file as buffer
     ///
     /// If the file is already open, returns existing buffer ID.

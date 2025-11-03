@@ -215,8 +215,8 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
 
-    #[test]
-    fn test_language_detection() {
+    #[tokio::test]
+    async fn test_language_detection() {
         let config = LspConfig::default();
         let manager = LspManager::new(config);
 

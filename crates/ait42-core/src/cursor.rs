@@ -191,7 +191,9 @@ impl Cursor {
     pub fn move_to_line_end(&mut self, buffer: &Buffer) {
         let (line, _) = buffer.pos_to_line_col(self.position);
         if let Some(line_text) = buffer.line(line) {
-            let line_len = line_text.graphemes(true).count();
+            // Strip trailing newline before counting characters
+            let text_without_newline = line_text.trim_end_matches(&['\n', '\r'][..]);
+            let line_len = text_without_newline.graphemes(true).count();
             if let Some(pos) = buffer.line_col_to_pos(line, line_len) {
                 self.position = pos;
                 self.preferred_col = None;

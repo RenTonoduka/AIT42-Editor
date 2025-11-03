@@ -118,7 +118,9 @@ impl EditorState {
     /// Initializes cursor, selection, history, and view for the buffer.
     pub fn open_buffer(&mut self, buffer: Buffer) -> BufferId {
         let id = buffer.id();
-        self.buffer_manager.open_file(buffer.path().unwrap()).ok();
+
+        // Add buffer to buffer manager
+        self.buffer_manager.add_buffer(buffer);
 
         // Initialize state for new buffer
         self.cursors.insert(id, CursorSet::new(0));

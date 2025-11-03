@@ -380,6 +380,9 @@ mod tests {
         let config = EditorConfig::default();
         let mut state = EditorState::new(config).unwrap();
 
+        // Add some content to the buffer
+        state.buffer.insert(0, "Line 1\nLine 2\nLine 3").unwrap();
+
         let initial_pos = state.cursor.position(&state.buffer);
         assert_eq!(initial_pos.line, 0);
         assert_eq!(initial_pos.col, 0);
