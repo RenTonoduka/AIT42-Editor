@@ -4,6 +4,7 @@
 use tracing::info;
 
 mod commands;
+mod plugin;
 mod state;
 
 use state::AppState;
@@ -54,6 +55,13 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::git_branches,
             commands::git_checkout,
             commands::git_create_branch,
+            // Plugin operations
+            commands::list_plugins,
+            commands::get_plugin,
+            commands::enable_plugin,
+            commands::disable_plugin,
+            commands::install_plugin,
+            commands::uninstall_plugin,
             // Terminal operations
             commands::execute_command,
             commands::get_terminal_output,
@@ -109,7 +117,14 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::git_log,
             commands::git_branches,
             commands::git_checkout,
-            commands::git_create_branch
+            commands::git_create_branch,
+            // Plugin operations
+            commands::list_plugins,
+            commands::get_plugin,
+            commands::enable_plugin,
+            commands::disable_plugin,
+            commands::install_plugin,
+            commands::uninstall_plugin
         ]
     }
 }

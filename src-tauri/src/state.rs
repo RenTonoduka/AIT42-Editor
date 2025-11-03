@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 use ait42_config::Config;
 use ait42_core::{Editor, EditorConfig, EditorState, buffer::BufferManager};
 use ait42_lsp::{LspConfig, LspManager};
+use crate::plugin::PluginManager;
 
 // Import TerminalExecutor from ait42-tui if available
 // Note: This will compile if ait42-tui is in dependencies
@@ -29,6 +30,9 @@ pub struct AppState {
 
     /// LSP manager for multiple language servers
     pub lsp_manager: Arc<LspManager>,
+
+    /// Plugin manager for extensibility
+    pub plugin_manager: Arc<Mutex<PluginManager>>,
 
     /// Terminal executor (optional feature) - uses tokio::sync::Mutex for async
     #[cfg(feature = "terminal")]
@@ -53,12 +57,21 @@ impl AppState {
         let lsp_config = LspConfig::default();
         let lsp_manager = LspManager::new(lsp_config);
 
+        // Initialize plugin manager
+        let plugins_dir = std::env::current_dir()
+            .unwrap_or_else(|_| std::path::PathBuf::from("."))
+            .join("plugins");
+        let mut plugin_manager = PluginManager::new(plugins_dir);
+        plugin_manager.initialize()
+            .unwrap_or_else(|e| eprintln!("Failed to initialize plugin manager: {}", e));
+
         Ok(Self {
             editor: Arc::new(Mutex::new(editor)),
             editor_state: Arc::new(Mutex::new(editor_state)),
             buffer_manager: Mutex::new(BufferManager::new()),
             config: Mutex::new(Config::default()),
             lsp_manager: Arc::new(lsp_manager),
+            plugin_manager: Arc::new(Mutex::new(plugin_manager)),
             #[cfg(feature = "terminal")]
             terminal: Arc::new(tokio::sync::Mutex::new(TerminalExecutor::new(working_dir))),
         })
