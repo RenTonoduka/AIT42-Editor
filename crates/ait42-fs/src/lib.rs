@@ -2,6 +2,17 @@
 //!
 //! Provides file system operations with async support and file watching.
 
+pub mod directory;
+pub mod file;
+pub mod sync;
+pub mod watcher;
+
+// Re-exports
+pub use directory::{list_directory, find_files, DirectoryListing};
+pub use file::{FileHandle, FileMetadata};
+pub use sync::FileSynchronizer;
+pub use watcher::{FileEvent, FileWatcher};
+
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -17,6 +28,12 @@ pub enum FsError {
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("Watch error: {0}")]
+    WatchError(String),
+
+    #[error("Invalid path: {0}")]
+    InvalidPath(String),
 }
 
 pub type Result<T> = std::result::Result<T, FsError>;
@@ -74,5 +91,20 @@ mod tests {
     async fn test_read_current_dir() {
         let result = read_dir(".").await;
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_file_node() {
+        let node = FileNode {
+            name: "test.txt".to_string(),
+            path: PathBuf::from("/tmp/test.txt"),
+            is_dir: false,
+            is_hidden: false,
+            size: 100,
+            children: None,
+        };
+
+        assert!(!node.is_dir);
+        assert_eq!(node.name, "test.txt");
     }
 }

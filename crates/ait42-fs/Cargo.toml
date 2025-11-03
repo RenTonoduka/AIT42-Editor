@@ -26,3 +26,10 @@ thiserror = { workspace = true }
 
 # Logging
 tracing = { workspace = true }
+
+# Additional dependencies
+glob = "0.3"
+
+[dev-dependencies]
+tempfile = "3.8"
+tokio-test = "0.4"

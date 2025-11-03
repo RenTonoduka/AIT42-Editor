@@ -3,8 +3,18 @@
 //! Language Server Protocol integration for intelligent code completion,
 //! diagnostics, and other language features.
 
+pub mod client;
+pub mod config;
+pub mod manager;
+pub mod position;
+
+// Re-exports
+pub use client::{LspClient, LspClientBuilder};
+pub use config::{LspConfig, LspServerConfig};
+pub use manager::LspManager;
+pub use position::{buffer_pos_to_lsp, lsp_pos_to_buffer};
+
 use lsp_types::*;
-use std::collections::HashMap;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -17,50 +27,35 @@ pub enum LspError {
 
     #[error("Initialization failed: {0}")]
     InitializationFailed(String),
+
+    #[error("Server process error: {0}")]
+    ProcessError(String),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(#[from] serde_json::Error),
+
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("Server not initialized")]
+    NotInitialized,
+
+    #[error("Invalid response: {0}")]
+    InvalidResponse(String),
 }
 
 pub type Result<T> = std::result::Result<T, LspError>;
 
-/// LSP client manager
-pub struct LspManager {
-    servers: HashMap<String, ServerInfo>,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[derive(Debug)]
-struct ServerInfo {
-    language_id: String,
-    server_path: String,
-    initialized: bool,
-}
+    #[test]
+    fn test_error_types() {
+        let err = LspError::ServerNotAvailable("rust".to_string());
+        assert!(err.to_string().contains("rust"));
 
-impl LspManager {
-    pub fn new() -> Self {
-        Self {
-            servers: HashMap::new(),
-        }
-    }
-
-    /// Start LSP server for a language
-    pub async fn start_server(&mut self, language_id: impl Into<String>) -> Result<()> {
-        // TODO: Implement LSP server initialization
-        Ok(())
-    }
-
-    /// Get completion suggestions
-    pub async fn get_completions(&self, _uri: &str, _position: Position) -> Result<Vec<CompletionItem>> {
-        // TODO: Implement completion requests
-        Ok(Vec::new())
-    }
-
-    /// Get diagnostics
-    pub async fn get_diagnostics(&self, _uri: &str) -> Result<Vec<Diagnostic>> {
-        // TODO: Implement diagnostics
-        Ok(Vec::new())
-    }
-}
-
-impl Default for LspManager {
-    fn default() -> Self {
-        Self::new()
+        let err = LspError::NotInitialized;
+        assert!(err.to_string().contains("not initialized"));
     }
 }
