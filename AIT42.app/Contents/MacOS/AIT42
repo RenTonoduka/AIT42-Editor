@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# AIT42 Editor Launcher for macOS
+# Opens Terminal.app and launches the TUI editor
+
+# Get the directory where this app bundle is located
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+BINARY_PATH="$APP_DIR/../target/release/ait42"
+
+# Check if binary exists
+if [ ! -f "$BINARY_PATH" ]; then
+    osascript -e 'display alert "AIT42 Error" message "Binary not found at: '"$BINARY_PATH"'" as critical'
+    exit 1
+fi
+
+# Get the file/directory path if provided via "Open With"
+TARGET_PATH="$1"
+
+# Create AppleScript to open Terminal and run ait42
+if [ -n "$TARGET_PATH" ]; then
+    # Open with specific file/directory
+    osascript <<EOF
+tell application "Terminal"
+    activate
+    do script "cd '$APP_DIR/..' && '$BINARY_PATH' '$TARGET_PATH'"
+end tell
+EOF
+else
+    # Open in current directory
+    osascript <<EOF
+tell application "Terminal"
+    activate
+    do script "cd '$APP_DIR/..' && '$BINARY_PATH'"
+end tell
+EOF
+fi

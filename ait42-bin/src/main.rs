@@ -149,6 +149,38 @@ fn resolve_target_path(path: Option<PathBuf>) -> Result<PathBuf> {
         .canonicalize()
         .with_context(|| format!("Path does not exist: {}", target.display()))?;
 
+    // If it's a directory, try to find a suitable file to open
+    if canonical.is_dir() {
+        info!("Target is a directory, looking for a file to open...");
+
+        // Try common project files
+        let candidates = [
+            "README.md",
+            "Cargo.toml",
+            "package.json",
+            "main.rs",
+            "src/main.rs",
+            "src/lib.rs",
+        ];
+
+        for candidate in &candidates {
+            let file_path = canonical.join(candidate);
+            if file_path.exists() && file_path.is_file() {
+                info!("Opening file: {}", file_path.display());
+                return Ok(file_path);
+            }
+        }
+
+        // If no suitable file found, return error message
+        anyhow::bail!(
+            "Target is a directory. Please specify a file to open.\n\
+             Directory: {}\n\
+             \n\
+             Usage: ait42 <file>",
+            canonical.display()
+        );
+    }
+
     Ok(canonical)
 }
 
