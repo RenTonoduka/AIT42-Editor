@@ -4,11 +4,13 @@ import { Sidebar } from './components/Sidebar/Sidebar';
 import { EditorContainer } from '@/components/Editor';
 import { StatusBar } from '@/components/StatusBar';
 import { useEditorStore } from '@/store/editorStore';
+import { useSettingsStore } from '@/store/settingsStore';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 
 function App() {
   const [activePanel, setActivePanel] = useState<'editor' | 'terminal' | 'settings'>('editor');
   const { addTab } = useEditorStore();
+  const { toggleSettingsPanel } = useSettingsStore();
 
   const handleFileOpen = async (path: string) => {
     try {
@@ -53,7 +55,10 @@ function App() {
           <Terminal size={24} />
         </button>
         <button
-          onClick={() => setActivePanel('settings')}
+          onClick={() => {
+            setActivePanel('settings');
+            toggleSettingsPanel();
+          }}
           className={`p-3 rounded-lg transition-colors ${
             activePanel === 'settings'
               ? 'bg-primary-600 text-white'
@@ -71,7 +76,7 @@ function App() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col">
         {/* Editor Container with Tab Bar and Editor */}
-        <EditorContainer />
+        <EditorContainer onFileOpen={handleFileOpen} />
 
         {/* Status Bar */}
         <StatusBar />

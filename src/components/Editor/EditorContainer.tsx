@@ -16,11 +16,54 @@ import { useEditorStore } from '@/store/editorStore';
 import { useTerminalStore, MIN_TERMINAL_HEIGHT } from '@/store/terminalStore';
 import { useLspStore } from '@/store/lspStore';
 import { useGitStore } from '@/store/gitStore';
+import { open } from '@tauri-apps/api/dialog';
+
+interface EmptyStateProps {
+  onFileOpen?: (path: string) => void;
+}
 
 /**
  * Empty state when no files are open
  */
-const EmptyState: React.FC = () => {
+const EmptyState: React.FC<EmptyStateProps> = ({ onFileOpen }) => {
+  const handleOpenFile = async () => {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [
+          {
+            name: 'All Files',
+            extensions: ['*']
+          }
+        ]
+      });
+
+      if (selected && typeof selected === 'string' && onFileOpen) {
+        await onFileOpen(selected);
+      }
+    } catch (error) {
+      console.error('Failed to open file:', error);
+    }
+  };
+
+  const handleNewFile = () => {
+    // Create a new untitled file
+    const timestamp = Date.now();
+    const newTab = {
+      id: `untitled-${timestamp}`,
+      path: `Untitled-${timestamp}`,
+      name: 'Untitled',
+      content: '',
+      language: 'plaintext',
+      isDirty: false,
+      isActive: true,
+    };
+
+    useEditorStore.setState((state) => ({
+      tabs: [...state.tabs.map(t => ({ ...t, isActive: false })), newTab],
+      activeTabId: newTab.id,
+    }));
+  };
   return (
     <div className="flex items-center justify-center h-full bg-[#1E1E1E] text-[#CCCCCC]">
       <div className="text-center space-y-4">
@@ -31,12 +74,14 @@ const EmptyState: React.FC = () => {
         </p>
         <div className="flex gap-4 justify-center mt-6">
           <button
+            onClick={handleOpenFile}
             className="px-4 py-2 bg-[#007ACC] hover:bg-[#148EE0] text-white rounded transition-colors"
             title="Open file (Cmd+O)"
           >
             Open File
           </button>
           <button
+            onClick={handleNewFile}
             className="px-4 py-2 bg-[#3E3E42] hover:bg-[#505050] text-white rounded transition-colors"
             title="New file (Cmd+N)"
           >
@@ -62,10 +107,14 @@ const ResizeHandle: React.FC<{
   );
 };
 
+interface EditorContainerProps {
+  onFileOpen?: (path: string) => void;
+}
+
 /**
  * EditorContainer - Main editor UI
  */
-export const EditorContainer: React.FC = () => {
+export const EditorContainer: React.FC<EditorContainerProps> = ({ onFileOpen }) => {
   const { tabs, activeTabId, updateTabContent, saveTab } = useEditorStore();
   const {
     isVisible: isTerminalVisible,
@@ -185,7 +234,7 @@ export const EditorContainer: React.FC = () => {
             onSave={handleSave}
           />
         ) : (
-          <EmptyState />
+          <EmptyState onFileOpen={onFileOpen} />
         )}
       </div>
 
