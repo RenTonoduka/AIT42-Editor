@@ -26,3 +26,50 @@ code {
   height: 100vh;
   overflow: hidden;
 }
+
+/* Custom scrollbar styling (Cursor theme) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(121, 121, 121, 0.4);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 100, 100, 0.7);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: rgba(191, 191, 191, 0.4);
+}
+
+/* Thin scrollbar utility class */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(121, 121, 121, 0.4) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(121, 121, 121, 0.4);
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 100, 100, 0.7);
+}
+
+/* Scrollbar track utility */
+.scrollbar-track-transparent::-webkit-scrollbar-track {
+  background: transparent;
+}

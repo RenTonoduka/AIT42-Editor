@@ -1,17 +1,11 @@
-//! Tauri Command Handlers
+//! Tauri Command Modules
 //!
-//! This module contains all Tauri command handlers that bridge
-//! the frontend (TypeScript/React) with the Rust backend.
+//! This module contains all Tauri commands organized by functionality.
 
-pub mod editor;
 pub mod file;
 
-#[cfg(feature = "terminal")]
-pub mod terminal;
-
-// Re-export all commands for easy registration
-pub use editor::*;
+// Re-export commands
 pub use file::*;
 
-#[cfg(feature = "terminal")]
-pub use terminal::*;
+#[cfg(test)]
+mod file_tests;

@@ -30,9 +30,9 @@ pub struct AppState {
     /// LSP clients
     pub lsp_clients: Mutex<Vec<LspClient>>,
 
-    /// Terminal executor (optional feature)
+    /// Terminal executor (optional feature) - uses tokio::sync::Mutex for async
     #[cfg(feature = "terminal")]
-    pub terminal: Arc<Mutex<TerminalExecutor>>,
+    pub terminal: Arc<tokio::sync::Mutex<TerminalExecutor>>,
 }
 
 impl AppState {
@@ -56,7 +56,7 @@ impl AppState {
             config: Mutex::new(Config::default()),
             lsp_clients: Mutex::new(Vec::new()),
             #[cfg(feature = "terminal")]
-            terminal: Arc::new(Mutex::new(TerminalExecutor::new(working_dir))),
+            terminal: Arc::new(tokio::sync::Mutex::new(TerminalExecutor::new(working_dir))),
         })
     }
 
@@ -93,13 +93,15 @@ mod tests {
         // Verify editor state can be locked
         assert!(state.editor_state.lock().is_ok());
 
-        // Verify terminal can be locked
+        // Terminal uses tokio::sync::Mutex, test in async context if needed
         #[cfg(feature = "terminal")]
-        assert!(state.terminal.lock().is_ok());
+        {
+            let _ = &state.terminal;
+        }
     }
 
-    #[test]
-    fn test_app_state_with_custom_dir() {
+    #[tokio::test]
+    async fn test_app_state_with_custom_dir() {
         let temp_dir = std::env::temp_dir();
         let state = AppState::new(temp_dir.clone());
         assert!(state.is_ok());
@@ -107,7 +109,7 @@ mod tests {
         #[cfg(feature = "terminal")]
         {
             let state = state.unwrap();
-            let terminal = state.terminal.lock().unwrap();
+            let terminal = state.terminal.lock().await;
             assert_eq!(terminal.current_dir(), &temp_dir);
         }
     }

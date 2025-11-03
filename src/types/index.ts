@@ -43,5 +43,15 @@ export interface EditorConfig {
   tabSize: number;
   insertSpaces: boolean;
   wordWrap: boolean;
-  theme: 'vs-dark' | 'vs-light';
+  theme: 'vs-dark' | 'vs-light' | 'cursor-dark';
+}
+
+export interface EditorTab {
+  id: string;
+  path: string;
+  name: string;
+  content: string;
+  language: string;
+  isDirty: boolean;
+  isActive: boolean;
 }

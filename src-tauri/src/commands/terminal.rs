@@ -23,33 +23,20 @@ pub async fn execute_command(
     command: String,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    // Execute command - need to drop lock before await
-    {
-        let mut terminal = state
-            .terminal
-            .lock()
-            .map_err(|e| format!("Failed to lock terminal: {}", e))?;
+    // Lock, execute (async), then get output
+    let mut terminal = state.terminal.lock().await;
 
-        terminal
-            .execute(&command)
-            .await
-            .map_err(|e| format!("Failed to execute command: {}", e))?;
-    }
+    terminal
+        .execute(&command)
+        .await
+        .map_err(|e| format!("Failed to execute command: {}", e))?;
 
-    // Get output in separate scope
-    let output = {
-        let terminal = state
-            .terminal
-            .lock()
-            .map_err(|e| format!("Failed to lock terminal: {}", e))?;
-
-        terminal
-            .get_output()
-            .iter()
-            .cloned()
-            .collect::<Vec<String>>()
-            .join("\n")
-    };
+    let output = terminal
+        .get_output()
+        .iter()
+        .cloned()
+        .collect::<Vec<String>>()
+        .join("\n");
 
     Ok(output)
 }
@@ -66,10 +53,7 @@ pub async fn execute_command(
 /// * `Err(message)` - Error message
 #[tauri::command]
 pub async fn get_terminal_output(state: State<'_, AppState>) -> Result<Vec<String>, String> {
-    let terminal = state
-        .terminal
-        .lock()
-        .map_err(|e| format!("Failed to lock terminal: {}", e))?;
+    let terminal = state.terminal.lock().await;
 
     Ok(terminal.get_output().to_vec())
 }
@@ -88,10 +72,7 @@ pub async fn get_terminal_tail(
     lines: usize,
     state: State<'_, AppState>,
 ) -> Result<Vec<String>, String> {
-    let terminal = state
-        .terminal
-        .lock()
-        .map_err(|e| format!("Failed to lock terminal: {}", e))?;
+    let terminal = state.terminal.lock().await;
 
     Ok(terminal.get_output_tail(lines).to_vec())
 }
@@ -106,10 +87,7 @@ pub async fn get_terminal_tail(
 /// * `Err(message)` - Error message
 #[tauri::command]
 pub async fn clear_terminal(state: State<'_, AppState>) -> Result<(), String> {
-    let mut terminal = state
-        .terminal
-        .lock()
-        .map_err(|e| format!("Failed to lock terminal: {}", e))?;
+    let mut terminal = state.terminal.lock().await;
 
     terminal.clear();
 
@@ -126,10 +104,7 @@ pub async fn clear_terminal(state: State<'_, AppState>) -> Result<(), String> {
 /// * `Err(message)` - Error message
 #[tauri::command]
 pub async fn get_current_directory(state: State<'_, AppState>) -> Result<String, String> {
-    let terminal = state
-        .terminal
-        .lock()
-        .map_err(|e| format!("Failed to lock terminal: {}", e))?;
+    let terminal = state.terminal.lock().await;
 
     Ok(terminal.current_dir().to_string_lossy().to_string())
 }
@@ -148,10 +123,7 @@ pub async fn set_current_directory(
     path: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let mut terminal = state
-        .terminal
-        .lock()
-        .map_err(|e| format!("Failed to lock terminal: {}", e))?;
+    let mut terminal = state.terminal.lock().await;
 
     let path_buf = std::path::PathBuf::from(&path);
 
@@ -174,10 +146,7 @@ pub async fn set_current_directory(
 /// * `Err(message)` - Error message
 #[tauri::command]
 pub async fn get_command_history(state: State<'_, AppState>) -> Result<Vec<String>, String> {
-    let terminal = state
-        .terminal
-        .lock()
-        .map_err(|e| format!("Failed to lock terminal: {}", e))?;
+    let terminal = state.terminal.lock().await;
 
     // Reverse to get most recent first
     let history: Vec<String> = terminal
@@ -200,10 +169,7 @@ pub async fn get_command_history(state: State<'_, AppState>) -> Result<Vec<Strin
 /// * `Err(message)` - Error message
 #[tauri::command]
 pub async fn get_terminal_info(state: State<'_, AppState>) -> Result<TerminalInfo, String> {
-    let terminal = state
-        .terminal
-        .lock()
-        .map_err(|e| format!("Failed to lock terminal: {}", e))?;
+    let terminal = state.terminal.lock().await;
 
     Ok(TerminalInfo {
         current_dir: terminal.current_dir().to_string_lossy().to_string(),
@@ -230,15 +196,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     fn create_test_state() -> AppState {
-        let editor = Editor::new(EditorConfig::default()).unwrap();
-        let editor_state = EditorState::new();
-        let terminal = TerminalExecutor::new(std::env::current_dir().unwrap());
-
-        AppState {
-            editor: Arc::new(Mutex::new(editor)),
-            editor_state: Arc::new(Mutex::new(editor_state)),
-            terminal: Arc::new(Mutex::new(terminal)),
-        }
+        AppState::default_with_dir().unwrap()
     }
 
     #[tokio::test]
