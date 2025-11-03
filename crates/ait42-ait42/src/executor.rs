@@ -181,8 +181,6 @@ impl Coordinator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::AIT42Config;
-    use std::path::PathBuf;
 
     #[test]
     fn test_execution_mode() {

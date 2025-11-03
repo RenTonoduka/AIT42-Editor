@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use tracing::{debug, info, warn};
 
 /// Agent category classification
@@ -23,22 +24,23 @@ pub enum AgentCategory {
     Meta,
 }
 
-impl AgentCategory {
-    /// Parse category from string
-    pub fn from_str(s: &str) -> Option<Self> {
+impl FromStr for AgentCategory {
+    type Err = String;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "backend" => Some(Self::Backend),
-            "frontend" => Some(Self::Frontend),
-            "testing" | "qa" => Some(Self::Testing),
-            "documentation" | "docs" => Some(Self::Documentation),
-            "security" => Some(Self::Security),
-            "infrastructure" | "infra" => Some(Self::Infrastructure),
-            "coordination" => Some(Self::Coordination),
-            "planning" | "design" => Some(Self::Planning),
-            "quality_assurance" | "qualityassurance" => Some(Self::QualityAssurance),
-            "operations" | "ops" => Some(Self::Operations),
-            "meta" => Some(Self::Meta),
-            _ => None,
+            "backend" => Ok(Self::Backend),
+            "frontend" => Ok(Self::Frontend),
+            "testing" | "qa" => Ok(Self::Testing),
+            "documentation" | "docs" => Ok(Self::Documentation),
+            "security" => Ok(Self::Security),
+            "infrastructure" | "infra" => Ok(Self::Infrastructure),
+            "coordination" => Ok(Self::Coordination),
+            "planning" | "design" => Ok(Self::Planning),
+            "quality_assurance" | "qualityassurance" => Ok(Self::QualityAssurance),
+            "operations" | "ops" => Ok(Self::Operations),
+            "meta" => Ok(Self::Meta),
+            _ => Err(format!("Unknown agent category: {}", s)),
         }
     }
 }
@@ -348,10 +350,10 @@ mod tests {
 
     #[test]
     fn test_agent_category_from_str() {
-        assert_eq!(AgentCategory::from_str("backend"), Some(AgentCategory::Backend));
-        assert_eq!(AgentCategory::from_str("Backend"), Some(AgentCategory::Backend));
-        assert_eq!(AgentCategory::from_str("qa"), Some(AgentCategory::Testing));
-        assert_eq!(AgentCategory::from_str("invalid"), None);
+        assert_eq!(AgentCategory::from_str("backend"), Ok(AgentCategory::Backend));
+        assert_eq!(AgentCategory::from_str("Backend"), Ok(AgentCategory::Backend));
+        assert_eq!(AgentCategory::from_str("qa"), Ok(AgentCategory::Testing));
+        assert!(AgentCategory::from_str("invalid").is_err());
     }
 
     #[test]

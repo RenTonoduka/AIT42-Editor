@@ -183,7 +183,7 @@ impl ConfigLoader {
     pub async fn restore_backup(&self) -> Result<()> {
         let backup_path = self.config_path.with_extension("toml.bak");
 
-        if !fs::metadata(&backup_path).await.is_ok() {
+        if fs::metadata(&backup_path).await.is_err() {
             return Err(ConfigError::NotFound(backup_path));
         }
 

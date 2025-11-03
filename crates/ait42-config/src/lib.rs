@@ -15,8 +15,7 @@ pub use schema::{
 };
 pub use watch::ConfigWatcher;
 
-use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

@@ -14,7 +14,6 @@ pub use config::{LspConfig, LspServerConfig};
 pub use manager::LspManager;
 pub use position::{buffer_pos_to_lsp, lsp_pos_to_buffer};
 
-use lsp_types::*;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

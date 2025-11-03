@@ -30,7 +30,7 @@ pub struct TmuxSession {
 #[derive(Debug)]
 pub struct TmuxManager {
     script_path: PathBuf,
-    parallel_script_path: PathBuf,
+    _parallel_script_path: PathBuf, // Reserved for future parallel execution support
     ait42_root: PathBuf,
 }
 
@@ -42,7 +42,7 @@ impl TmuxManager {
 
         Self {
             script_path,
-            parallel_script_path,
+            _parallel_script_path: parallel_script_path,
             ait42_root: ait42_root.to_path_buf(),
         }
     }
@@ -263,8 +263,8 @@ impl TmuxManager {
         // Parse agent name from session ID: ait42-{agent}-{timestamp}
         let agent_name = session_id
             .strip_prefix("ait42-")?
-            .rsplitn(2, '-')
-            .nth(1)?
+            .rsplit_once('-')?
+            .0
             .to_string();
 
         // Parse timestamp
@@ -329,11 +329,10 @@ impl TmuxManager {
         for session in sessions {
             if session.status != SessionStatus::Running {
                 if let Ok(age) = now.duration_since(session.start_time) {
-                    if age > max_age {
-                        if self.kill_session(&session.id).await.is_ok() {
+                    if age > max_age
+                        && self.kill_session(&session.id).await.is_ok() {
                             cleaned += 1;
                         }
-                    }
                 }
             }
         }

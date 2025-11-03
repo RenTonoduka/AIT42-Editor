@@ -121,7 +121,7 @@ pub async fn find_files(root: &Path, pattern: &str) -> Result<Vec<PathBuf>> {
         Ok::<Vec<PathBuf>, FsError>(matches)
     })
     .await
-    .map_err(|e| FsError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))??;
+    .map_err(|e| FsError::Io(std::io::Error::other(e)))??;
 
     Ok(result)
 }
@@ -235,12 +235,10 @@ pub async fn directory_size(path: &Path) -> Result<u64> {
     tokio::task::spawn_blocking(move || {
         let mut total = 0u64;
 
-        for entry in WalkDir::new(&path) {
-            if let Ok(entry) = entry {
-                if let Ok(metadata) = entry.metadata() {
-                    if metadata.is_file() {
-                        total += metadata.len();
-                    }
+        for entry in WalkDir::new(&path).into_iter().flatten() {
+            if let Ok(metadata) = entry.metadata() {
+                if metadata.is_file() {
+                    total += metadata.len();
                 }
             }
         }
@@ -248,7 +246,7 @@ pub async fn directory_size(path: &Path) -> Result<u64> {
         Ok(total)
     })
     .await
-    .map_err(|e| FsError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?
+    .map_err(|e| FsError::Io(std::io::Error::other(e)))?
 }
 
 #[cfg(test)]

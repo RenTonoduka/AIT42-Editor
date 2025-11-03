@@ -3,7 +3,6 @@
 //! Manages multiple LSP clients for different programming languages.
 
 use crate::{LspClient, LspClientBuilder, LspConfig, LspError, Result};
-use lsp_types::*;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;

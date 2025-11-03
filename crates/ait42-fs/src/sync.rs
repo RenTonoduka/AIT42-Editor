@@ -6,7 +6,7 @@ use crate::{FileEvent, FileHandle, FileWatcher, FsError, Result};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use tokio::time::{interval, Duration, Interval};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// File synchronizer
 ///

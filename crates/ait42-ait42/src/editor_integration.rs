@@ -130,7 +130,7 @@ impl EditorAgentBridge {
             .iter()
             .skip(selection.start_line.saturating_sub(1))
             .take(selection.end_line - selection.start_line + 1)
-            .map(|&s| s)
+            .copied()
             .collect::<Vec<_>>()
             .join("\n")
     }

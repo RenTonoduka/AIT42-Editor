@@ -70,7 +70,7 @@ impl AIT42Config {
         let ait42_root = std::env::var("AIT42_ROOT")
             .ok()
             .map(PathBuf::from)
-            .or_else(|| Self::detect_ait42_root())
+            .or_else(Self::detect_ait42_root)
             .ok_or_else(|| {
                 AIT42Error::ConfigError(
                     "AIT42_ROOT not set and could not detect AIT42 installation".to_string(),
@@ -155,13 +155,7 @@ impl AIT42Config {
             PathBuf::from("/opt/ait42"),
         ];
 
-        for candidate in candidates {
-            if candidate.join(".claude/agents").exists() {
-                return Some(candidate);
-            }
-        }
-
-        None
+        candidates.into_iter().find(|candidate| candidate.join(".claude/agents").exists())
     }
 
     /// Get timeout as Duration

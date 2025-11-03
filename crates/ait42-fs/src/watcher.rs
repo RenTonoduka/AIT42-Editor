@@ -57,7 +57,7 @@ impl FileEvent {
 pub struct FileWatcher {
     _watcher: Arc<RecommendedWatcher>,
     rx: mpsc::Receiver<FileEvent>,
-    tx: mpsc::Sender<FileEvent>,
+    _tx: mpsc::Sender<FileEvent>, // Kept alive to maintain channel
 }
 
 impl FileWatcher {
@@ -97,7 +97,7 @@ impl FileWatcher {
         Ok(Self {
             _watcher: Arc::new(watcher),
             rx,
-            tx,
+            _tx: tx,
         })
     }
 

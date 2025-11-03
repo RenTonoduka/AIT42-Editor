@@ -307,7 +307,7 @@ mod tests {
 
     #[test]
     fn test_auto_select_agents() {
-        let config = AIT42Config::new(PathBuf::from("/tmp/ait42"));
+        let _config = AIT42Config::new(PathBuf::from("/tmp/ait42"));
         // This will fail without actual agents, but tests the structure
         // In real tests, use a temp directory with mock agents
     }

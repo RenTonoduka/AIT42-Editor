@@ -13,7 +13,7 @@ use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{ChildStdin, ChildStdout};
 use tokio::sync::{mpsc, Mutex, RwLock};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 /// LSP client for a single language server
 pub struct LspClient {
@@ -90,9 +90,16 @@ impl LspClient {
     async fn initialize(&self, root_uri: Option<Url>) -> Result<()> {
         debug!("Initializing LSP server");
 
+        let workspace_folders = root_uri.as_ref().map(|uri| {
+            vec![WorkspaceFolder {
+                uri: uri.clone(),
+                name: uri.path().rsplit('/').next().unwrap_or("workspace").to_string(),
+            }]
+        });
+
         let init_params = InitializeParams {
             process_id: Some(std::process::id()),
-            root_uri,
+            workspace_folders,
             capabilities: ClientCapabilities {
                 text_document: Some(TextDocumentClientCapabilities {
                     completion: Some(CompletionClientCapabilities {

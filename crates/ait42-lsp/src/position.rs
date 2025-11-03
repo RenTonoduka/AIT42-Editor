@@ -56,16 +56,14 @@ pub fn lsp_pos_to_buffer(buffer: &impl BufferLike, pos: Position) -> usize {
 /// Convert UTF-8 character offset to UTF-16 code units
 fn utf8_to_utf16_offset(text: &str, char_offset: usize) -> u32 {
     let mut utf16_offset = 0;
-    let mut current_char = 0;
 
-    for ch in text.chars() {
+    for (current_char, ch) in text.chars().enumerate() {
         if current_char >= char_offset {
             break;
         }
 
         // Each character is 1 or 2 UTF-16 code units
         utf16_offset += ch.len_utf16() as u32;
-        current_char += 1;
     }
 
     utf16_offset
