@@ -107,6 +107,25 @@ export interface GitCommit {
 }
 
 /**
+ * Plugin information
+ */
+export interface PluginInfo {
+  manifest: {
+    id: string;
+    name: string;
+    version: string;
+    author: string;
+    description: string;
+    entry_point: string;
+    dependencies: string[];
+    permissions: string[];
+  };
+  state: 'Installed' | 'Enabled' | 'Disabled' | 'Error';
+  install_path: string;
+  error?: string;
+}
+
+/**
  * Type-safe Tauri command wrappers
  */
 export const tauriApi = {
@@ -552,6 +571,77 @@ export const tauriApi = {
       await invoke('git_create_branch', { name });
     } catch (error) {
       throw new Error(`Failed to create branch: ${error}`);
+    }
+  },
+
+  // ===== Plugin Commands =====
+
+  /**
+   * List all plugins
+   */
+  async listPlugins(): Promise<PluginInfo[]> {
+    try {
+      const plugins = await invoke<PluginInfo[]>('list_plugins');
+      return plugins;
+    } catch (error) {
+      throw new Error(`Failed to list plugins: ${error}`);
+    }
+  },
+
+  /**
+   * Get plugin by ID
+   */
+  async getPlugin(pluginId: string): Promise<PluginInfo | null> {
+    try {
+      const plugin = await invoke<PluginInfo | null>('get_plugin', { pluginId });
+      return plugin;
+    } catch (error) {
+      throw new Error(`Failed to get plugin: ${error}`);
+    }
+  },
+
+  /**
+   * Enable a plugin
+   */
+  async enablePlugin(pluginId: string): Promise<void> {
+    try {
+      await invoke('enable_plugin', { pluginId });
+    } catch (error) {
+      throw new Error(`Failed to enable plugin: ${error}`);
+    }
+  },
+
+  /**
+   * Disable a plugin
+   */
+  async disablePlugin(pluginId: string): Promise<void> {
+    try {
+      await invoke('disable_plugin', { pluginId });
+    } catch (error) {
+      throw new Error(`Failed to disable plugin: ${error}`);
+    }
+  },
+
+  /**
+   * Install a plugin from path
+   */
+  async installPlugin(sourcePath: string): Promise<string> {
+    try {
+      const pluginId = await invoke<string>('install_plugin', { sourcePath });
+      return pluginId;
+    } catch (error) {
+      throw new Error(`Failed to install plugin: ${error}`);
+    }
+  },
+
+  /**
+   * Uninstall a plugin
+   */
+  async uninstallPlugin(pluginId: string): Promise<void> {
+    try {
+      await invoke('uninstall_plugin', { pluginId });
+    } catch (error) {
+      throw new Error(`Failed to uninstall plugin: ${error}`);
     }
   },
 };
