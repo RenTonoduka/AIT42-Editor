@@ -72,6 +72,27 @@ pub enum EditorCommand {
     Quit,
     ForceQuit,
 
+    // Phase 10b: Tab management
+    NewTab,
+    CloseTab,
+    NextTab,
+    PrevTab,
+    SwitchTab(usize),
+
+    // Phase 10b: Panel visibility and focus
+    ToggleSidebar,
+    ToggleTerminal,
+    FocusSidebar,
+    FocusEditor,
+    FocusTerminal,
+    FocusNextPanel,
+
+    // Phase 10b: Sidebar navigation
+    SidebarMoveUp,
+    SidebarMoveDown,
+    SidebarSelect,
+    SidebarToggleExpand,
+
     // Other
     Noop,
 }
@@ -103,6 +124,7 @@ pub struct KeyMap {
     insert_mode: HashMap<KeyBinding, EditorCommand>,
     visual_mode: HashMap<KeyBinding, EditorCommand>,
     command_mode: HashMap<KeyBinding, EditorCommand>,
+    sidebar_mode: HashMap<KeyBinding, EditorCommand>,
 }
 
 impl KeyMap {
@@ -112,18 +134,21 @@ impl KeyMap {
         let mut insert_mode = HashMap::new();
         let mut visual_mode = HashMap::new();
         let mut command_mode = HashMap::new();
+        let mut sidebar_mode = HashMap::new();
 
         // Normal mode bindings
         Self::setup_normal_mode(&mut normal_mode);
         Self::setup_insert_mode(&mut insert_mode);
         Self::setup_visual_mode(&mut visual_mode);
         Self::setup_command_mode(&mut command_mode);
+        Self::setup_sidebar_mode(&mut sidebar_mode);
 
         Self {
             normal_mode,
             insert_mode,
             visual_mode,
             command_mode,
+            sidebar_mode,
         }
     }
 
@@ -175,6 +200,23 @@ impl KeyMap {
         map.insert(kb(Char('p'), CTRL), OpenCommandPalette);
         map.insert(kb(Char('s'), CTRL), Save);
         map.insert(kb(Char('q'), NONE), Quit);
+
+        // Phase 10b: Tab management
+        map.insert(kb(Char('t'), CTRL), NewTab);
+        map.insert(kb(Char('w'), CTRL), CloseTab);
+        map.insert(kb(Tab, CTRL), NextTab);
+        map.insert(kb(Tab, CTRL | SHIFT), PrevTab);
+
+        // Phase 10b: Panel visibility
+        map.insert(kb(Char('b'), CTRL), ToggleSidebar);
+        map.insert(kb(Char('`'), CTRL), ToggleTerminal);
+
+        // Phase 10b: Panel focus
+        map.insert(kb(Char('e'), CTRL), FocusSidebar);
+        map.insert(kb(Char('1'), CTRL), FocusEditor);
+        map.insert(kb(Char('2'), CTRL), FocusSidebar);
+        map.insert(kb(Char('3'), CTRL), FocusTerminal);
+        map.insert(kb(Tab, NONE), FocusNextPanel);
     }
 
     fn setup_insert_mode(map: &mut HashMap<KeyBinding, EditorCommand>) {
@@ -233,6 +275,29 @@ impl KeyMap {
         map.insert(kb(KeyCode::Backspace, NONE), EditorCommand::Backspace);
     }
 
+    fn setup_sidebar_mode(map: &mut HashMap<KeyBinding, EditorCommand>) {
+        use EditorCommand::*;
+        use KeyCode::*;
+
+        // Sidebar navigation
+        map.insert(kb(Up, NONE), SidebarMoveUp);
+        map.insert(kb(Down, NONE), SidebarMoveDown);
+        map.insert(kb(Char('k'), NONE), SidebarMoveUp);
+        map.insert(kb(Char('j'), NONE), SidebarMoveDown);
+
+        // Sidebar actions
+        map.insert(kb(Enter, NONE), SidebarSelect);
+        map.insert(kb(Char(' '), NONE), SidebarToggleExpand);
+
+        // Focus switching
+        map.insert(kb(Esc, NONE), FocusEditor);
+        map.insert(kb(Tab, NONE), FocusNextPanel);
+
+        // Panel visibility
+        map.insert(kb(Char('b'), CTRL), ToggleSidebar);
+        map.insert(kb(Char('`'), CTRL), ToggleTerminal);
+    }
+
     /// Look up command for key binding in current mode
     pub fn lookup(&self, mode: Mode, key: KeyBinding) -> Option<&EditorCommand> {
         let map = match mode {
@@ -242,6 +307,11 @@ impl KeyMap {
             Mode::Command => &self.command_mode,
         };
         map.get(&key)
+    }
+
+    /// Look up command for key binding in sidebar mode
+    pub fn lookup_sidebar(&self, key: KeyBinding) -> Option<&EditorCommand> {
+        self.sidebar_mode.get(&key)
     }
 
     /// Add custom key binding
@@ -270,6 +340,7 @@ fn kb(code: KeyCode, modifiers: KeyModifiers) -> KeyBinding {
 const NONE: KeyModifiers = KeyModifiers::NONE;
 const CTRL: KeyModifiers = KeyModifiers::CONTROL;
 const SHIFT: KeyModifiers = KeyModifiers::SHIFT;
+const ALT: KeyModifiers = KeyModifiers::ALT;
 
 /// Configuration for custom key bindings
 #[derive(Debug, Clone, Serialize, Deserialize)]
