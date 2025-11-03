@@ -1,83 +1,108 @@
 /**
  * Tauri command bindings for communication with Rust backend
  */
-import { invoke } from '@tauri-apps/api/core';
-import type {
-  FileContent,
-  FileTreeNode,
-  Diagnostic,
-  CompletionItem,
-} from '@/types';
+import { invoke } from '@tauri-apps/api/tauri';
 
-export const tauriCommands = {
+/**
+ * Response from open_file command
+ */
+export interface OpenFileResponse {
+  bufferId: string;
+  content: string;
+  path: string;
+  language: string | null;
+}
+
+/**
+ * File node structure from backend
+ */
+export interface FileNode {
+  name: string;
+  path: string;
+  isDirectory: boolean;
+  children: FileNode[] | null;
+}
+
+/**
+ * Type-safe Tauri command wrappers
+ */
+export const tauriApi = {
   /**
-   * Open and read a file
+   * Open a file and return its content with buffer info
    */
-  async openFile(path: string): Promise<FileContent> {
-    return invoke('open_file', { path });
+  async openFile(path: string): Promise<OpenFileResponse> {
+    try {
+      const response = await invoke<OpenFileResponse>('open_file', { path });
+      return response;
+    } catch (error) {
+      throw new Error(`Failed to open file: ${error}`);
+    }
   },
 
   /**
-   * Save file content
+   * Save file content to disk
    */
   async saveFile(path: string, content: string): Promise<void> {
-    return invoke('save_file', { path, content });
+    try {
+      await invoke('save_file', { path, content });
+    } catch (error) {
+      throw new Error(`Failed to save file: ${error}`);
+    }
+  },
+
+  /**
+   * Read directory contents
+   */
+  async readDirectory(path: string): Promise<FileNode[]> {
+    try {
+      const nodes = await invoke<FileNode[]>('read_directory', { path });
+      return nodes;
+    } catch (error) {
+      throw new Error(`Failed to read directory: ${error}`);
+    }
   },
 
   /**
    * Create a new file
    */
   async createFile(path: string): Promise<void> {
-    return invoke('create_file', { path });
+    try {
+      await invoke('create_file', { path });
+    } catch (error) {
+      throw new Error(`Failed to create file: ${error}`);
+    }
   },
 
   /**
-   * Get file tree for a directory
+   * Create a new directory
    */
-  async getFileTree(rootPath: string): Promise<FileTreeNode> {
-    return invoke('get_file_tree', { rootPath });
+  async createDirectory(path: string): Promise<void> {
+    try {
+      await invoke('create_directory', { path });
+    } catch (error) {
+      throw new Error(`Failed to create directory: ${error}`);
+    }
   },
 
   /**
-   * Search files by pattern
+   * Delete a file or directory
    */
-  async searchFiles(rootPath: string, pattern: string): Promise<string[]> {
-    return invoke('search_files', { rootPath, pattern });
+  async deletePath(path: string): Promise<void> {
+    try {
+      await invoke('delete_path', { path });
+    } catch (error) {
+      throw new Error(`Failed to delete: ${error}`);
+    }
   },
 
   /**
-   * Format document using LSP
+   * Rename/move a file or directory
    */
-  async formatDocument(path: string, content: string): Promise<string> {
-    return invoke('format_document', { path, content });
-  },
-
-  /**
-   * Get diagnostics for a file
-   */
-  async getDiagnostics(path: string): Promise<Diagnostic[]> {
-    return invoke('get_diagnostics', { path });
-  },
-
-  /**
-   * Get completions at cursor position
-   */
-  async getCompletions(
-    path: string,
-    line: number,
-    character: number,
-  ): Promise<CompletionItem[]> {
-    return invoke('get_completions', { path, line, character });
-  },
-
-  /**
-   * Go to definition
-   */
-  async gotoDefinition(
-    path: string,
-    line: number,
-    character: number,
-  ): Promise<FileContent | null> {
-    return invoke('goto_definition', { path, line, character });
+  async renamePath(oldPath: string, newPath: string): Promise<void> {
+    try {
+      await invoke('rename_path', { oldPath, newPath });
+    } catch (error) {
+      throw new Error(`Failed to rename: ${error}`);
+    }
   },
 };
