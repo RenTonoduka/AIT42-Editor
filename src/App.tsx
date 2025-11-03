@@ -3,14 +3,17 @@ import { Code, Terminal, Settings } from 'lucide-react';
 import { Sidebar } from './components/Sidebar/Sidebar';
 import { EditorContainer } from '@/components/Editor';
 import { StatusBar } from '@/components/StatusBar';
+import { SettingsPanel } from '@/components/Settings/SettingsPanel';
 import { useEditorStore } from '@/store/editorStore';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useTerminalStore } from '@/store/terminalStore';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 
 function App() {
   const [activePanel, setActivePanel] = useState<'editor' | 'terminal' | 'settings'>('editor');
   const { addTab } = useEditorStore();
   const { toggleSettingsPanel } = useSettingsStore();
+  const { toggleVisibility } = useTerminalStore();
 
   const handleFileOpen = async (path: string) => {
     try {
@@ -44,7 +47,10 @@ function App() {
           <Code size={24} />
         </button>
         <button
-          onClick={() => setActivePanel('terminal')}
+          onClick={() => {
+            setActivePanel('terminal');
+            toggleVisibility();
+          }}
           className={`p-3 rounded-lg transition-colors ${
             activePanel === 'terminal'
               ? 'bg-primary-600 text-white'
@@ -81,6 +87,9 @@ function App() {
         {/* Status Bar */}
         <StatusBar />
       </main>
+
+      {/* Settings Panel (Modal) */}
+      <SettingsPanel />
     </div>
   );
 }

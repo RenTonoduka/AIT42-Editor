@@ -7,7 +7,7 @@
  * - File icons
  * - Expand/collapse animation
  * - Selection highlighting
- * - Double-click to open files
+ * - Single-click to open files
  */
 import { useState } from 'react';
 import { ChevronRight, ChevronDown, Loader2 } from 'lucide-react';
@@ -70,16 +70,8 @@ function FileTreeItem({ node, level, onFileOpen }: FileTreeItemProps) {
 
     if (node.isDirectory) {
       handleToggle(e);
-    }
-  };
-
-  /**
-   * Handle double-click to open file
-   */
-  const handleDoubleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    if (!node.isDirectory && onFileOpen) {
+    } else if (onFileOpen) {
+      // Open file on single click
       onFileOpen(node.path);
     }
   };
@@ -94,7 +86,6 @@ function FileTreeItem({ node, level, onFileOpen }: FileTreeItemProps) {
         `}
         style={{ paddingLeft: `${level * 12 + 8}px` }}
         onClick={handleClick}
-        onDoubleClick={handleDoubleClick}
       >
         {/* Expand/Collapse Icon */}
         <div className="w-4 h-4 mr-1 flex items-center justify-center">
