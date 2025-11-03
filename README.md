@@ -19,19 +19,63 @@ A modern, fast TUI (Terminal User Interface) code editor with integrated AI agen
 
 ### Installation
 
+#### macOS (Recommended)
+
+For macOS users, we provide a streamlined app bundle experience:
+
 ```bash
 # Clone the repository
 git clone https://github.com/RenTonoduka/AIT42
 cd AIT42-Editor
 
-# Run setup script
-./scripts/setup.sh
-
-# Build and run
-cargo run
+# Run automated installer
+./install-macos.sh
 ```
 
-See [README.md](README.md) and [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for complete documentation.
+This will:
+- Build the release binary
+- Install AIT42.app to /Applications
+- Optionally add to PATH
+
+You can then launch by:
+- Double-clicking AIT42.app in Applications
+- Running `open /Applications/AIT42.app`
+- Right-click any file → Open With → AIT42
+
+See [INSTALL_MACOS.md](INSTALL_MACOS.md) for detailed macOS installation instructions.
+
+#### Manual Installation (All Platforms)
+
+```bash
+# Clone the repository
+git clone https://github.com/RenTonoduka/AIT42
+cd AIT42-Editor
+
+# Build release binary
+cargo build --release
+
+# Run the editor
+./target/release/ait42 [file_or_directory]
+```
+
+### Usage
+
+```bash
+# Open a specific file
+ait42 src/main.rs
+
+# Open current directory (auto-selects README.md, Cargo.toml, etc.)
+ait42 .
+
+# Open with options
+ait42 --debug --log-file ait42.log src/main.rs
+```
+
+## Documentation
+
+- [INSTALL_MACOS.md](INSTALL_MACOS.md) - macOS installation guide
+- [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) - Project architecture
+- [AGENTS.md](AGENTS.md) - AI agents documentation (if available)
 
 ---
 
