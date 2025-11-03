@@ -49,8 +49,8 @@ pub mod state;
 pub mod view;
 
 // Private modules (implementation details)
-mod history;
 mod editor;
+mod history;
 
 // Re-exports for convenience
 pub use buffer::{Buffer, BufferId, BufferManager, LineEnding};
@@ -192,11 +192,7 @@ mod tests {
         state.open_buffer(buffer);
 
         // Execute command
-        let cmd = Box::new(InsertCommand::new(
-            state.active_buffer().unwrap().id(),
-            0,
-            "Hello",
-        ));
+        let cmd = Box::new(InsertCommand::new(state.active_buffer().unwrap().id(), 0, "Hello"));
 
         state.execute_command(cmd).unwrap();
         assert_eq!(state.active_buffer().unwrap().to_string(), "Hello");

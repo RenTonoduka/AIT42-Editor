@@ -338,9 +338,11 @@ impl Buffer {
     ///
     /// Uses atomic write (write to temp file, then rename).
     pub fn save(&mut self) -> Result<()> {
-        let path = self.file_path.as_ref().ok_or_else(|| {
-            EditorError::Other("Cannot save buffer without file path".to_string())
-        })?.to_path_buf();
+        let path = self
+            .file_path
+            .as_ref()
+            .ok_or_else(|| EditorError::Other("Cannot save buffer without file path".to_string()))?
+            .to_path_buf();
 
         self.save_as(&path)
     }
@@ -449,10 +451,7 @@ impl BufferManager {
         let buffer = self.get(id).ok_or(EditorError::BufferNotFound(id))?;
 
         if buffer.is_dirty() && !force {
-            return Err(EditorError::Other(format!(
-                "Buffer {} has unsaved changes",
-                id
-            )));
+            return Err(EditorError::Other(format!("Buffer {} has unsaved changes", id)));
         }
 
         self.buffers.retain(|b| b.id() != id);

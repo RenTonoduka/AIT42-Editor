@@ -148,7 +148,8 @@ impl EditorState {
     ///
     /// Commands are automatically added to undo history.
     pub fn execute_command(&mut self, mut cmd: Box<dyn Command>) -> Result<()> {
-        let buffer = self.active_buffer_mut()
+        let buffer = self
+            .active_buffer_mut()
             .ok_or_else(|| crate::error::EditorError::NoActiveBuffer)?;
 
         // Execute command
@@ -182,10 +183,14 @@ impl EditorState {
     ///
     /// Returns true if undo was successful, false if nothing to undo.
     pub fn undo(&mut self) -> Result<bool> {
-        let id = self.buffer_manager.active_buffer_id()
+        let id = self
+            .buffer_manager
+            .active_buffer_id()
             .ok_or_else(|| crate::error::EditorError::NoActiveBuffer)?;
 
-        let buffer = self.buffer_manager.active_mut()
+        let buffer = self
+            .buffer_manager
+            .active_mut()
             .ok_or_else(|| crate::error::EditorError::NoActiveBuffer)?;
 
         if let Some(history) = self.histories.get_mut(&id) {
@@ -199,10 +204,14 @@ impl EditorState {
     ///
     /// Returns true if redo was successful, false if nothing to redo.
     pub fn redo(&mut self) -> Result<bool> {
-        let id = self.buffer_manager.active_buffer_id()
+        let id = self
+            .buffer_manager
+            .active_buffer_id()
             .ok_or_else(|| crate::error::EditorError::NoActiveBuffer)?;
 
-        let buffer = self.buffer_manager.active_mut()
+        let buffer = self
+            .buffer_manager
+            .active_mut()
             .ok_or_else(|| crate::error::EditorError::NoActiveBuffer)?;
 
         if let Some(history) = self.histories.get_mut(&id) {

@@ -263,11 +263,9 @@ impl TuiApp {
             // Update view scroll to keep cursor visible
             let size = self.renderer.size()?;
             let cursor_pos = self.state.cursor.position(&self.state.buffer);
-            self.state.view.update_scroll(
-                cursor_pos.line,
-                cursor_pos.col,
-                size,
-            );
+            self.state
+                .view
+                .update_scroll(cursor_pos.line, cursor_pos.col, size);
 
             // Update layout config
             self.layout_config.show_command_palette = self.state.show_command_palette;
@@ -313,8 +311,11 @@ impl TuiApp {
     /// Handle keyboard input
     fn handle_key(&mut self, key: KeyEvent) -> Result<()> {
         // Special handling for Ctrl+C to quit
-        if key.code == KeyCode::Char('c') &&
-           key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+        if key.code == KeyCode::Char('c')
+            && key
+                .modifiers
+                .contains(crossterm::event::KeyModifiers::CONTROL)
+        {
             self.state.running = false;
             return Ok(());
         }
@@ -368,10 +369,14 @@ mod tests {
         let config = EditorConfig::default();
         let mut state = EditorState::new(config).unwrap();
 
-        state.execute_command(&EditorCommand::EnterInsertMode).unwrap();
+        state
+            .execute_command(&EditorCommand::EnterInsertMode)
+            .unwrap();
         assert_eq!(state.mode, Mode::Insert);
 
-        state.execute_command(&EditorCommand::EnterNormalMode).unwrap();
+        state
+            .execute_command(&EditorCommand::EnterNormalMode)
+            .unwrap();
         assert_eq!(state.mode, Mode::Normal);
     }
 
@@ -403,10 +408,14 @@ mod tests {
 
         assert!(!state.show_command_palette);
 
-        state.execute_command(&EditorCommand::OpenCommandPalette).unwrap();
+        state
+            .execute_command(&EditorCommand::OpenCommandPalette)
+            .unwrap();
         assert!(state.show_command_palette);
 
-        state.execute_command(&EditorCommand::OpenCommandPalette).unwrap();
+        state
+            .execute_command(&EditorCommand::OpenCommandPalette)
+            .unwrap();
         assert!(!state.show_command_palette);
     }
 }

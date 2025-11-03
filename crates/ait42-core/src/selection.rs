@@ -40,7 +40,10 @@ impl SelectionRange {
     }
 
     /// Convert to byte range (requires buffer for conversion)
-    pub fn to_byte_range(&self, line_col_to_pos: impl Fn(usize, usize) -> Option<usize>) -> Option<Range<usize>> {
+    pub fn to_byte_range(
+        &self,
+        line_col_to_pos: impl Fn(usize, usize) -> Option<usize>,
+    ) -> Option<Range<usize>> {
         let start_pos = line_col_to_pos(self.start.line, self.start.col)?;
         let end_pos = line_col_to_pos(self.end.line, self.end.col)?;
         Some(start_pos..end_pos)
@@ -187,10 +190,7 @@ mod tests {
     #[test]
     fn test_selection_clear() {
         let mut sel = Selection::new();
-        sel.add_range(SelectionRange::new(
-            CursorPosition::new(0, 0),
-            CursorPosition::new(0, 5),
-        ));
+        sel.add_range(SelectionRange::new(CursorPosition::new(0, 0), CursorPosition::new(0, 5)));
 
         sel.clear();
         assert!(sel.is_empty());
@@ -201,14 +201,8 @@ mod tests {
         let mut sel = Selection::new();
 
         // Add overlapping ranges
-        sel.add_range(SelectionRange::new(
-            CursorPosition::new(0, 0),
-            CursorPosition::new(0, 5),
-        ));
-        sel.add_range(SelectionRange::new(
-            CursorPosition::new(0, 3),
-            CursorPosition::new(0, 8),
-        ));
+        sel.add_range(SelectionRange::new(CursorPosition::new(0, 0), CursorPosition::new(0, 5)));
+        sel.add_range(SelectionRange::new(CursorPosition::new(0, 3), CursorPosition::new(0, 8)));
 
         sel.merge_overlapping();
 
@@ -223,14 +217,8 @@ mod tests {
         let mut sel = Selection::new();
 
         // Add non-overlapping ranges
-        sel.add_range(SelectionRange::new(
-            CursorPosition::new(0, 0),
-            CursorPosition::new(0, 5),
-        ));
-        sel.add_range(SelectionRange::new(
-            CursorPosition::new(0, 10),
-            CursorPosition::new(0, 15),
-        ));
+        sel.add_range(SelectionRange::new(CursorPosition::new(0, 0), CursorPosition::new(0, 5)));
+        sel.add_range(SelectionRange::new(CursorPosition::new(0, 10), CursorPosition::new(0, 15)));
 
         sel.merge_overlapping();
 

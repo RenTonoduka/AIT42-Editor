@@ -176,9 +176,7 @@ impl AgentRegistry {
         let lines: Vec<&str> = content.lines().collect();
 
         if lines.first() != Some(&"---") {
-            return Err(AIT42Error::InvalidMetadata(
-                "No frontmatter delimiter found".to_string(),
-            ));
+            return Err(AIT42Error::InvalidMetadata("No frontmatter delimiter found".to_string()));
         }
 
         let end_idx = lines
@@ -245,9 +243,7 @@ impl AgentRegistry {
             {
                 AgentCategory::Infrastructure
             }
-            n if n.contains("coordinator") || n.contains("workflow") => {
-                AgentCategory::Coordination
-            }
+            n if n.contains("coordinator") || n.contains("workflow") => AgentCategory::Coordination,
             n if n.contains("architect") || n.contains("designer") || n.contains("planner") => {
                 AgentCategory::Planning
             }
@@ -359,18 +355,9 @@ mod tests {
     #[test]
     fn test_infer_category() {
         let registry = AgentRegistry::new(PathBuf::from("/tmp"));
-        assert_eq!(
-            registry.infer_category("backend-developer"),
-            AgentCategory::Backend
-        );
-        assert_eq!(
-            registry.infer_category("frontend-developer"),
-            AgentCategory::Frontend
-        );
-        assert_eq!(
-            registry.infer_category("test-generator"),
-            AgentCategory::Testing
-        );
+        assert_eq!(registry.infer_category("backend-developer"), AgentCategory::Backend);
+        assert_eq!(registry.infer_category("frontend-developer"), AgentCategory::Frontend);
+        assert_eq!(registry.infer_category("test-generator"), AgentCategory::Testing);
     }
 
     #[test]

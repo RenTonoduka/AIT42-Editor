@@ -185,10 +185,7 @@ fn build_tree_recursive(
         while let Some(entry) = entries.next_entry().await? {
             let metadata = entry.metadata().await?;
             let entry_path = entry.path();
-            let name = entry
-                .file_name()
-                .to_string_lossy()
-                .to_string();
+            let name = entry.file_name().to_string_lossy().to_string();
 
             let is_dir = metadata.is_dir();
             let is_hidden = name.starts_with('.');
@@ -210,12 +207,10 @@ fn build_tree_recursive(
         }
 
         // Sort: directories first, then by name
-        nodes.sort_by(|a, b| {
-            match (a.is_dir, b.is_dir) {
-                (true, false) => std::cmp::Ordering::Less,
-                (false, true) => std::cmp::Ordering::Greater,
-                _ => a.name.cmp(&b.name),
-            }
+        nodes.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => a.name.cmp(&b.name),
         });
 
         Ok(nodes)
@@ -310,9 +305,7 @@ mod tests {
             .await
             .unwrap();
 
-        let files = find_by_extension(temp_dir.path(), "rs")
-            .await
-            .unwrap();
+        let files = find_by_extension(temp_dir.path(), "rs").await.unwrap();
         assert_eq!(files.len(), 2);
     }
 

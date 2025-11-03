@@ -60,19 +60,15 @@ impl Renderer {
             }
 
             // Render main editor
-            let editor_widget = EditorWidget::new(buffer, cursor, view, theme)
-                .show_line_numbers(false); // Line numbers rendered separately
+            let editor_widget =
+                EditorWidget::new(buffer, cursor, view, theme).show_line_numbers(false); // Line numbers rendered separately
             f.render_widget(editor_widget, layout.editor);
 
             // Render status line
             let cursor_pos = cursor.position(buffer);
-            let status = StatusLine::new(
-                mode,
-                (cursor_pos.line, cursor_pos.col),
-                buffer.len_lines(),
-                theme,
-            )
-            .dirty(buffer.is_dirty());
+            let status =
+                StatusLine::new(mode, (cursor_pos.line, cursor_pos.col), buffer.len_lines(), theme)
+                    .dirty(buffer.is_dirty());
 
             if let Some(path) = buffer.path() {
                 let status = status.file_path(path);
@@ -90,15 +86,16 @@ impl Renderer {
             }
 
             // Set cursor position for terminal
-            let cursor_screen_x = layout.editor.x +
-                cursor_pos.col.saturating_sub(view.scroll_col) as u16;
-            let cursor_screen_y = layout.editor.y +
-                cursor_pos.line.saturating_sub(view.scroll_line) as u16;
+            let cursor_screen_x =
+                layout.editor.x + cursor_pos.col.saturating_sub(view.scroll_col) as u16;
+            let cursor_screen_y =
+                layout.editor.y + cursor_pos.line.saturating_sub(view.scroll_line) as u16;
 
             // Only show cursor in insert mode
             if mode == Mode::Insert {
-                if cursor_screen_x < layout.editor.right() &&
-                   cursor_screen_y < layout.editor.bottom() {
+                if cursor_screen_x < layout.editor.right()
+                    && cursor_screen_y < layout.editor.bottom()
+                {
                     f.set_cursor(cursor_screen_x, cursor_screen_y);
                 }
             }

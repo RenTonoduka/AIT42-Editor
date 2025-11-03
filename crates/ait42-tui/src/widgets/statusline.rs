@@ -90,17 +90,11 @@ impl<'a> StatusLine<'a> {
             "[No Name]"
         };
 
-        spans.push(Span::styled(
-            file_name,
-            Style::default().fg(self.theme.foreground),
-        ));
+        spans.push(Span::styled(file_name, Style::default().fg(self.theme.foreground)));
 
         // Dirty indicator
         if self.dirty {
-            spans.push(Span::styled(
-                " [+]",
-                Style::default().fg(self.theme.keyword.fg.unwrap()),
-            ));
+            spans.push(Span::styled(" [+]", Style::default().fg(self.theme.keyword.fg.unwrap())));
         }
 
         spans
@@ -112,10 +106,7 @@ impl<'a> StatusLine<'a> {
 
         // File type
         if let Some(ft) = self.file_type {
-            spans.push(Span::styled(
-                ft,
-                Style::default().fg(self.theme.comment.fg.unwrap()),
-            ));
+            spans.push(Span::styled(ft, Style::default().fg(self.theme.comment.fg.unwrap())));
             spans.push(Span::raw(" │ "));
         }
 
@@ -129,10 +120,7 @@ impl<'a> StatusLine<'a> {
         };
 
         let position_text = format!(" {}:{} {}% ", line, col, percentage);
-        spans.push(Span::styled(
-            position_text,
-            Style::default().fg(self.theme.foreground),
-        ));
+        spans.push(Span::styled(position_text, Style::default().fg(self.theme.foreground)));
 
         spans
     }

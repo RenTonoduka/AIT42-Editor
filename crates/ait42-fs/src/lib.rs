@@ -8,7 +8,7 @@ pub mod sync;
 pub mod watcher;
 
 // Re-exports
-pub use directory::{list_directory, find_files, DirectoryListing};
+pub use directory::{find_files, list_directory, DirectoryListing};
 pub use file::{FileHandle, FileMetadata};
 pub use sync::FileSynchronizer;
 pub use watcher::{FileEvent, FileWatcher};

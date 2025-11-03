@@ -32,15 +32,9 @@ impl EditorAgentBridge {
     /// Execute agent on current buffer content
     pub async fn run_on_buffer(&mut self, agent: &str, buffer: &Buffer) -> Result<String> {
         let context = self.build_buffer_context(buffer);
-        let task = format!(
-            "Analyze and process the following code:\n\n{}",
-            context
-        );
+        let task = format!("Analyze and process the following code:\n\n{}", context);
 
-        let results = self
-            .executor
-            .execute_single(agent, &task)
-            .await?;
+        let results = self.executor.execute_single(agent, &task).await?;
 
         Ok(results.output)
     }
@@ -62,10 +56,7 @@ impl EditorAgentBridge {
             selected_text
         );
 
-        let task = format!(
-            "Analyze and process the following code selection:\n\n{}",
-            context
-        );
+        let task = format!("Analyze and process the following code selection:\n\n{}", context);
 
         let results = self.executor.execute_single(agent, &task).await?;
 
@@ -165,8 +156,8 @@ mod tests {
         setup_test_env().expect("Failed to setup test environment");
 
         let config = crate::config::AIT42Config::default();
-        let coordinator = crate::coordinator::Coordinator::new(config)
-            .expect("Failed to create coordinator");
+        let coordinator =
+            crate::coordinator::Coordinator::new(config).expect("Failed to create coordinator");
         let executor = AgentExecutor::new(coordinator);
         EditorAgentBridge::new(executor)
     }

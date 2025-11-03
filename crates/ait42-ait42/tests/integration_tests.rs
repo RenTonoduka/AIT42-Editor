@@ -101,7 +101,8 @@ fn test_agent_registry_loading() {
 #[test]
 fn test_agent_registry_get() {
     let (_temp, config) = setup_test_env();
-    let registry = ait42_ait42::registry::AgentRegistry::load_from_directory(&config.agents_dir()).unwrap();
+    let registry =
+        ait42_ait42::registry::AgentRegistry::load_from_directory(&config.agents_dir()).unwrap();
 
     let agent = registry.get("test-agent-1");
     assert!(agent.is_some());
@@ -114,7 +115,8 @@ fn test_agent_registry_get() {
 #[test]
 fn test_agent_registry_search() {
     let (_temp, config) = setup_test_env();
-    let registry = ait42_ait42::registry::AgentRegistry::load_from_directory(&config.agents_dir()).unwrap();
+    let registry =
+        ait42_ait42::registry::AgentRegistry::load_from_directory(&config.agents_dir()).unwrap();
 
     let results = registry.search("backend");
     assert!(!results.is_empty(), "Should find backend agents");
@@ -124,7 +126,8 @@ fn test_agent_registry_search() {
 #[test]
 fn test_agent_category_classification() {
     let (_temp, config) = setup_test_env();
-    let registry = ait42_ait42::registry::AgentRegistry::load_from_directory(&config.agents_dir()).unwrap();
+    let registry =
+        ait42_ait42::registry::AgentRegistry::load_from_directory(&config.agents_dir()).unwrap();
 
     let backend_agents = registry.list_by_category(AgentCategory::Backend);
     assert!(!backend_agents.is_empty());

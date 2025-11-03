@@ -104,11 +104,7 @@ impl FileWatcher {
     /// Watch a path (file or directory)
     pub fn watch(&mut self, path: impl AsRef<Path>, recursive: bool) -> Result<()> {
         let path = path.as_ref();
-        info!(
-            "Watching path: {} (recursive: {})",
-            path.display(),
-            recursive
-        );
+        info!("Watching path: {} (recursive: {})", path.display(), recursive);
 
         let mode = if recursive {
             RecursiveMode::Recursive

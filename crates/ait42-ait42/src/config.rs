@@ -155,7 +155,9 @@ impl AIT42Config {
             PathBuf::from("/opt/ait42"),
         ];
 
-        candidates.into_iter().find(|candidate| candidate.join(".claude/agents").exists())
+        candidates
+            .into_iter()
+            .find(|candidate| candidate.join(".claude/agents").exists())
     }
 
     /// Get timeout as Duration
@@ -206,10 +208,7 @@ mod tests {
     #[test]
     fn test_paths() {
         let config = AIT42Config::new(PathBuf::from("/tmp/ait42"));
-        assert_eq!(
-            config.agents_dir(),
-            PathBuf::from("/tmp/ait42/.claude/agents")
-        );
+        assert_eq!(config.agents_dir(), PathBuf::from("/tmp/ait42/.claude/agents"));
         assert_eq!(config.scripts_dir(), PathBuf::from("/tmp/ait42/scripts"));
     }
 }

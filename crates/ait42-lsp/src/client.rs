@@ -32,11 +32,7 @@ impl LspClient {
     /// * `server_cmd` - Command to execute the LSP server (e.g., "rust-analyzer")
     /// * `args` - Command-line arguments for the server
     /// * `root_uri` - Root URI for the workspace
-    pub async fn new(
-        server_cmd: &str,
-        args: &[&str],
-        root_uri: Option<Url>,
-    ) -> Result<Self> {
+    pub async fn new(server_cmd: &str, args: &[&str], root_uri: Option<Url>) -> Result<Self> {
         info!("Starting LSP server: {} {:?}", server_cmd, args);
 
         // Spawn the LSP server process
@@ -74,11 +70,7 @@ impl LspClient {
         };
 
         // Spawn background task to handle server responses
-        tokio::spawn(Self::handle_server_output(
-            stdout,
-            pending_requests,
-            diagnostics,
-        ));
+        tokio::spawn(Self::handle_server_output(stdout, pending_requests, diagnostics));
 
         // Initialize the server
         client.initialize(root_uri).await?;
@@ -93,7 +85,12 @@ impl LspClient {
         let workspace_folders = root_uri.as_ref().map(|uri| {
             vec![WorkspaceFolder {
                 uri: uri.clone(),
-                name: uri.path().rsplit('/').next().unwrap_or("workspace").to_string(),
+                name: uri
+                    .path()
+                    .rsplit('/')
+                    .next()
+                    .unwrap_or("workspace")
+                    .to_string(),
             }]
         });
 
@@ -124,9 +121,7 @@ impl LspClient {
             ..Default::default()
         };
 
-        let response: InitializeResult = self
-            .send_request("initialize", init_params)
-            .await?;
+        let response: InitializeResult = self.send_request("initialize", init_params).await?;
 
         // Store server capabilities
         *self.capabilities.write().await = Some(response.capabilities);
@@ -169,10 +164,7 @@ impl LspClient {
 
         // Check for error
         if let Some(error) = response.get("error") {
-            return Err(LspError::CommunicationError(format!(
-                "Server error: {}",
-                error
-            )));
+            return Err(LspError::CommunicationError(format!("Server error: {}", error)));
         }
 
         // Extract result
@@ -309,8 +301,7 @@ impl LspClient {
             },
         };
 
-        self.send_notification("textDocument/didOpen", params)
-            .await
+        self.send_notification("textDocument/didOpen", params).await
     }
 
     /// Notify server of document changes
@@ -336,8 +327,7 @@ impl LspClient {
             text,
         };
 
-        self.send_notification("textDocument/didSave", params)
-            .await
+        self.send_notification("textDocument/didSave", params).await
     }
 
     /// Notify server that a document was closed
@@ -402,8 +392,7 @@ impl LspClient {
             partial_result_params: Default::default(),
         };
 
-        self.send_request("textDocument/definition", params)
-            .await
+        self.send_request("textDocument/definition", params).await
     }
 
     /// Get diagnostics for a document

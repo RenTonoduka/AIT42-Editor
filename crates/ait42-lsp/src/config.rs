@@ -215,9 +215,6 @@ command = "clippy"
 "#;
 
         let config = LspConfig::from_toml(toml).unwrap();
-        assert_eq!(
-            config.servers.get("rust").unwrap().command,
-            "rust-analyzer"
-        );
+        assert_eq!(config.servers.get("rust").unwrap().command, "rust-analyzer");
     }
 }

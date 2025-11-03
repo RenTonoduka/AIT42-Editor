@@ -106,9 +106,7 @@ impl TmuxManager {
         }
 
         if session_ids.is_empty() {
-            return Err(AIT42Error::ExecutionFailed(
-                "Failed to start any agents".to_string(),
-            ));
+            return Err(AIT42Error::ExecutionFailed("Failed to start any agents".to_string()));
         }
 
         Ok(session_ids)
@@ -246,9 +244,7 @@ impl TmuxManager {
             }
         }
 
-        Err(AIT42Error::TmuxError(
-            "Could not extract session ID from output".to_string(),
-        ))
+        Err(AIT42Error::TmuxError("Could not extract session ID from output".to_string()))
     }
 
     /// Parse session line from tmux list-sessions
@@ -310,9 +306,7 @@ impl TmuxManager {
             .await?;
 
         if !output.status.success() {
-            return Err(AIT42Error::TmuxError(
-                "Failed to send keys to session".to_string(),
-            ));
+            return Err(AIT42Error::TmuxError("Failed to send keys to session".to_string()));
         }
 
         Ok(())
@@ -329,10 +323,9 @@ impl TmuxManager {
         for session in sessions {
             if session.status != SessionStatus::Running {
                 if let Ok(age) = now.duration_since(session.start_time) {
-                    if age > max_age
-                        && self.kill_session(&session.id).await.is_ok() {
-                            cleaned += 1;
-                        }
+                    if age > max_age && self.kill_session(&session.id).await.is_ok() {
+                        cleaned += 1;
+                    }
                 }
             }
         }

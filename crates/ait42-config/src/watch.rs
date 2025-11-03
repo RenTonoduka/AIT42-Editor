@@ -68,7 +68,9 @@ impl ConfigWatcher {
         // Watch the config file
         watcher
             .watch(&config_path, RecursiveMode::NonRecursive)
-            .map_err(|e| crate::ConfigError::ParseError(format!("Failed to watch config: {}", e)))?;
+            .map_err(|e| {
+                crate::ConfigError::ParseError(format!("Failed to watch config: {}", e))
+            })?;
 
         info!("Watching config file: {}", config_path.display());
 

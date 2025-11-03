@@ -140,11 +140,7 @@ impl AgentCommand {
                 let session_info = sessions
                     .into_iter()
                     .map(|session| {
-                        let age = session
-                            .start_time
-                            .elapsed()
-                            .unwrap_or_default()
-                            .as_secs();
+                        let age = session.start_time.elapsed().unwrap_or_default().as_secs();
                         SessionInfo {
                             id: session.id,
                             agent_name: session.agent_name,
@@ -166,26 +162,17 @@ impl AgentCommand {
 
             AgentCommand::KillSession { session_id } => {
                 executor.coordinator().kill_session(session_id).await?;
-                Ok(CommandResult::Success(format!(
-                    "Session {} killed",
-                    session_id
-                )))
+                Ok(CommandResult::Success(format!("Session {} killed", session_id)))
             }
 
             AgentCommand::AttachSession { session_id } => {
                 // This command should be handled specially as it requires TTY
-                Ok(CommandResult::Success(format!(
-                    "To attach, run: tmux attach -t {}",
-                    session_id
-                )))
+                Ok(CommandResult::Success(format!("To attach, run: tmux attach -t {}", session_id)))
             }
 
             AgentCommand::CleanupSessions => {
                 let count = executor.coordinator().cleanup_sessions().await?;
-                Ok(CommandResult::Success(format!(
-                    "Cleaned up {} old sessions",
-                    count
-                )))
+                Ok(CommandResult::Success(format!("Cleaned up {} old sessions", count)))
             }
 
             AgentCommand::GetAgentDetails { agent } => {

@@ -79,8 +79,11 @@ impl StreamManager {
             for session_id in session_ids {
                 // Check if session still exists
                 if !self.tmux.is_session_alive(&session_id).await {
-                    self.send_event(&session_id, StreamEvent::StatusChange(SessionStatus::Completed))
-                        .await;
+                    self.send_event(
+                        &session_id,
+                        StreamEvent::StatusChange(SessionStatus::Completed),
+                    )
+                    .await;
                     continue;
                 }
 

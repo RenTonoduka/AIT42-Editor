@@ -11,7 +11,8 @@ pub mod watch;
 pub use defaults::default_config;
 pub use loader::ConfigLoader;
 pub use schema::{
-    AIT42Config, EditorConfig, KeyBindingConfig, LspServerConfig, ThemeConfig, Config as EditorConfiguration,
+    AIT42Config, Config as EditorConfiguration, EditorConfig, KeyBindingConfig, LspServerConfig,
+    ThemeConfig,
 };
 pub use watch::ConfigWatcher;
 

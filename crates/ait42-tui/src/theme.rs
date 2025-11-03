@@ -61,8 +61,7 @@ impl Theme {
                 .bg(Color::Rgb(174, 129, 255))
                 .fg(Color::Rgb(39, 40, 34))
                 .add_modifier(Modifier::BOLD),
-            border: Style::default()
-                .fg(Color::Rgb(117, 113, 94)),
+            border: Style::default().fg(Color::Rgb(117, 113, 94)),
             search_match: Style::default()
                 .bg(Color::Rgb(253, 151, 31))
                 .fg(Color::Rgb(39, 40, 34))
@@ -73,12 +72,9 @@ impl Theme {
             keyword: Style::default()
                 .fg(Color::Rgb(249, 38, 114))
                 .add_modifier(Modifier::BOLD),
-            string: Style::default()
-                .fg(Color::Rgb(230, 219, 116)),
-            number: Style::default()
-                .fg(Color::Rgb(174, 129, 255)),
-            function: Style::default()
-                .fg(Color::Rgb(166, 226, 46)),
+            string: Style::default().fg(Color::Rgb(230, 219, 116)),
+            number: Style::default().fg(Color::Rgb(174, 129, 255)),
+            function: Style::default().fg(Color::Rgb(166, 226, 46)),
         }
     }
 
@@ -114,8 +110,7 @@ impl Theme {
                 .bg(Color::Rgb(108, 113, 196))
                 .fg(Color::Rgb(0, 43, 54))
                 .add_modifier(Modifier::BOLD),
-            border: Style::default()
-                .fg(Color::Rgb(7, 54, 66)),
+            border: Style::default().fg(Color::Rgb(7, 54, 66)),
             search_match: Style::default()
                 .bg(Color::Rgb(181, 137, 0))
                 .fg(Color::Rgb(0, 43, 54))
@@ -126,12 +121,9 @@ impl Theme {
             keyword: Style::default()
                 .fg(Color::Rgb(133, 153, 0))
                 .add_modifier(Modifier::BOLD),
-            string: Style::default()
-                .fg(Color::Rgb(42, 161, 152)),
-            number: Style::default()
-                .fg(Color::Rgb(108, 113, 196)),
-            function: Style::default()
-                .fg(Color::Rgb(38, 139, 210)),
+            string: Style::default().fg(Color::Rgb(42, 161, 152)),
+            number: Style::default().fg(Color::Rgb(108, 113, 196)),
+            function: Style::default().fg(Color::Rgb(38, 139, 210)),
         }
     }
 
@@ -167,8 +159,7 @@ impl Theme {
                 .bg(Color::Rgb(177, 98, 134))
                 .fg(Color::Rgb(40, 40, 40))
                 .add_modifier(Modifier::BOLD),
-            border: Style::default()
-                .fg(Color::Rgb(80, 73, 69)),
+            border: Style::default().fg(Color::Rgb(80, 73, 69)),
             search_match: Style::default()
                 .bg(Color::Rgb(215, 153, 33))
                 .fg(Color::Rgb(40, 40, 40))
@@ -179,12 +170,9 @@ impl Theme {
             keyword: Style::default()
                 .fg(Color::Rgb(251, 73, 52))
                 .add_modifier(Modifier::BOLD),
-            string: Style::default()
-                .fg(Color::Rgb(184, 187, 38)),
-            number: Style::default()
-                .fg(Color::Rgb(211, 134, 155)),
-            function: Style::default()
-                .fg(Color::Rgb(142, 192, 124)),
+            string: Style::default().fg(Color::Rgb(184, 187, 38)),
+            number: Style::default().fg(Color::Rgb(211, 134, 155)),
+            function: Style::default().fg(Color::Rgb(142, 192, 124)),
         }
     }
 

@@ -219,18 +219,12 @@ mod tests {
         let config = LspConfig::default();
         let manager = LspManager::new(config);
 
-        assert_eq!(
-            manager.detect_language(&PathBuf::from("test.rs")),
-            Some("rust".to_string())
-        );
+        assert_eq!(manager.detect_language(&PathBuf::from("test.rs")), Some("rust".to_string()));
         assert_eq!(
             manager.detect_language(&PathBuf::from("test.ts")),
             Some("typescript".to_string())
         );
-        assert_eq!(
-            manager.detect_language(&PathBuf::from("test.py")),
-            Some("python".to_string())
-        );
+        assert_eq!(manager.detect_language(&PathBuf::from("test.py")), Some("python".to_string()));
         assert_eq!(manager.detect_language(&PathBuf::from("test.unknown")), None);
     }
 

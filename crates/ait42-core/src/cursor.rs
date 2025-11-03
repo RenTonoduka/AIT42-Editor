@@ -344,10 +344,7 @@ impl CursorSet {
     /// Remove cursor by index (secondary cursors only)
     pub fn remove_cursor(&mut self, index: usize) -> Result<()> {
         if index >= self.secondary.len() {
-            return Err(EditorError::Other(format!(
-                "Cursor index {} out of bounds",
-                index
-            )));
+            return Err(EditorError::Other(format!("Cursor index {} out of bounds", index)));
         }
         self.secondary.remove(index);
         Ok(())

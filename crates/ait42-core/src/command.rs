@@ -309,7 +309,12 @@ mod tests {
 
         let cmd1 = Box::new(InsertCommand::new(buffer.id(), 0, "Hello"));
         history.push(cmd1);
-        history.undo_stack.last_mut().unwrap().execute(&mut buffer).unwrap();
+        history
+            .undo_stack
+            .last_mut()
+            .unwrap()
+            .execute(&mut buffer)
+            .unwrap();
 
         assert_eq!(buffer.to_string(), "Hello");
         assert!(history.can_undo());
@@ -329,7 +334,12 @@ mod tests {
 
         let cmd1 = Box::new(InsertCommand::new(buffer.id(), 0, "Hello"));
         history.push(cmd1);
-        history.undo_stack.last_mut().unwrap().execute(&mut buffer).unwrap();
+        history
+            .undo_stack
+            .last_mut()
+            .unwrap()
+            .execute(&mut buffer)
+            .unwrap();
 
         history.undo(&mut buffer).unwrap();
         assert!(history.can_redo());

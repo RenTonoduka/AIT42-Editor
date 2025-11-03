@@ -29,7 +29,11 @@ impl AgentExecutor {
     }
 
     /// Execute task with specified mode
-    pub async fn execute(&mut self, mode: ExecutionMode, task: &str) -> Result<Vec<ExecutionResult>> {
+    pub async fn execute(
+        &mut self,
+        mode: ExecutionMode,
+        task: &str,
+    ) -> Result<Vec<ExecutionResult>> {
         match mode {
             ExecutionMode::Single(agent) => {
                 let result = self.execute_single(&agent, task).await?;
@@ -54,9 +58,7 @@ impl AgentExecutor {
         let mut results = self.coordinator.execute_task(task).await?;
 
         if results.is_empty() {
-            return Err(AIT42Error::ExecutionFailed(
-                "No execution results returned".to_string(),
-            ));
+            return Err(AIT42Error::ExecutionFailed("No execution results returned".to_string()));
         }
 
         Ok(results.remove(0))
@@ -84,9 +86,7 @@ impl AgentExecutor {
             let task = task.to_string();
             let mut coordinator = self.coordinator.clone_for_parallel()?;
 
-            let handle = tokio::spawn(async move {
-                coordinator.execute_task(&task).await
-            });
+            let handle = tokio::spawn(async move { coordinator.execute_task(&task).await });
 
             handles.push(handle);
         }

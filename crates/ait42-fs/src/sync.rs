@@ -84,10 +84,7 @@ impl FileSynchronizer {
 
         // If no more files in this directory, stop watching
         if let Some(parent) = path.parent() {
-            let has_files_in_dir = self
-                .open_files
-                .keys()
-                .any(|p| p.parent() == Some(parent));
+            let has_files_in_dir = self.open_files.keys().any(|p| p.parent() == Some(parent));
 
             if !has_files_in_dir {
                 let _ = self.watcher.unwatch(parent);

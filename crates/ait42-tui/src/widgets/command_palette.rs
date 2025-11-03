@@ -22,7 +22,11 @@ pub struct Command {
 }
 
 impl Command {
-    pub fn new(name: impl Into<String>, description: impl Into<String>, category: impl Into<String>) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        description: impl Into<String>,
+        category: impl Into<String>,
+    ) -> Self {
         Self {
             name: name.into(),
             description: description.into(),
@@ -137,12 +141,8 @@ impl<'a> Widget for CommandPalette<'a> {
         }
 
         // Filter and render suggestions
-        let suggestions_area = Rect::new(
-            inner.x,
-            inner.y + 2,
-            inner.width,
-            inner.height.saturating_sub(2),
-        );
+        let suggestions_area =
+            Rect::new(inner.x, inner.y + 2, inner.width, inner.height.saturating_sub(2));
 
         let matches = self.filter_commands();
         let visible_count = suggestions_area.height as usize;
@@ -158,12 +158,8 @@ impl<'a> Widget for CommandPalette<'a> {
             };
 
             // Format: [Category] Name - Description
-            let text = format!(
-                "[{}] {} - {}",
-                m.command.category,
-                m.command.name,
-                m.command.description
-            );
+            let text =
+                format!("[{}] {} - {}", m.command.category, m.command.name, m.command.description);
 
             // Truncate to fit
             let max_width = suggestions_area.width as usize;
@@ -248,8 +244,10 @@ mod tests {
 
         let matches = palette.filter_commands();
         assert!(matches.len() > 0);
-        assert!(matches[0].command.name.contains("save") ||
-                matches[0].command.description.contains("save"));
+        assert!(
+            matches[0].command.name.contains("save")
+                || matches[0].command.description.contains("save")
+        );
     }
 
     #[test]

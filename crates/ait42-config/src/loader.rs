@@ -33,9 +33,7 @@ impl ConfigLoader {
     pub fn default_config_dir() -> Result<PathBuf> {
         directories::ProjectDirs::from("com", "ait42", "ait42-editor")
             .map(|dirs| dirs.config_dir().to_path_buf())
-            .ok_or_else(|| {
-                ConfigError::ParseError("Cannot determine config directory".to_string())
-            })
+            .ok_or_else(|| ConfigError::ParseError("Cannot determine config directory".to_string()))
     }
 
     /// Get default configuration file path
@@ -48,10 +46,7 @@ impl ConfigLoader {
     /// If file doesn't exist, returns default configuration.
     pub async fn load(&self) -> Result<Config> {
         if !self.exists().await {
-            info!(
-                "Config file not found at {}, using defaults",
-                self.config_path.display()
-            );
+            info!("Config file not found at {}, using defaults", self.config_path.display());
             return Ok(Config::default());
         }
 
@@ -116,10 +111,7 @@ impl ConfigLoader {
 
         // Validate agents path exists (warning only)
         if !config.ait42.agents_path.exists() {
-            warn!(
-                "Agents path does not exist: {}",
-                config.ait42.agents_path.display()
-            );
+            warn!("Agents path does not exist: {}", config.ait42.agents_path.display());
         }
 
         Ok(())

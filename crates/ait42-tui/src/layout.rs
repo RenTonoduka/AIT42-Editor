@@ -77,10 +77,7 @@ impl EditorLayout {
         let (sidebar, main_area) = if config.show_sidebar {
             let chunks = RatatuiLayout::default()
                 .direction(Direction::Horizontal)
-                .constraints([
-                    Constraint::Length(config.sidebar_width),
-                    Constraint::Min(0),
-                ])
+                .constraints([Constraint::Length(config.sidebar_width), Constraint::Min(0)])
                 .split(full);
             (Some(chunks[0]), chunks[1])
         } else {
@@ -95,10 +92,7 @@ impl EditorLayout {
                 Constraint::Length(1),
             ]
         } else {
-            vec![
-                Constraint::Min(0),
-                Constraint::Length(1),
-            ]
+            vec![Constraint::Min(0), Constraint::Length(1)]
         };
 
         let vertical_chunks = RatatuiLayout::default()
@@ -141,10 +135,7 @@ impl EditorLayout {
     fn minimal(terminal_size: Rect) -> Self {
         let chunks = RatatuiLayout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Min(0),
-                Constraint::Length(1),
-            ])
+            .constraints([Constraint::Min(0), Constraint::Length(1)])
             .split(terminal_size);
 
         Self {

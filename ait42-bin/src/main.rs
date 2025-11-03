@@ -107,16 +107,13 @@ fn setup_logging(args: &Args) -> Result<()> {
     if let Some(log_path) = &args.log_file {
         let file_appender = tracing_appender::rolling::daily(
             log_path.parent().unwrap_or(std::path::Path::new(".")),
-            log_path.file_name().unwrap_or(std::ffi::OsStr::new("ait42.log")),
+            log_path
+                .file_name()
+                .unwrap_or(std::ffi::OsStr::new("ait42.log")),
         );
-        let file_layer = fmt::layer()
-            .json()
-            .with_writer(file_appender);
+        let file_layer = fmt::layer().json().with_writer(file_appender);
 
-        subscriber
-            .with(fmt_layer)
-            .with(file_layer)
-            .init();
+        subscriber.with(fmt_layer).with(file_layer).init();
     } else {
         subscriber.with(fmt_layer).init();
     }
@@ -126,7 +123,7 @@ fn setup_logging(args: &Args) -> Result<()> {
 
 /// Load configuration from file or defaults
 async fn load_config(args: &Args) -> Result<ait42_config::Config> {
-    use ait42_config::{ConfigLoader, default_config};
+    use ait42_config::{default_config, ConfigLoader};
 
     let config = if let Some(config_path) = &args.config {
         ConfigLoader::with_path(config_path.clone())
@@ -134,9 +131,9 @@ async fn load_config(args: &Args) -> Result<ait42_config::Config> {
             .await
             .context("Failed to load config file")?
     } else {
-        let loader = ConfigLoader::new()
-            .context("Failed to create config loader")?;
-        loader.load_or_create()
+        let loader = ConfigLoader::new().context("Failed to create config loader")?;
+        loader
+            .load_or_create()
             .await
             .unwrap_or_else(|_| default_config())
     };

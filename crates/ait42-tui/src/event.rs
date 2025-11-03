@@ -2,9 +2,7 @@
 //!
 //! Provides async event handling for terminal input (keyboard, mouse, resize).
 
-use crossterm::event::{
-    Event as CrosstermEvent, EventStream, KeyEvent, MouseEvent,
-};
+use crossterm::event::{Event as CrosstermEvent, EventStream, KeyEvent, MouseEvent};
 use futures::StreamExt;
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -142,10 +140,11 @@ mod tests {
         // Collect multiple ticks
         let mut tick_count = 0;
         for _ in 0..3 {
-            if let Some(EditorEvent::Tick) = timeout(
-                Duration::from_millis(100),
-                event_loop.next()
-            ).await.ok().flatten() {
+            if let Some(EditorEvent::Tick) = timeout(Duration::from_millis(100), event_loop.next())
+                .await
+                .ok()
+                .flatten()
+            {
                 tick_count += 1;
             }
         }

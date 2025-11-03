@@ -61,7 +61,10 @@ impl Coordinator {
             selected.push("backend-developer".to_string());
         }
 
-        if task_lower.contains("frontend") || task_lower.contains("ui") || task_lower.contains("react") {
+        if task_lower.contains("frontend")
+            || task_lower.contains("ui")
+            || task_lower.contains("react")
+        {
             selected.push("frontend-developer".to_string());
         }
 
@@ -143,7 +146,10 @@ impl Coordinator {
 
         // Wait for completion with timeout
         let timeout_secs = self.config.session_timeout_secs;
-        let wait_result = self.tmux.wait_for_completion(&session_id, timeout_secs).await;
+        let wait_result = self
+            .tmux
+            .wait_for_completion(&session_id, timeout_secs)
+            .await;
 
         // Get output
         let output = self.tmux.get_output(&session_id).await.unwrap_or_default();
@@ -178,7 +184,11 @@ impl Coordinator {
     }
 
     /// Execute with multiple agents in parallel
-    async fn execute_parallel(&mut self, agents: &[String], task: &str) -> Result<Vec<ExecutionResult>> {
+    async fn execute_parallel(
+        &mut self,
+        agents: &[String],
+        task: &str,
+    ) -> Result<Vec<ExecutionResult>> {
         info!("Executing task with {} agents in parallel", agents.len());
 
         let mut results = Vec::new();
@@ -246,9 +256,7 @@ impl Coordinator {
         }
 
         if results.is_empty() {
-            return Err(AIT42Error::ExecutionFailed(
-                "All parallel executions failed".to_string(),
-            ));
+            return Err(AIT42Error::ExecutionFailed("All parallel executions failed".to_string()));
         }
 
         Ok(results)
