@@ -11,9 +11,11 @@ import { TabBar } from './TabBar';
 import { EditorPane } from './EditorPane';
 import { Terminal } from '@/components/Terminal';
 import { DiagnosticsPanel } from '@/components/Diagnostics';
+import { GitPanel } from '@/components/Git';
 import { useEditorStore } from '@/store/editorStore';
 import { useTerminalStore, MIN_TERMINAL_HEIGHT } from '@/store/terminalStore';
 import { useLspStore } from '@/store/lspStore';
+import { useGitStore } from '@/store/gitStore';
 
 /**
  * Empty state when no files are open
@@ -73,6 +75,7 @@ export const EditorContainer: React.FC = () => {
     setXTermInstance,
   } = useTerminalStore();
   const { showDiagnosticsPanel } = useLspStore();
+  const { showGitPanel } = useGitStore();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const isResizing = useRef(false);
@@ -138,17 +141,30 @@ export const EditorContainer: React.FC = () => {
     document.addEventListener('mouseup', handleMouseUp);
   }, [setTerminalHeight, setResizing]);
 
-  // Calculate diagnostics panel height
+  // Calculate panel heights
   const diagnosticsPanelHeight = 200; // Fixed height for diagnostics panel
+  const gitPanelHeight = 300; // Fixed height for git panel
 
-  // Calculate editor height
+  // Calculate editor height accounting for all visible panels
   let editorHeight = '100%';
-  if (isTerminalVisible && showDiagnosticsPanel) {
-    editorHeight = `calc(100% - ${terminalHeight}px - ${diagnosticsPanelHeight}px - 2px)`; // -2px for resize handles
-  } else if (isTerminalVisible) {
-    editorHeight = `calc(100% - ${terminalHeight}px - 1px)`; // -1px for resize handle
-  } else if (showDiagnosticsPanel) {
-    editorHeight = `calc(100% - ${diagnosticsPanelHeight}px - 1px)`; // -1px for resize handle
+  let totalBottomPanelHeight = 0;
+  let separatorCount = 0;
+
+  if (showDiagnosticsPanel) {
+    totalBottomPanelHeight += diagnosticsPanelHeight;
+    separatorCount += 1;
+  }
+  if (showGitPanel) {
+    totalBottomPanelHeight += gitPanelHeight;
+    separatorCount += 1;
+  }
+  if (isTerminalVisible) {
+    totalBottomPanelHeight += terminalHeight;
+    separatorCount += 1;
+  }
+
+  if (totalBottomPanelHeight > 0) {
+    editorHeight = `calc(100% - ${totalBottomPanelHeight}px - ${separatorCount}px)`; // -1px per separator
   }
 
   return (
@@ -179,6 +195,16 @@ export const EditorContainer: React.FC = () => {
           <div className="h-1 bg-[#2D2D30]" />
           <div style={{ height: diagnosticsPanelHeight }}>
             <DiagnosticsPanel />
+          </div>
+        </>
+      )}
+
+      {/* Git Panel section */}
+      {showGitPanel && (
+        <>
+          <div className="h-1 bg-[#2D2D30]" />
+          <div style={{ height: gitPanelHeight }}>
+            <GitPanel />
           </div>
         </>
       )}

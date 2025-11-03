@@ -9,10 +9,11 @@
  * - Language mode
  */
 
-import React from 'react';
-import { AlertCircle, AlertTriangle } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { AlertCircle, AlertTriangle, GitBranch, Upload, Download } from 'lucide-react';
 import { useEditorStore } from '@/store/editorStore';
 import { useLspStore } from '@/store/lspStore';
+import { useGitStore } from '@/store/gitStore';
 import { getFileIcon } from '@/utils/monaco';
 
 /**
@@ -28,6 +29,18 @@ export const StatusBar: React.FC = () => {
     toggleDiagnosticsPanel,
     showDiagnosticsPanel,
   } = useLspStore();
+
+  const {
+    status: gitStatus,
+    fetchStatus,
+    toggleGitPanel,
+    showGitPanel,
+  } = useGitStore();
+
+  // Fetch Git status on mount
+  useEffect(() => {
+    fetchStatus();
+  }, [fetchStatus]);
 
   const errorCount = getTotalErrorCount();
   const warningCount = getTotalWarningCount();
@@ -70,6 +83,35 @@ export const StatusBar: React.FC = () => {
               <div className="flex items-center gap-1">
                 <AlertTriangle size={14} />
                 <span className="text-xs">{warningCount}</span>
+              </div>
+            )}
+          </button>
+        )}
+
+        {/* Git status button */}
+        {gitStatus && (
+          <button
+            className={`flex items-center gap-2 px-2 py-1 rounded hover:bg-white/20 transition-colors ${
+              showGitPanel ? 'bg-white/10' : ''
+            }`}
+            onClick={toggleGitPanel}
+            title="Toggle Source Control"
+          >
+            <GitBranch size={14} />
+            <span className="text-xs">{gitStatus.branch}</span>
+            {gitStatus.files.length > 0 && (
+              <span className="text-xs">({gitStatus.files.length})</span>
+            )}
+            {gitStatus.ahead > 0 && (
+              <div className="flex items-center gap-0.5">
+                <Upload size={12} />
+                <span className="text-xs">{gitStatus.ahead}</span>
+              </div>
+            )}
+            {gitStatus.behind > 0 && (
+              <div className="flex items-center gap-0.5">
+                <Download size={12} />
+                <span className="text-xs">{gitStatus.behind}</span>
               </div>
             )}
           </button>

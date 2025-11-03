@@ -78,6 +78,35 @@ export interface LspLocation {
 }
 
 /**
+ * Git file status
+ */
+export interface GitFileStatus {
+  path: string;
+  status: string; // 'modified', 'added', 'deleted', 'untracked', 'renamed'
+}
+
+/**
+ * Git status information
+ */
+export interface GitStatus {
+  branch: string;
+  ahead: number;
+  behind: number;
+  files: GitFileStatus[];
+}
+
+/**
+ * Git commit information
+ */
+export interface GitCommit {
+  sha: string;
+  author: string;
+  email: string;
+  message: string;
+  timestamp: number;
+}
+
+/**
  * Type-safe Tauri command wrappers
  */
 export const tauriApi = {
@@ -407,6 +436,122 @@ export const tauriApi = {
       return diagnostics;
     } catch (error) {
       throw new Error(`Failed to get diagnostics: ${error}`);
+    }
+  },
+
+  // ===== Git Commands =====
+
+  /**
+   * Get Git status for current repository
+   */
+  async gitStatus(): Promise<GitStatus> {
+    try {
+      const status = await invoke<GitStatus>('git_status');
+      return status;
+    } catch (error) {
+      throw new Error(`Failed to get Git status: ${error}`);
+    }
+  },
+
+  /**
+   * Stage files for commit
+   */
+  async gitAdd(files: string[]): Promise<void> {
+    try {
+      await invoke('git_add', { files });
+    } catch (error) {
+      throw new Error(`Failed to add files: ${error}`);
+    }
+  },
+
+  /**
+   * Unstage files
+   */
+  async gitReset(files: string[]): Promise<void> {
+    try {
+      await invoke('git_reset', { files });
+    } catch (error) {
+      throw new Error(`Failed to reset files: ${error}`);
+    }
+  },
+
+  /**
+   * Create a commit
+   */
+  async gitCommit(message: string): Promise<string> {
+    try {
+      const sha = await invoke<string>('git_commit', { message });
+      return sha;
+    } catch (error) {
+      throw new Error(`Failed to commit: ${error}`);
+    }
+  },
+
+  /**
+   * Push to remote
+   */
+  async gitPush(remote?: string, branch?: string): Promise<void> {
+    try {
+      await invoke('git_push', { remote, branch });
+    } catch (error) {
+      throw new Error(`Failed to push: ${error}`);
+    }
+  },
+
+  /**
+   * Pull from remote
+   */
+  async gitPull(remote?: string, branch?: string): Promise<void> {
+    try {
+      await invoke('git_pull', { remote, branch });
+    } catch (error) {
+      throw new Error(`Failed to pull: ${error}`);
+    }
+  },
+
+  /**
+   * Get commit history
+   */
+  async gitLog(limit?: number): Promise<GitCommit[]> {
+    try {
+      const commits = await invoke<GitCommit[]>('git_log', { limit });
+      return commits;
+    } catch (error) {
+      throw new Error(`Failed to get commit history: ${error}`);
+    }
+  },
+
+  /**
+   * Get list of branches
+   */
+  async gitBranches(): Promise<string[]> {
+    try {
+      const branches = await invoke<string[]>('git_branches');
+      return branches;
+    } catch (error) {
+      throw new Error(`Failed to get branches: ${error}`);
+    }
+  },
+
+  /**
+   * Checkout branch
+   */
+  async gitCheckout(branch: string): Promise<void> {
+    try {
+      await invoke('git_checkout', { branch });
+    } catch (error) {
+      throw new Error(`Failed to checkout branch: ${error}`);
+    }
+  },
+
+  /**
+   * Create new branch
+   */
+  async gitCreateBranch(name: string): Promise<void> {
+    try {
+      await invoke('git_create_branch', { name });
+    } catch (error) {
+      throw new Error(`Failed to create branch: ${error}`);
     }
   },
 };
