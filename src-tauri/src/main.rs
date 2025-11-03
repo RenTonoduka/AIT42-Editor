@@ -43,6 +43,17 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::lsp_hover,
             commands::lsp_goto_definition,
             commands::lsp_diagnostics,
+            // Git operations
+            commands::git_status,
+            commands::git_add,
+            commands::git_reset,
+            commands::git_commit,
+            commands::git_push,
+            commands::git_pull,
+            commands::git_log,
+            commands::git_branches,
+            commands::git_checkout,
+            commands::git_create_branch,
             // Terminal operations
             commands::execute_command,
             commands::get_terminal_output,
@@ -87,7 +98,18 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::lsp_completion,
             commands::lsp_hover,
             commands::lsp_goto_definition,
-            commands::lsp_diagnostics
+            commands::lsp_diagnostics,
+            // Git operations
+            commands::git_status,
+            commands::git_add,
+            commands::git_reset,
+            commands::git_commit,
+            commands::git_push,
+            commands::git_pull,
+            commands::git_log,
+            commands::git_branches,
+            commands::git_checkout,
+            commands::git_create_branch
         ]
     }
 }

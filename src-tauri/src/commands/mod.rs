@@ -5,6 +5,7 @@
 pub mod file;
 pub mod editor;
 pub mod lsp;
+pub mod git;
 
 #[cfg(feature = "terminal")]
 pub mod terminal;
@@ -13,6 +14,7 @@ pub mod terminal;
 pub use file::*;
 pub use editor::*;
 pub use lsp::*;
+pub use git::*;
 
 #[cfg(feature = "terminal")]
 pub use terminal::*;
