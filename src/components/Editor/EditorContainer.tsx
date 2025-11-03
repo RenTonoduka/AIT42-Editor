@@ -5,11 +5,13 @@
  * handling tab switching and content updates.
  */
 
-import React from 'react';
+import React, { useRef, useCallback } from 'react';
 import { FileText } from 'lucide-react';
 import { TabBar } from './TabBar';
 import { EditorPane } from './EditorPane';
+import { Terminal } from '@/components/Terminal';
 import { useEditorStore } from '@/store/editorStore';
+import { useTerminalStore, MIN_TERMINAL_HEIGHT } from '@/store/terminalStore';
 
 /**
  * Empty state when no files are open
@@ -43,10 +45,34 @@ const EmptyState: React.FC = () => {
 };
 
 /**
+ * Terminal resize handle component
+ */
+const ResizeHandle: React.FC<{
+  onMouseDown: (e: React.MouseEvent) => void;
+}> = ({ onMouseDown }) => {
+  return (
+    <div
+      className="h-1 bg-[#2D2D30] hover:bg-[#007ACC] cursor-ns-resize transition-colors"
+      onMouseDown={onMouseDown}
+    />
+  );
+};
+
+/**
  * EditorContainer - Main editor UI
  */
 export const EditorContainer: React.FC = () => {
   const { tabs, activeTabId, updateTabContent, saveTab } = useEditorStore();
+  const {
+    isVisible: isTerminalVisible,
+    height: terminalHeight,
+    setHeight: setTerminalHeight,
+    setResizing,
+    setXTermInstance,
+  } = useTerminalStore();
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isResizing = useRef(false);
 
   // Get active tab
   const activeTab = tabs.find((t) => t.id === activeTabId);
@@ -74,13 +100,53 @@ export const EditorContainer: React.FC = () => {
     }
   };
 
+  /**
+   * Handle terminal resize start
+   */
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizing.current = true;
+    setResizing(true);
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isResizing.current || !containerRef.current) return;
+
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const containerBottom = containerRect.bottom;
+      const mouseY = moveEvent.clientY;
+
+      // Calculate new height (distance from mouse to container bottom)
+      const newHeight = Math.max(
+        MIN_TERMINAL_HEIGHT,
+        containerBottom - mouseY
+      );
+
+      setTerminalHeight(newHeight);
+    };
+
+    const handleMouseUp = () => {
+      isResizing.current = false;
+      setResizing(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [setTerminalHeight, setResizing]);
+
+  // Calculate editor height
+  const editorHeight = isTerminalVisible
+    ? `calc(100% - ${terminalHeight}px - 1px)` // -1px for resize handle
+    : '100%';
+
   return (
-    <div className="flex flex-col h-full">
+    <div ref={containerRef} className="flex flex-col h-full">
       {/* Tab bar */}
       <TabBar />
 
       {/* Editor pane */}
-      <div className="flex-1 overflow-hidden">
+      <div className="overflow-hidden" style={{ height: editorHeight }}>
         {activeTab ? (
           <EditorPane
             key={activeTab.id}
@@ -94,6 +160,19 @@ export const EditorContainer: React.FC = () => {
           <EmptyState />
         )}
       </div>
+
+      {/* Terminal section */}
+      {isTerminalVisible && (
+        <>
+          <ResizeHandle onMouseDown={handleResizeStart} />
+          <Terminal
+            height={terminalHeight}
+            onReady={(xterm) => {
+              setXTermInstance(xterm);
+            }}
+          />
+        </>
+      )}
     </div>
   );
 };

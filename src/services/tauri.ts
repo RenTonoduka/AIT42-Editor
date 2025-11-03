@@ -24,6 +24,16 @@ export interface FileNode {
 }
 
 /**
+ * Terminal information structure
+ */
+export interface TerminalInfo {
+  currentDir: string;
+  outputLines: number;
+  historySize: number;
+  timeoutSeconds: number;
+}
+
+/**
  * Type-safe Tauri command wrappers
  */
 export const tauriApi = {
@@ -103,6 +113,102 @@ export const tauriApi = {
       await invoke('rename_path', { oldPath, newPath });
     } catch (error) {
       throw new Error(`Failed to rename: ${error}`);
+    }
+  },
+
+  // ===== Terminal Commands =====
+
+  /**
+   * Execute a terminal command
+   */
+  async executeCommand(command: string): Promise<string> {
+    try {
+      const output = await invoke<string>('execute_command', { command });
+      return output;
+    } catch (error) {
+      throw new Error(`Failed to execute command: ${error}`);
+    }
+  },
+
+  /**
+   * Get all terminal output
+   */
+  async getTerminalOutput(): Promise<string[]> {
+    try {
+      const lines = await invoke<string[]>('get_terminal_output');
+      return lines;
+    } catch (error) {
+      throw new Error(`Failed to get terminal output: ${error}`);
+    }
+  },
+
+  /**
+   * Get last N lines of terminal output
+   */
+  async getTerminalTail(lines: number): Promise<string[]> {
+    try {
+      const output = await invoke<string[]>('get_terminal_tail', { lines });
+      return output;
+    } catch (error) {
+      throw new Error(`Failed to get terminal tail: ${error}`);
+    }
+  },
+
+  /**
+   * Clear terminal output buffer
+   */
+  async clearTerminal(): Promise<void> {
+    try {
+      await invoke('clear_terminal');
+    } catch (error) {
+      throw new Error(`Failed to clear terminal: ${error}`);
+    }
+  },
+
+  /**
+   * Get current working directory
+   */
+  async getCurrentDirectory(): Promise<string> {
+    try {
+      const path = await invoke<string>('get_current_directory');
+      return path;
+    } catch (error) {
+      throw new Error(`Failed to get current directory: ${error}`);
+    }
+  },
+
+  /**
+   * Set current working directory
+   */
+  async setCurrentDirectory(path: string): Promise<void> {
+    try {
+      await invoke('set_current_directory', { path });
+    } catch (error) {
+      throw new Error(`Failed to set current directory: ${error}`);
+    }
+  },
+
+  /**
+   * Get command history
+   */
+  async getCommandHistory(): Promise<string[]> {
+    try {
+      const history = await invoke<string[]>('get_command_history');
+      return history;
+    } catch (error) {
+      throw new Error(`Failed to get command history: ${error}`);
+    }
+  },
+
+  /**
+   * Get terminal info
+   */
+  async getTerminalInfo(): Promise<TerminalInfo> {
+    try {
+      const info = await invoke<TerminalInfo>('get_terminal_info');
+      return info;
+    } catch (error) {
+      throw new Error(`Failed to get terminal info: ${error}`);
     }
   },
 };

@@ -5,10 +5,12 @@
  * - File operations (Cmd+O, Cmd+N, Cmd+S, Cmd+Shift+S)
  * - Tab navigation (Cmd+1-9, Cmd+W, Cmd+Tab)
  * - Editor actions (Cmd+F, Cmd+H, Cmd+P)
+ * - Terminal (Ctrl+`, Cmd+J)
  */
 
 import { useEffect } from 'react';
 import { useEditorStore } from '@/store/editorStore';
+import { useTerminalStore } from '@/store/terminalStore';
 
 export interface KeyboardShortcutHandlers {
   /** Open file dialog */
@@ -25,6 +27,8 @@ export interface KeyboardShortcutHandlers {
   onFindReplace?: () => void;
   /** Command palette */
   onCommandPalette?: () => void;
+  /** Toggle terminal */
+  onToggleTerminal?: () => void;
 }
 
 /**
@@ -51,6 +55,7 @@ function matchesShortcut(
 export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers = {}) {
   const { tabs, activeTabId, closeTab, setActiveTab, saveTab, saveAllTabs } =
     useEditorStore();
+  const { toggleTerminal } = useTerminalStore();
 
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
@@ -118,6 +123,17 @@ export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers = {}) {
         return;
       }
 
+      // Ctrl+` or Cmd+J - Toggle terminal
+      if (
+        (e.ctrlKey && e.key === '`') ||
+        matchesShortcut(e, 'j', { cmd: true })
+      ) {
+        e.preventDefault();
+        toggleTerminal();
+        handlers.onToggleTerminal?.();
+        return;
+      }
+
       // Cmd+1 through Cmd+9 - Switch to tab 1-9
       if (isCmdOrCtrl && e.key >= '1' && e.key <= '9') {
         e.preventDefault();
@@ -161,5 +177,6 @@ export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers = {}) {
     setActiveTab,
     saveTab,
     saveAllTabs,
+    toggleTerminal,
   ]);
 }
