@@ -4,6 +4,7 @@
 [workspace]
 members = [
     "ait42-bin",
+    "src-tauri",
     "crates/ait42-core",
     "crates/ait42-tui",
     "crates/ait42-lsp",

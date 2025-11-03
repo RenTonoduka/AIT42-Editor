@@ -1,0 +1,185 @@
+/**
+ * AIT42 Editor - Cursor Dark Theme
+ * Based on Cursor IDE color scheme
+ */
+
+:root {
+  /* Primary Colors */
+  --cursor-bg-primary: #1E1E1E;
+  --cursor-bg-secondary: #252526;
+  --cursor-bg-tertiary: #2D2D30;
+
+  /* Foreground Colors */
+  --cursor-fg-primary: #CCCCCC;
+  --cursor-fg-secondary: #858585;
+  --cursor-fg-muted: #6A6A6A;
+
+  /* Accent Colors */
+  --cursor-accent: #007ACC;
+  --cursor-accent-hover: #0098FF;
+  --cursor-accent-active: #005A9E;
+
+  /* Border Colors */
+  --cursor-border: #3E3E42;
+  --cursor-border-focus: #007ACC;
+
+  /* Surface Colors */
+  --cursor-surface: #252526;
+  --cursor-surface-hover: #2A2D2E;
+  --cursor-surface-active: #37373D;
+
+  /* Status Colors */
+  --cursor-success: #89D185;
+  --cursor-warning: #CCA700;
+  --cursor-error: #F48771;
+  --cursor-info: #75BEFF;
+
+  /* Syntax Highlighting */
+  --cursor-syntax-keyword: #569CD6;
+  --cursor-syntax-string: #CE9178;
+  --cursor-syntax-number: #B5CEA8;
+  --cursor-syntax-comment: #6A9955;
+  --cursor-syntax-function: #DCDCAA;
+  --cursor-syntax-variable: #9CDCFE;
+  --cursor-syntax-type: #4EC9B0;
+
+  /* UI Elements */
+  --cursor-scrollbar-bg: #1E1E1E;
+  --cursor-scrollbar-thumb: #424242;
+  --cursor-scrollbar-thumb-hover: #4F4F4F;
+
+  /* Selection */
+  --cursor-selection: #264F78;
+  --cursor-selection-inactive: #3A3D41;
+
+  /* Line Numbers */
+  --cursor-line-number: #858585;
+  --cursor-line-number-active: #C6C6C6;
+
+  /* Gutter */
+  --cursor-gutter-bg: #1E1E1E;
+  --cursor-gutter-modified: #1B81A8;
+  --cursor-gutter-added: #487E02;
+  --cursor-gutter-deleted: #F85149;
+
+  /* Tab Colors */
+  --cursor-tab-active-bg: #1E1E1E;
+  --cursor-tab-inactive-bg: #2D2D2D;
+  --cursor-tab-border: #252526;
+  --cursor-tab-active-border: #007ACC;
+
+  /* Panel Colors */
+  --cursor-panel-bg: #181818;
+  --cursor-panel-border: #2D2D2D;
+
+  /* Terminal Colors */
+  --cursor-terminal-black: #000000;
+  --cursor-terminal-red: #CD3131;
+  --cursor-terminal-green: #0DBC79;
+  --cursor-terminal-yellow: #E5E510;
+  --cursor-terminal-blue: #2472C8;
+  --cursor-terminal-magenta: #BC3FBC;
+  --cursor-terminal-cyan: #11A8CD;
+  --cursor-terminal-white: #E5E5E5;
+
+  /* Spacing */
+  --cursor-spacing-xs: 4px;
+  --cursor-spacing-sm: 8px;
+  --cursor-spacing-md: 16px;
+  --cursor-spacing-lg: 24px;
+  --cursor-spacing-xl: 32px;
+
+  /* Border Radius */
+  --cursor-radius-sm: 3px;
+  --cursor-radius-md: 5px;
+  --cursor-radius-lg: 8px;
+
+  /* Font */
+  --cursor-font-family: 'Fira Code', 'Monaco', 'Menlo', 'Consolas', monospace;
+  --cursor-font-size: 14px;
+  --cursor-line-height: 1.5;
+
+  /* Transitions */
+  --cursor-transition-fast: 150ms ease;
+  --cursor-transition-normal: 250ms ease;
+  --cursor-transition-slow: 350ms ease;
+
+  /* Shadows */
+  --cursor-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
+  --cursor-shadow-md: 0 4px 8px rgba(0, 0, 0, 0.3);
+  --cursor-shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* Dark theme body defaults */
+body.cursor-dark-theme {
+  background-color: var(--cursor-bg-primary);
+  color: var(--cursor-fg-primary);
+  font-family: var(--cursor-font-family);
+  font-size: var(--cursor-font-size);
+  line-height: var(--cursor-line-height);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--cursor-scrollbar-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--cursor-scrollbar-thumb);
+  border-radius: var(--cursor-radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cursor-scrollbar-thumb-hover);
+}
+
+/* Selection */
+::selection {
+  background: var(--cursor-selection);
+}
+
+/* Focus outline */
+:focus-visible {
+  outline: 2px solid var(--cursor-border-focus);
+  outline-offset: 2px;
+}
+
+/* Button base styles */
+button {
+  font-family: var(--cursor-font-family);
+  transition: background-color var(--cursor-transition-fast);
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+button:active {
+  opacity: 0.8;
+}
+
+/* Input base styles */
+input, textarea {
+  font-family: var(--cursor-font-family);
+  background-color: var(--cursor-bg-secondary);
+  color: var(--cursor-fg-primary);
+  border: 1px solid var(--cursor-border);
+  transition: border-color var(--cursor-transition-fast);
+}
+
+input:focus, textarea:focus {
+  border-color: var(--cursor-border-focus);
+  outline: none;
+}
+
+/* Code blocks */
+code, pre {
+  font-family: var(--cursor-font-family);
+  background-color: var(--cursor-bg-secondary);
+  color: var(--cursor-fg-primary);
+}

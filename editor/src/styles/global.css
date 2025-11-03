@@ -1,0 +1,258 @@
+/**
+ * AIT42 Editor - Global Styles
+ */
+
+@import './cursor-theme.css';
+
+/* CSS Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Utility Classes */
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.gap-1 {
+  gap: var(--cursor-spacing-xs);
+}
+
+.gap-2 {
+  gap: var(--cursor-spacing-sm);
+}
+
+.gap-4 {
+  gap: var(--cursor-spacing-md);
+}
+
+.p-2 {
+  padding: var(--cursor-spacing-sm);
+}
+
+.p-4 {
+  padding: var(--cursor-spacing-md);
+}
+
+.m-0 {
+  margin: 0;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.h-full {
+  height: 100%;
+}
+
+.overflow-hidden {
+  overflow: hidden;
+}
+
+.overflow-auto {
+  overflow: auto;
+}
+
+/* Text utilities */
+.text-sm {
+  font-size: 12px;
+}
+
+.text-base {
+  font-size: 14px;
+}
+
+.text-lg {
+  font-size: 16px;
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
+/* Color utilities */
+.text-primary {
+  color: var(--cursor-fg-primary);
+}
+
+.text-secondary {
+  color: var(--cursor-fg-secondary);
+}
+
+.text-muted {
+  color: var(--cursor-fg-muted);
+}
+
+.text-accent {
+  color: var(--cursor-accent);
+}
+
+.text-success {
+  color: var(--cursor-success);
+}
+
+.text-warning {
+  color: var(--cursor-warning);
+}
+
+.text-error {
+  color: var(--cursor-error);
+}
+
+/* Background utilities */
+.bg-primary {
+  background-color: var(--cursor-bg-primary);
+}
+
+.bg-secondary {
+  background-color: var(--cursor-bg-secondary);
+}
+
+.bg-surface {
+  background-color: var(--cursor-surface);
+}
+
+.bg-accent {
+  background-color: var(--cursor-accent);
+}
+
+/* Border utilities */
+.border {
+  border: 1px solid var(--cursor-border);
+}
+
+.border-t {
+  border-top: 1px solid var(--cursor-border);
+}
+
+.border-b {
+  border-bottom: 1px solid var(--cursor-border);
+}
+
+.border-l {
+  border-left: 1px solid var(--cursor-border);
+}
+
+.border-r {
+  border-right: 1px solid var(--cursor-border);
+}
+
+.rounded {
+  border-radius: var(--cursor-radius-sm);
+}
+
+.rounded-md {
+  border-radius: var(--cursor-radius-md);
+}
+
+.rounded-lg {
+  border-radius: var(--cursor-radius-lg);
+}
+
+/* Interactive utilities */
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.select-none {
+  user-select: none;
+}
+
+.transition {
+  transition: all var(--cursor-transition-fast);
+}
+
+.hover-surface:hover {
+  background-color: var(--cursor-surface-hover);
+}
+
+.hover-accent:hover {
+  background-color: var(--cursor-accent-hover);
+}
+
+/* Animation keyframes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn var(--cursor-transition-normal);
+}
+
+.animate-slideInRight {
+  animation: slideInRight var(--cursor-transition-normal);
+}
+
+.animate-slideInLeft {
+  animation: slideInLeft var(--cursor-transition-normal);
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

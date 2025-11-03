@@ -1,0 +1,104 @@
+/**
+ * AIT42 Editor - Terminal Styles
+ */
+
+.terminal {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: var(--cursor-panel-bg);
+  border-top: 1px solid var(--cursor-border);
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--cursor-spacing-xs) var(--cursor-spacing-sm);
+  background-color: var(--cursor-bg-secondary);
+  border-bottom: 1px solid var(--cursor-border);
+  height: 35px;
+}
+
+.title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cursor-fg-primary);
+}
+
+.actions {
+  display: flex;
+  gap: var(--cursor-spacing-xs);
+}
+
+.iconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--cursor-fg-secondary);
+  cursor: pointer;
+  border-radius: var(--cursor-radius-sm);
+  transition: background-color var(--cursor-transition-fast);
+}
+
+.iconButton:hover {
+  background-color: var(--cursor-surface-hover);
+  color: var(--cursor-fg-primary);
+}
+
+.iconButton:active {
+  background-color: var(--cursor-surface-active);
+}
+
+/* Content */
+.content {
+  flex: 1;
+  padding: var(--cursor-spacing-sm);
+  overflow: hidden;
+}
+
+/* Override xterm.js styles to match Cursor theme */
+.content :global(.xterm) {
+  height: 100%;
+  padding: 0;
+}
+
+.content :global(.xterm-viewport) {
+  background-color: transparent !important;
+}
+
+.content :global(.xterm-screen) {
+  background-color: transparent !important;
+}
+
+.content :global(.xterm-cursor-layer) {
+  z-index: 1;
+}
+
+.content :global(.xterm-link-layer) {
+  z-index: 1;
+}
+
+/* Scrollbar styling for xterm */
+.content :global(.xterm-viewport)::-webkit-scrollbar {
+  width: 10px;
+}
+
+.content :global(.xterm-viewport)::-webkit-scrollbar-track {
+  background: var(--cursor-panel-bg);
+}
+
+.content :global(.xterm-viewport)::-webkit-scrollbar-thumb {
+  background: var(--cursor-scrollbar-thumb);
+  border-radius: var(--cursor-radius-sm);
+}
+
+.content :global(.xterm-viewport)::-webkit-scrollbar-thumb:hover {
+  background: var(--cursor-scrollbar-thumb-hover);
+}

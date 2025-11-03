@@ -1,0 +1,45 @@
+/**
+ * AIT42 Editor - Layout Styles
+ */
+
+.layout {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--cursor-bg-primary);
+  color: var(--cursor-fg-primary);
+}
+
+.sidebarPanel {
+  background-color: var(--cursor-bg-secondary);
+  border-right: 1px solid var(--cursor-border);
+}
+
+.resizeHandle {
+  width: 4px;
+  background-color: var(--cursor-border);
+  cursor: col-resize;
+  transition: background-color var(--cursor-transition-fast);
+}
+
+.resizeHandle:hover,
+.resizeHandle:active {
+  background-color: var(--cursor-accent);
+}
+
+.resizeHandle[data-panel-group-direction="vertical"] {
+  height: 4px;
+  width: 100%;
+  cursor: row-resize;
+}
+
+/* Smooth transitions */
+.layout * {
+  transition: none;
+}
+
+/* Focus styles */
+.layout *:focus-visible {
+  outline: 2px solid var(--cursor-border-focus);
+  outline-offset: -2px;
+}
