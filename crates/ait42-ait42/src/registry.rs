@@ -56,6 +56,7 @@ pub struct AgentMetadata {
 }
 
 /// Registry of available AI agents
+#[derive(Debug)]
 pub struct AgentRegistry {
     agents: HashMap<String, AgentMetadata>,
     agents_dir: PathBuf,

@@ -4,7 +4,8 @@
 
 use crate::{FsError, Result};
 use notify::{
-    Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher as NotifyWatcher,
+    event::ModifyKind, Config, Event, EventKind, RecommendedWatcher, RecursiveMode,
+    Watcher as NotifyWatcher,
 };
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -66,7 +67,7 @@ impl FileWatcher {
         let tx_clone = tx.clone();
 
         // Create the notify watcher
-        let mut watcher = RecommendedWatcher::new(
+        let watcher = RecommendedWatcher::new(
             move |res: notify::Result<Event>| {
                 let tx = tx_clone.clone();
                 tokio::spawn(async move {
@@ -152,6 +153,11 @@ impl FileWatcher {
                 Some(FileEvent::Created(paths[0].clone()))
             }
 
+            EventKind::Modify(ModifyKind::Name(_)) if paths.len() >= 2 => {
+                debug!("File renamed: {:?} -> {:?}", paths[0], paths[1]);
+                Some(FileEvent::Renamed(paths[0].clone(), paths[1].clone()))
+            }
+
             EventKind::Modify(_) => {
                 debug!("File modified: {:?}", paths[0]);
                 Some(FileEvent::Modified(paths[0].clone()))
@@ -160,11 +166,6 @@ impl FileWatcher {
             EventKind::Remove(_) => {
                 debug!("File deleted: {:?}", paths[0]);
                 Some(FileEvent::Deleted(paths[0].clone()))
-            }
-
-            EventKind::Rename(_, _) if paths.len() >= 2 => {
-                debug!("File renamed: {:?} -> {:?}", paths[0], paths[1]);
-                Some(FileEvent::Renamed(paths[0].clone(), paths[1].clone()))
             }
 
             _ => None,

@@ -2,7 +2,7 @@
 # Pins the Rust version for consistent builds
 
 [toolchain]
-channel = "1.75.0"
+channel = "stable"
 components = ["rustfmt", "clippy", "rust-analyzer"]
 targets = ["x86_64-apple-darwin", "aarch64-apple-darwin"]
 profile = "minimal"

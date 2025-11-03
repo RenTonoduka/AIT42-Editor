@@ -2,7 +2,7 @@
 
 use crate::error::{AIT42Error, Result};
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Duration;
 
 /// AIT42 integration configuration

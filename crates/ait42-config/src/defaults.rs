@@ -42,7 +42,7 @@ pub fn minimal_config() -> Config {
 
 /// Example configuration with comments (for documentation)
 pub fn example_config_toml() -> String {
-    r#"# AIT42 Editor Configuration
+    r##"# AIT42 Editor Configuration
 
 [editor]
 # Tab size in spaces
@@ -120,7 +120,7 @@ auto_coordinator = true
 
 # Default agent to use (optional)
 # default_agent = "Coordinator"
-"#
+"##
     .to_string()
 }
 

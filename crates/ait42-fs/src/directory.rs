@@ -4,7 +4,9 @@
 
 use crate::{FileNode, FsError, Result};
 use ignore::WalkBuilder;
+use std::future::Future;
 use std::path::{Path, PathBuf};
+use std::pin::Pin;
 use tokio::fs;
 use tracing::debug;
 use walkdir::WalkDir;
@@ -97,7 +99,7 @@ pub async fn find_files(root: &Path, pattern: &str) -> Result<Vec<PathBuf>> {
             .git_ignore(true) // Respect .gitignore
             .build()
         {
-            let entry = entry.map_err(|e| FsError::Io(e.into()))?;
+            let entry = entry.map_err(|e| FsError::InvalidPath(format!("Walk error: {}", e)))?;
             let path = entry.path();
 
             if path.is_file() {
@@ -137,7 +139,7 @@ pub async fn build_tree(root: &Path, max_depth: usize) -> Result<FileNode> {
 
     if !metadata.is_dir() {
         return Ok(FileNode {
-            name: root_name,
+            name: root_name.clone(),
             path: root.clone(),
             is_dir: false,
             is_hidden: root_name.starts_with('.'),
@@ -166,55 +168,58 @@ pub async fn build_tree(root: &Path, max_depth: usize) -> Result<FileNode> {
     })
 }
 
-async fn build_tree_recursive(
+fn build_tree_recursive(
     path: &Path,
     max_depth: usize,
     current_depth: usize,
-) -> Result<Vec<FileNode>> {
-    if current_depth >= max_depth {
-        return Ok(Vec::new());
-    }
-
-    let mut entries = fs::read_dir(path).await?;
-    let mut nodes = Vec::new();
-
-    while let Some(entry) = entries.next_entry().await? {
-        let metadata = entry.metadata().await?;
-        let entry_path = entry.path();
-        let name = entry
-            .file_name()
-            .to_string_lossy()
-            .to_string();
-
-        let is_dir = metadata.is_dir();
-        let is_hidden = name.starts_with('.');
-
-        let children = if is_dir && current_depth + 1 < max_depth {
-            Some(build_tree_recursive(&entry_path, max_depth, current_depth + 1).await?)
-        } else {
-            None
-        };
-
-        nodes.push(FileNode {
-            name,
-            path: entry_path,
-            is_dir,
-            is_hidden,
-            size: metadata.len(),
-            children,
-        });
-    }
-
-    // Sort: directories first, then by name
-    nodes.sort_by(|a, b| {
-        match (a.is_dir, b.is_dir) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => a.name.cmp(&b.name),
+) -> Pin<Box<dyn Future<Output = Result<Vec<FileNode>>> + Send>> {
+    let path = path.to_path_buf();
+    Box::pin(async move {
+        if current_depth >= max_depth {
+            return Ok(Vec::new());
         }
-    });
 
-    Ok(nodes)
+        let mut entries = fs::read_dir(&path).await?;
+        let mut nodes = Vec::new();
+
+        while let Some(entry) = entries.next_entry().await? {
+            let metadata = entry.metadata().await?;
+            let entry_path = entry.path();
+            let name = entry
+                .file_name()
+                .to_string_lossy()
+                .to_string();
+
+            let is_dir = metadata.is_dir();
+            let is_hidden = name.starts_with('.');
+
+            let children = if is_dir && current_depth + 1 < max_depth {
+                Some(build_tree_recursive(&entry_path, max_depth, current_depth + 1).await?)
+            } else {
+                None
+            };
+
+            nodes.push(FileNode {
+                name,
+                path: entry_path,
+                is_dir,
+                is_hidden,
+                size: metadata.len(),
+                children,
+            });
+        }
+
+        // Sort: directories first, then by name
+        nodes.sort_by(|a, b| {
+            match (a.is_dir, b.is_dir) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => a.name.cmp(&b.name),
+            }
+        });
+
+        Ok(nodes)
+    })
 }
 
 /// Find files by extension

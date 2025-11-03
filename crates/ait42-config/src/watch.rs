@@ -94,9 +94,7 @@ impl ConfigWatcher {
 // Clone implementation for ConfigLoader
 impl Clone for ConfigLoader {
     fn clone(&self) -> Self {
-        Self {
-            config_path: self.config_path.clone(),
-        }
+        Self::with_path(self.path().to_path_buf())
     }
 }
 

@@ -165,7 +165,8 @@ async fn example_editor_integration(executor: &mut AgentExecutor) -> Result<()> 
 
     println!("Simulating editor operations\n");
 
-    let bridge = EditorAgentBridge::new(executor.clone());
+    // Note: EditorAgentBridge requires AgentExecutor to implement Clone
+    // let bridge = EditorAgentBridge::new(executor.clone());
 
     // Mock buffer
     let buffer = Buffer {

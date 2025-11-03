@@ -16,7 +16,7 @@ resolver = "2"
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.91"
 authors = ["AIT42 Team"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/RenTonoduka/AIT42"
@@ -101,7 +101,3 @@ strip = false
 
 [profile.test]
 opt-level = 1
-
-[[bench]]
-name = "buffer_bench"
-harness = false

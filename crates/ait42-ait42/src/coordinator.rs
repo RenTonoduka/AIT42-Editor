@@ -6,7 +6,7 @@ use crate::registry::{AgentMetadata, AgentRegistry};
 use crate::tmux::{SessionStatus, TmuxManager, TmuxSession};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime};
-use tracing::{debug, info};
+use tracing::info;
 
 /// Result of agent execution
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -19,6 +19,7 @@ pub struct ExecutionResult {
 }
 
 /// Coordinator for agent selection and execution
+#[derive(Debug)]
 pub struct Coordinator {
     registry: AgentRegistry,
     tmux: TmuxManager,
@@ -36,6 +37,11 @@ impl Coordinator {
             tmux,
             config,
         })
+    }
+
+    /// Get a reference to the configuration
+    pub fn config(&self) -> &AIT42Config {
+        &self.config
     }
 
     /// Auto-select best agent(s) for a task

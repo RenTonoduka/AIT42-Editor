@@ -27,6 +27,7 @@ pub struct TmuxSession {
 }
 
 /// Tmux session manager
+#[derive(Debug)]
 pub struct TmuxManager {
     script_path: PathBuf,
     parallel_script_path: PathBuf,

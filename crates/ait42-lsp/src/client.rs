@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{ChildStdin, ChildStdout};
 use tokio::sync::{mpsc, Mutex, RwLock};
 use tracing::{debug, error, info, warn};
@@ -254,7 +254,7 @@ impl LspClient {
             // Handle response
             if let Some(id) = message.get("id").and_then(|v| v.as_u64()) {
                 if let Some(tx) = pending_requests.lock().await.remove(&id) {
-                    let _ = tx.send(message).await;
+                    let _ = tx.send(message.clone()).await;
                 }
             }
 
@@ -427,7 +427,7 @@ impl LspClient {
 
         // Kill the process if still running
         let mut process = self.server_process.lock().await;
-        let _ = process.kill().await;
+        let _ = process.kill();
 
         Ok(())
     }

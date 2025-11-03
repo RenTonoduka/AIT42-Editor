@@ -80,8 +80,7 @@ impl AgentExecutor {
         // Create tasks for each agent
         let mut handles = Vec::new();
 
-        for agent in agents {
-            let agent = agent.clone();
+        for _agent in agents {
             let task = task.to_string();
             let mut coordinator = self.coordinator.clone_for_parallel()?;
 
@@ -175,7 +174,7 @@ impl Coordinator {
     /// Clone coordinator for parallel execution
     /// Note: This creates a new coordinator with same config
     fn clone_for_parallel(&self) -> Result<Self> {
-        Coordinator::new(self.config.clone())
+        Coordinator::new(self.config().clone())
     }
 }
 
