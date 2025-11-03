@@ -34,6 +34,7 @@ pub mod keybinds;
 pub mod layout;
 pub mod renderer;
 pub mod theme;
+pub mod themes;
 pub mod tui_app;
 pub mod widgets;
 
@@ -43,8 +44,11 @@ pub use keybinds::{EditorCommand, KeyBinding, KeyMap, Mode};
 pub use layout::{EditorLayout, LayoutConfig};
 pub use renderer::Renderer;
 pub use theme::Theme;
+pub use themes::{CursorTheme, DefaultTheme, Theme as ThemeTrait};
 pub use tui_app::{EditorState, TuiApp};
-pub use widgets::{editor::ViewState, CommandPalette, EditorWidget, StatusLine};
+pub use widgets::{
+    editor::ViewState, CommandPalette, EditorWidget, Sidebar, StatusLine, TabBar, TerminalPanel,
+};
 
 use anyhow::Result;
 use tracing::info;
