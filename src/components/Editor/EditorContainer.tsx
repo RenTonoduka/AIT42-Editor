@@ -65,27 +65,50 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onFileOpen }) => {
     }));
   };
   return (
-    <div className="flex items-center justify-center h-full bg-[#1E1E1E] text-[#CCCCCC]">
-      <div className="text-center space-y-4">
-        <FileText size={64} className="mx-auto text-[#858585]" />
-        <h2 className="text-2xl font-semibold text-[#CCCCCC]">No file open</h2>
-        <p className="text-[#858585]">
-          Open a file from the explorer or use Cmd+O
-        </p>
-        <div className="flex gap-4 justify-center mt-6">
+    <div className="flex items-center justify-center h-full bg-editor-bg text-text-primary animate-fade-in">
+      <div className="text-center space-y-6 max-w-md px-8">
+        {/* Icon with glow effect */}
+        <div className="relative mb-8">
+          <div className="absolute inset-0 bg-gradient-to-br from-accent-primary/30 to-accent-secondary/30 rounded-full blur-3xl animate-glow" />
+          <FileText size={72} className="relative mx-auto text-text-tertiary drop-shadow-lg" />
+        </div>
+
+        {/* Title and description */}
+        <div className="space-y-3">
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-text-primary to-text-secondary bg-clip-text text-transparent">
+            No File Open
+          </h2>
+          <p className="text-text-secondary leading-relaxed">
+            Start by opening an existing file or create a new one
+          </p>
+          <p className="text-xs text-text-tertiary font-mono">
+            <kbd className="px-2 py-1 bg-editor-elevated/50 rounded border border-editor-border/30">⌘</kbd> +
+            <kbd className="px-2 py-1 bg-editor-elevated/50 rounded border border-editor-border/30">O</kbd> to open file
+          </p>
+        </div>
+
+        {/* Action buttons - Modern gradient design */}
+        <div className="flex gap-3 justify-center mt-8">
           <button
             onClick={handleOpenFile}
-            className="px-4 py-2 bg-[#007ACC] hover:bg-[#148EE0] text-white rounded transition-colors"
+            className="group relative px-6 py-3 bg-gradient-to-r from-accent-primary to-accent-secondary rounded-xl text-white font-semibold transition-all duration-300 hover:shadow-glow-lg hover:scale-105 overflow-hidden"
             title="Open file (Cmd+O)"
           >
-            Open File
+            <span className="relative z-10 flex items-center gap-2">
+              <FileText size={18} />
+              Open File
+            </span>
+            <div className="absolute inset-0 bg-gradient-to-r from-accent-secondary to-accent-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           </button>
           <button
             onClick={handleNewFile}
-            className="px-4 py-2 bg-[#3E3E42] hover:bg-[#505050] text-white rounded transition-colors"
+            className="group px-6 py-3 bg-editor-elevated/50 hover:bg-editor-elevated border border-editor-border/30 hover:border-accent-primary/50 text-text-primary rounded-xl font-semibold transition-all duration-300 hover:shadow-glow-sm"
             title="New file (Cmd+N)"
           >
-            New File
+            <span className="flex items-center gap-2">
+              <FileText size={18} />
+              New File
+            </span>
           </button>
         </div>
       </div>

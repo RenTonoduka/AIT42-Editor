@@ -32,47 +32,56 @@ function App() {
   });
 
   return (
-    <div className="flex h-screen bg-gray-900 text-gray-100">
-      {/* Activity Bar */}
-      <aside className="w-16 bg-gray-800 border-r border-gray-700 flex flex-col items-center py-4 space-y-4">
+    <div className="flex h-screen bg-editor-bg text-text-primary font-sans">
+      {/* Activity Bar - Modern gradient with glass effect */}
+      <aside className="w-16 bg-gradient-to-b from-editor-surface to-editor-elevated border-r border-editor-border/50 flex flex-col items-center py-6 space-y-3 backdrop-blur-sm">
         <button
           onClick={() => setActivePanel('editor')}
-          className={`p-3 rounded-lg transition-colors ${
+          className={`group relative p-3 rounded-xl transition-all duration-300 ${
             activePanel === 'editor'
-              ? 'bg-primary-600 text-white'
-              : 'text-gray-400 hover:bg-gray-700 hover:text-white'
+              ? 'bg-gradient-to-br from-accent-primary to-accent-secondary text-white shadow-glow-md'
+              : 'text-text-tertiary hover:text-text-primary hover:bg-editor-hover hover:shadow-glow-sm'
           }`}
           title="Editor"
         >
-          <Code size={24} />
+          <Code size={22} className="transition-transform group-hover:scale-110" />
+          {activePanel === 'editor' && (
+            <div className="absolute left-0 w-1 h-8 bg-accent-primary rounded-r-full animate-fade-in" />
+          )}
         </button>
         <button
           onClick={() => {
             setActivePanel('terminal');
             toggleTerminal();
           }}
-          className={`p-3 rounded-lg transition-colors ${
+          className={`group relative p-3 rounded-xl transition-all duration-300 ${
             activePanel === 'terminal'
-              ? 'bg-primary-600 text-white'
-              : 'text-gray-400 hover:bg-gray-700 hover:text-white'
+              ? 'bg-gradient-to-br from-accent-primary to-accent-secondary text-white shadow-glow-md'
+              : 'text-text-tertiary hover:text-text-primary hover:bg-editor-hover hover:shadow-glow-sm'
           }`}
           title="Terminal"
         >
-          <Terminal size={24} />
+          <Terminal size={22} className="transition-transform group-hover:scale-110" />
+          {activePanel === 'terminal' && (
+            <div className="absolute left-0 w-1 h-8 bg-accent-primary rounded-r-full animate-fade-in" />
+          )}
         </button>
         <button
           onClick={() => {
             setActivePanel('settings');
             toggleSettingsPanel();
           }}
-          className={`p-3 rounded-lg transition-colors ${
+          className={`group relative p-3 rounded-xl transition-all duration-300 ${
             activePanel === 'settings'
-              ? 'bg-primary-600 text-white'
-              : 'text-gray-400 hover:bg-gray-700 hover:text-white'
+              ? 'bg-gradient-to-br from-accent-primary to-accent-secondary text-white shadow-glow-md'
+              : 'text-text-tertiary hover:text-text-primary hover:bg-editor-hover hover:shadow-glow-sm'
           }`}
           title="Settings"
         >
-          <Settings size={24} />
+          <Settings size={22} className="transition-transform group-hover:scale-110" />
+          {activePanel === 'settings' && (
+            <div className="absolute left-0 w-1 h-8 bg-accent-primary rounded-r-full animate-fade-in" />
+          )}
         </button>
       </aside>
 

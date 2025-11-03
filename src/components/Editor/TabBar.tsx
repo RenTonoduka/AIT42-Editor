@@ -33,42 +33,55 @@ const TabItem: React.FC<TabItemProps> = ({ tab, onActivate, onClose }) => {
     <div
       onClick={() => onActivate(tab.id)}
       className={`
-        group flex items-center gap-2 px-4 py-2 min-w-[120px] max-w-[200px]
-        cursor-pointer select-none transition-colors border-r
+        group relative flex items-center gap-2.5 px-4 py-2.5 min-w-[140px] max-w-[220px]
+        cursor-pointer select-none transition-all duration-200
         ${
           tab.isActive
-            ? 'bg-[#2D2D2D] text-white border-[#3E3E42]'
-            : 'bg-[#252525] text-[#858585] hover:bg-[#2A2A2A] border-[#3E3E42]'
+            ? 'bg-editor-elevated/80 text-text-primary shadow-glow-sm'
+            : 'bg-editor-surface/20 text-text-secondary hover:bg-editor-hover/50 hover:text-text-primary'
         }
       `}
       role="tab"
       aria-selected={tab.isActive}
       tabIndex={tab.isActive ? 0 : -1}
     >
-      {/* Dirty indicator (unsaved changes) */}
-      {tab.isDirty && (
-        <div
-          className="w-2 h-2 rounded-full bg-[#007ACC]"
-          title="Unsaved changes"
-        />
+      {/* Active indicator line */}
+      {tab.isActive && (
+        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent-primary via-accent-secondary to-accent-primary animate-fade-in" />
       )}
 
-      {/* File name */}
-      <span className="flex-1 truncate text-sm">{tab.name}</span>
+      {/* Dirty indicator (unsaved changes) - Modern pulsing dot */}
+      {tab.isDirty && (
+        <div className="relative">
+          <div
+            className="w-2 h-2 rounded-full bg-accent-primary animate-glow"
+            title="Unsaved changes"
+          />
+          <div className="absolute inset-0 w-2 h-2 rounded-full bg-accent-primary blur-sm opacity-50" />
+        </div>
+      )}
 
-      {/* Close button */}
+      {/* File name with font styling */}
+      <span className="flex-1 truncate text-sm font-medium">{tab.name}</span>
+
+      {/* Close button - Elegant hover effect */}
       <button
         onClick={handleClose}
         className={`
-          p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity
-          hover:bg-[#3E3E42]
-          ${tab.isActive ? 'opacity-100' : ''}
+          p-1 rounded-lg transition-all duration-200
+          ${tab.isActive ? 'opacity-60 hover:opacity-100' : 'opacity-0 group-hover:opacity-60 hover:opacity-100'}
+          hover:bg-editor-hover/80 hover:text-accent-danger
         `}
         aria-label={`Close ${tab.name}`}
         title="Close"
       >
-        <X size={14} />
+        <X size={14} className="transition-transform hover:scale-110" />
       </button>
+
+      {/* Subtle gradient overlay on active tab */}
+      {tab.isActive && (
+        <div className="absolute inset-0 bg-gradient-to-b from-accent-primary/5 to-transparent pointer-events-none" />
+      )}
     </div>
   );
 };
@@ -118,17 +131,17 @@ export const TabBar: React.FC = () => {
 
   if (tabs.length === 0) {
     return (
-      <div className="h-10 bg-[#252525] border-b border-[#3E3E42] flex items-center px-4">
-        <div className="text-sm text-[#858585]">No files open</div>
+      <div className="h-11 bg-editor-surface/50 backdrop-blur-sm border-b border-editor-border/30 flex items-center px-5">
+        <div className="text-sm text-text-tertiary font-medium">No files open</div>
       </div>
     );
   }
 
   return (
-    <div className="h-10 bg-[#252525] border-b border-[#3E3E42]">
+    <div className="h-11 bg-editor-surface/50 backdrop-blur-sm border-b border-editor-border/30 shadow-sm">
       <div
         ref={scrollContainerRef}
-        className="flex overflow-x-auto scrollbar-thin scrollbar-thumb-[#79797966] scrollbar-track-transparent hover:scrollbar-thumb-[#646464B3]"
+        className="flex overflow-x-auto scrollbar-thin scrollbar-thumb-editor-border/50 scrollbar-track-transparent hover:scrollbar-thumb-editor-border"
         role="tablist"
         aria-label="Editor tabs"
       >

@@ -47,83 +47,94 @@ export const StatusBar: React.FC = () => {
   const hasProblems = errorCount > 0 || warningCount > 0;
 
   return (
-    <div className="h-8 bg-[#007ACC] flex items-center justify-between px-4 text-sm text-white">
-      {/* Left side - File info */}
-      <div className="flex items-center space-x-4">
+    <div className="h-7 bg-editor-surface/60 backdrop-blur-md border-t border-editor-border/20 flex items-center justify-between px-4 text-xs font-medium shadow-sm">
+      {/* Left side - File info with elegant badges */}
+      <div className="flex items-center space-x-3">
         {activeTab ? (
           <>
-            <span className="flex items-center gap-1">
+            <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-editor-elevated/50 border border-editor-border/20">
               <span>{getFileIcon(activeTab.language)}</span>
-              <span>{activeTab.name}</span>
-            </span>
+              <span className="text-text-primary font-semibold">{activeTab.name}</span>
+            </div>
             {activeTab.isDirty && (
-              <span className="text-xs">● Modified</span>
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-accent-primary/10 text-accent-primary border border-accent-primary/20">
+                <div className="w-1.5 h-1.5 rounded-full bg-accent-primary animate-glow" />
+                <span className="text-xs font-medium">Modified</span>
+              </div>
             )}
           </>
         ) : (
-          <span>Ready</span>
+          <span className="text-text-secondary">Ready</span>
         )}
 
-        {/* Diagnostics button */}
+        {/* Diagnostics button - Modern pill design */}
         {hasProblems && (
           <button
-            className={`flex items-center gap-2 px-2 py-1 rounded hover:bg-white/20 transition-colors ${
-              showDiagnosticsPanel ? 'bg-white/10' : ''
+            className={`flex items-center gap-2 px-2.5 py-1 rounded-lg transition-all duration-200 ${
+              showDiagnosticsPanel
+                ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/30'
+                : 'bg-editor-hover/30 text-text-secondary hover:bg-editor-hover/50 hover:text-text-primary border border-transparent'
             }`}
             onClick={toggleDiagnosticsPanel}
             title="Toggle Problems Panel"
           >
             {errorCount > 0 && (
               <div className="flex items-center gap-1">
-                <AlertCircle size={14} />
-                <span className="text-xs">{errorCount}</span>
+                <AlertCircle size={13} className="text-accent-danger" />
+                <span className="font-semibold">{errorCount}</span>
               </div>
             )}
             {warningCount > 0 && (
               <div className="flex items-center gap-1">
-                <AlertTriangle size={14} />
-                <span className="text-xs">{warningCount}</span>
+                <AlertTriangle size={13} className="text-accent-warning" />
+                <span className="font-semibold">{warningCount}</span>
               </div>
             )}
           </button>
         )}
 
-        {/* Git status button */}
+        {/* Git status button - Sleek design */}
         {gitStatus && (
           <button
-            className={`flex items-center gap-2 px-2 py-1 rounded hover:bg-white/20 transition-colors ${
-              showGitPanel ? 'bg-white/10' : ''
+            className={`flex items-center gap-2 px-2.5 py-1 rounded-lg transition-all duration-200 ${
+              showGitPanel
+                ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/30'
+                : 'bg-editor-hover/30 text-text-secondary hover:bg-editor-hover/50 hover:text-text-primary border border-transparent'
             }`}
             onClick={toggleGitPanel}
             title="Toggle Source Control"
           >
-            <GitBranch size={14} />
-            <span className="text-xs">{gitStatus.branch}</span>
+            <GitBranch size={13} />
+            <span className="font-semibold">{gitStatus.branch}</span>
             {gitStatus.files.length > 0 && (
-              <span className="text-xs">({gitStatus.files.length})</span>
+              <span className="text-xs opacity-70">({gitStatus.files.length})</span>
             )}
             {gitStatus.ahead > 0 && (
               <div className="flex items-center gap-0.5">
-                <Upload size={12} />
-                <span className="text-xs">{gitStatus.ahead}</span>
+                <Upload size={11} />
+                <span>{gitStatus.ahead}</span>
               </div>
             )}
             {gitStatus.behind > 0 && (
               <div className="flex items-center gap-0.5">
-                <Download size={12} />
-                <span className="text-xs">{gitStatus.behind}</span>
+                <Download size={11} />
+                <span>{gitStatus.behind}</span>
               </div>
             )}
           </button>
         )}
       </div>
 
-      {/* Right side - Editor settings */}
-      <div className="flex items-center space-x-4">
-        <span>UTF-8</span>
-        <span>LF</span>
+      {/* Right side - Editor settings with subtle badges */}
+      <div className="flex items-center space-x-2">
+        <div className="px-2 py-0.5 rounded bg-editor-elevated/30 text-text-tertiary">UTF-8</div>
+        <div className="w-px h-3 bg-editor-border/30" />
+        <div className="px-2 py-0.5 rounded bg-editor-elevated/30 text-text-tertiary">LF</div>
         {activeTab && (
-          <span className="capitalize">{activeTab.language}</span>
+          <>
+            <div className="w-px h-3 bg-editor-border/30" />
+            <div className="px-2 py-0.5 rounded bg-editor-elevated/30 text-text-tertiary capitalize">{activeTab.language}</div>
+          </>
         )}
       </div>
     </div>
