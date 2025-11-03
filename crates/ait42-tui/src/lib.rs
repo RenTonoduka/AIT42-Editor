@@ -1,93 +1,82 @@
 //! AIT42 TUI - Terminal User Interface
 //!
 //! Provides the terminal-based UI layer using ratatui.
+//!
+//! # Architecture
+//!
+//! ```text
+//! TuiApp
+//!   ├── EventLoop (async event handling)
+//!   ├── Renderer (terminal rendering)
+//!   ├── KeyMap (key bindings)
+//!   ├── Theme (color schemes)
+//!   └── Widgets
+//!       ├── EditorWidget
+//!       ├── StatusLine
+//!       └── CommandPalette
+//! ```
+//!
+//! # Example
+//!
+//! ```no_run
+//! use ait42_tui::TuiApp;
+//!
+//! #[tokio::main]
+//! async fn main() -> anyhow::Result<()> {
+//!     let mut app = TuiApp::new().await?;
+//!     app.run().await?;
+//!     Ok(())
+//! }
+//! ```
 
-use ait42_core::Editor;
+pub mod event;
+pub mod keybinds;
+pub mod layout;
+pub mod renderer;
+pub mod theme;
+pub mod tui_app;
+pub mod widgets;
+
+// Re-exports
+pub use event::{EditorEvent, EventLoop};
+pub use keybinds::{EditorCommand, KeyBinding, KeyMap, Mode};
+pub use layout::{EditorLayout, LayoutConfig};
+pub use renderer::Renderer;
+pub use theme::Theme;
+pub use tui_app::{EditorState, TuiApp};
+pub use widgets::{editor::ViewState, CommandPalette, EditorWidget, StatusLine};
+
 use anyhow::Result;
-use crossterm::{
-    event::{self, Event, KeyCode},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
-use ratatui::{
-    backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout},
-    widgets::{Block, Borders, Paragraph},
-    Terminal,
-};
-use std::{io, path::PathBuf};
 use tracing::info;
 
-pub mod app;
-pub mod ui;
+/// Run the TUI application with default settings
+pub async fn run() -> Result<()> {
+    info!("Initializing AIT42 TUI");
 
-/// Run the TUI application
-pub async fn run(editor: Editor, path: PathBuf) -> Result<()> {
-    info!("Initializing TUI");
+    let mut app = TuiApp::new().await?;
+    app.run().await?;
 
-    // Setup terminal
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
-    // Run app loop
-    let result = run_app(&mut terminal, editor, path).await;
-
-    // Restore terminal
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-    terminal.show_cursor()?;
-
-    result
+    Ok(())
 }
 
-/// Main application loop
-async fn run_app<B: ratatui::backend::Backend>(
-    terminal: &mut Terminal<B>,
-    mut editor: Editor,
-    _path: PathBuf,
-) -> Result<()> {
-    loop {
-        terminal.draw(|f| {
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Length(1),
-                    Constraint::Min(0),
-                    Constraint::Length(1),
-                ])
-                .split(f.area());
+/// Run TUI with a specific file
+pub async fn run_with_file(path: std::path::PathBuf) -> Result<()> {
+    info!("Initializing AIT42 TUI with file: {:?}", path);
 
-            // Title bar
-            let title = Paragraph::new("AIT42 Editor - Press 'q' to quit")
-                .block(Block::default().borders(Borders::ALL));
-            f.render_widget(title, chunks[0]);
+    let mut app = TuiApp::new().await?;
+    app.load_file(path)?;
+    app.run().await?;
 
-            // Editor area
-            let editor_block = Block::default()
-                .title("Editor")
-                .borders(Borders::ALL);
-            f.render_widget(editor_block, chunks[1]);
+    Ok(())
+}
 
-            // Status bar
-            let status = Paragraph::new("Ready")
-                .block(Block::default().borders(Borders::ALL));
-            f.render_widget(status, chunks[2]);
-        })?;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-        // Handle input
-        if event::poll(std::time::Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
-                match key.code {
-                    KeyCode::Char('q') => {
-                        info!("User quit");
-                        return Ok(());
-                    }
-                    _ => {}
-                }
-            }
-        }
+    #[test]
+    fn test_module_structure() {
+        // Ensure all modules compile
+        assert!(true);
     }
 }

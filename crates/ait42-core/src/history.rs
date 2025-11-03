@@ -1,4 +1,7 @@
 //! Undo/Redo History
+//!
+//! Legacy module - kept for backward compatibility.
+//! Use `command::CommandHistory` for new code.
 
 /// Represents a change in the buffer
 #[derive(Debug, Clone)]
@@ -16,6 +19,8 @@ pub enum Change {
 }
 
 /// History manager for undo/redo
+///
+/// **Deprecated**: Use `crate::command::CommandHistory` instead.
 #[derive(Debug, Default)]
 pub struct History {
     changes: Vec<Change>,
@@ -50,5 +55,47 @@ impl History {
         } else {
             None
         }
+    }
+
+    pub fn can_undo(&self) -> bool {
+        self.current > 0
+    }
+
+    pub fn can_redo(&self) -> bool {
+        self.current < self.changes.len()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_history_push() {
+        let mut history = History::new();
+        history.push(Change::Insert {
+            line: 0,
+            col: 0,
+            text: "Hello".to_string(),
+        });
+
+        assert!(history.can_undo());
+        assert!(!history.can_redo());
+    }
+
+    #[test]
+    fn test_history_undo_redo() {
+        let mut history = History::new();
+        history.push(Change::Insert {
+            line: 0,
+            col: 0,
+            text: "Hello".to_string(),
+        });
+
+        assert!(history.undo().is_some());
+        assert!(history.can_redo());
+
+        assert!(history.redo().is_some());
+        assert!(history.can_undo());
     }
 }
