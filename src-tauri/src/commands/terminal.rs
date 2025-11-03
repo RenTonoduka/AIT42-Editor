@@ -23,24 +23,33 @@ pub async fn execute_command(
     command: String,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    let mut terminal = state
-        .terminal
-        .lock()
-        .map_err(|e| format!("Failed to lock terminal: {}", e))?;
+    // Execute command - need to drop lock before await
+    {
+        let mut terminal = state
+            .terminal
+            .lock()
+            .map_err(|e| format!("Failed to lock terminal: {}", e))?;
 
-    // Execute command
-    terminal
-        .execute(&command)
-        .await
-        .map_err(|e| format!("Failed to execute command: {}", e))?;
+        terminal
+            .execute(&command)
+            .await
+            .map_err(|e| format!("Failed to execute command: {}", e))?;
+    }
 
-    // Get output
-    let output = terminal
-        .get_output()
-        .iter()
-        .cloned()
-        .collect::<Vec<String>>()
-        .join("\n");
+    // Get output in separate scope
+    let output = {
+        let terminal = state
+            .terminal
+            .lock()
+            .map_err(|e| format!("Failed to lock terminal: {}", e))?;
+
+        terminal
+            .get_output()
+            .iter()
+            .cloned()
+            .collect::<Vec<String>>()
+            .join("\n")
+    };
 
     Ok(output)
 }

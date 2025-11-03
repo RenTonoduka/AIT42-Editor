@@ -2,7 +2,7 @@
 //!
 //! Tauri commands for text editing operations: insert, delete, undo, redo, etc.
 
-use ait42_core::{BufferId, Command, DeleteCommand, InsertCommand, ReplaceCommand};
+use ait42_core::BufferId;
 use serde::{Deserialize, Serialize};
 use std::ops::Range;
 use tauri::State;
