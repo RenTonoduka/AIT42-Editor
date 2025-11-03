@@ -11,7 +11,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Widget},
 };
-use unicode_width::UnicodeWidthStr;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 /// View state for scrolling
 #[derive(Debug, Clone, Default)]
@@ -95,8 +95,8 @@ impl<'a> EditorWidget<'a> {
             return;
         }
 
-        let line_count = self.buffer.line_count();
-        let cursor_line = self.cursor.position().line;
+        let line_count = self.buffer.len_lines();
+        let cursor_line = self.cursor.position(self.buffer).line;
         let start_line = self.view.scroll_line;
         let end_line = (start_line + area.height as usize).min(line_count);
 
@@ -133,11 +133,11 @@ impl<'a> Widget for EditorWidget<'a> {
             }
         }
 
-        let content = self.buffer.content();
+        let content = self.buffer.to_string();
         let lines: Vec<&str> = content.lines().collect();
         let line_count = lines.len().max(1);
 
-        let cursor_pos = self.cursor.position();
+        let cursor_pos = self.cursor.position(self.buffer);
         let start_line = self.view.scroll_line;
         let end_line = (start_line + area.height as usize).min(line_count);
 

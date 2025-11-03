@@ -149,13 +149,31 @@ impl EditorAgentBridge {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+
+    fn setup_test_env() -> Result<()> {
+        let root = std::path::PathBuf::from("/tmp/ait42");
+
+        // Create test directory structure
+        fs::create_dir_all(root.join(".claude/agents"))?;
+        fs::create_dir_all(root.join("scripts"))?;
+
+        Ok(())
+    }
+
+    fn create_test_bridge() -> EditorAgentBridge {
+        setup_test_env().expect("Failed to setup test environment");
+
+        let config = crate::config::AIT42Config::default();
+        let coordinator = crate::coordinator::Coordinator::new(config)
+            .expect("Failed to create coordinator");
+        let executor = AgentExecutor::new(coordinator);
+        EditorAgentBridge::new(executor)
+    }
 
     #[test]
     fn test_build_buffer_context() {
-        let config = crate::config::AIT42Config::default();
-        let coordinator = crate::coordinator::Coordinator::new(config).unwrap();
-        let executor = AgentExecutor::new(coordinator);
-        let bridge = EditorAgentBridge::new(executor);
+        let bridge = create_test_bridge();
 
         let buffer = Buffer {
             content: "fn main() {\n    println!(\"Hello\");\n}".to_string(),
@@ -171,10 +189,7 @@ mod tests {
 
     #[test]
     fn test_extract_selection() {
-        let config = crate::config::AIT42Config::default();
-        let coordinator = crate::coordinator::Coordinator::new(config).unwrap();
-        let executor = AgentExecutor::new(coordinator);
-        let bridge = EditorAgentBridge::new(executor);
+        let bridge = create_test_bridge();
 
         let buffer = Buffer {
             content: "line 1\nline 2\nline 3\nline 4".to_string(),

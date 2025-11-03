@@ -11,7 +11,7 @@ use crate::error::Result;
 ///
 /// All editor operations that modify state should be commands.
 /// This enables undo/redo functionality.
-pub trait Command: Send + Sync {
+pub trait Command: Send + Sync + std::fmt::Debug {
     /// Execute the command
     ///
     /// Modifies the editor state according to the command's logic.
@@ -75,14 +75,9 @@ impl Command for InsertCommand {
         "Insert text"
     }
 
-    fn merge_with(&mut self, other: &dyn Command) -> bool {
-        // Try to merge with another insert command if positions are consecutive
-        if let Some(other_insert) = (other as &dyn std::any::Any).downcast_ref::<InsertCommand>() {
-            if other_insert.pos == self.pos + self.text.len() {
-                self.text.push_str(&other_insert.text);
-                return true;
-            }
-        }
+    fn merge_with(&mut self, _other: &dyn Command) -> bool {
+        // TODO: Implement merge logic using a different approach
+        // Downcasting requires 'static lifetime which trait methods can't enforce
         false
     }
 }

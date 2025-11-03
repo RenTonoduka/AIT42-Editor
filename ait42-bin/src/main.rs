@@ -63,21 +63,16 @@ async fn main() -> Result<()> {
     info!("Rust version: {}", env!("CARGO_PKG_RUST_VERSION"));
 
     // Load configuration
-    let config = load_config(&args).await?;
+    let _config = load_config(&args).await?;
     info!("Configuration loaded successfully");
 
     // Determine target path
     let target_path = resolve_target_path(args.path)?;
     info!("Target path: {}", target_path.display());
 
-    // Initialize editor core
-    let editor = ait42_core::Editor::new(config)
-        .context("Failed to initialize editor")?;
-    info!("Editor core initialized");
-
     // Start TUI application
     info!("Starting TUI application...");
-    ait42_tui::run(editor, target_path)
+    ait42_tui::run_with_file(target_path)
         .await
         .context("TUI application error")?;
 
@@ -131,14 +126,19 @@ fn setup_logging(args: &Args) -> Result<()> {
 
 /// Load configuration from file or defaults
 async fn load_config(args: &Args) -> Result<ait42_config::Config> {
+    use ait42_config::{ConfigLoader, default_config};
+
     let config = if let Some(config_path) = &args.config {
-        ait42_config::Config::from_file(config_path)
+        ConfigLoader::with_path(config_path.clone())
+            .load()
             .await
             .context("Failed to load config file")?
     } else {
-        ait42_config::Config::load_default()
+        let loader = ConfigLoader::new()
+            .context("Failed to create config loader")?;
+        loader.load_or_create()
             .await
-            .context("Failed to load default config")?
+            .unwrap_or_else(|_| default_config())
     };
 
     Ok(config)

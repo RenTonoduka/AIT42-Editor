@@ -58,7 +58,7 @@ impl EditorState {
 
     /// Load file into buffer
     pub fn load_file(&mut self, path: std::path::PathBuf) -> Result<()> {
-        self.buffer = Buffer::from_file(path)?;
+        self.buffer = Buffer::from_file(&path)?;
         self.cursor = Cursor::default();
         self.view = ViewState::new();
         Ok(())
@@ -123,41 +123,41 @@ impl EditorState {
 
     // Cursor movement implementations
     fn move_cursor_left(&mut self) {
-        let pos = self.cursor.position();
+        let pos = self.cursor.position(&self.buffer);
         if pos.col > 0 {
-            self.cursor.move_to(pos.line, pos.col - 1);
+            let _ = self.cursor.move_to(&self.buffer, pos.line, pos.col - 1);
         }
     }
 
     fn move_cursor_right(&mut self) {
-        let pos = self.cursor.position();
+        let pos = self.cursor.position(&self.buffer);
         // TODO: Check line length
-        self.cursor.move_to(pos.line, pos.col + 1);
+        let _ = self.cursor.move_to(&self.buffer, pos.line, pos.col + 1);
     }
 
     fn move_cursor_up(&mut self) {
-        let pos = self.cursor.position();
+        let pos = self.cursor.position(&self.buffer);
         if pos.line > 0 {
-            self.cursor.move_to(pos.line - 1, pos.col);
+            let _ = self.cursor.move_to(&self.buffer, pos.line - 1, pos.col);
         }
     }
 
     fn move_cursor_down(&mut self) {
-        let pos = self.cursor.position();
-        if pos.line < self.buffer.line_count().saturating_sub(1) {
-            self.cursor.move_to(pos.line + 1, pos.col);
+        let pos = self.cursor.position(&self.buffer);
+        if pos.line < self.buffer.len_lines().saturating_sub(1) {
+            let _ = self.cursor.move_to(&self.buffer, pos.line + 1, pos.col);
         }
     }
 
     fn move_cursor_line_start(&mut self) {
-        let pos = self.cursor.position();
-        self.cursor.move_to(pos.line, 0);
+        let pos = self.cursor.position(&self.buffer);
+        let _ = self.cursor.move_to(&self.buffer, pos.line, 0);
     }
 
     fn move_cursor_line_end(&mut self) {
-        let pos = self.cursor.position();
+        let pos = self.cursor.position(&self.buffer);
         // TODO: Get actual line length
-        self.cursor.move_to(pos.line, 100);
+        let _ = self.cursor.move_to(&self.buffer, pos.line, 100);
     }
 
     fn move_cursor_word_forward(&mut self) {
@@ -173,7 +173,7 @@ impl EditorState {
     // Editing operations
     fn insert_char(&mut self, ch: char) {
         if self.mode == Mode::Insert {
-            let pos = self.cursor.position();
+            let pos = self.cursor.position(&self.buffer);
             // TODO: Implement actual insertion
             debug!("Insert char '{}' at {}:{}", ch, pos.line, pos.col);
             self.move_cursor_right();
@@ -211,7 +211,7 @@ impl EditorState {
     }
 
     fn quit(&mut self) {
-        if self.buffer.is_modified() {
+        if self.buffer.is_dirty() {
             // TODO: Prompt for save
             info!("Buffer modified, use :q! to force quit");
         } else {
@@ -262,7 +262,7 @@ impl TuiApp {
         while self.state.running {
             // Update view scroll to keep cursor visible
             let size = self.renderer.size()?;
-            let cursor_pos = self.state.cursor.position();
+            let cursor_pos = self.state.cursor.position(&self.state.buffer);
             self.state.view.update_scroll(
                 cursor_pos.line,
                 cursor_pos.col,
@@ -380,16 +380,16 @@ mod tests {
         let config = EditorConfig::default();
         let mut state = EditorState::new(config).unwrap();
 
-        let initial_pos = state.cursor.position();
+        let initial_pos = state.cursor.position(&state.buffer);
         assert_eq!(initial_pos.line, 0);
         assert_eq!(initial_pos.col, 0);
 
         state.execute_command(&EditorCommand::MoveRight).unwrap();
-        let new_pos = state.cursor.position();
+        let new_pos = state.cursor.position(&state.buffer);
         assert_eq!(new_pos.col, 1);
 
         state.execute_command(&EditorCommand::MoveDown).unwrap();
-        let new_pos = state.cursor.position();
+        let new_pos = state.cursor.position(&state.buffer);
         assert_eq!(new_pos.line, 1);
     }
 

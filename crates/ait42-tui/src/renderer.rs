@@ -65,16 +65,16 @@ impl Renderer {
             f.render_widget(editor_widget, layout.editor);
 
             // Render status line
-            let cursor_pos = cursor.position();
+            let cursor_pos = cursor.position(buffer);
             let status = StatusLine::new(
                 mode,
                 (cursor_pos.line, cursor_pos.col),
-                buffer.line_count(),
+                buffer.len_lines(),
                 theme,
             )
-            .dirty(buffer.is_modified());
+            .dirty(buffer.is_dirty());
 
-            if let Some(path) = buffer.file_path() {
+            if let Some(path) = buffer.path() {
                 let status = status.file_path(path);
                 f.render_widget(status, layout.statusline);
             } else {

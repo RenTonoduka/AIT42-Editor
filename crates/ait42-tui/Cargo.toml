@@ -20,6 +20,7 @@ tui-textarea = { workspace = true }
 
 # Async runtime
 tokio = { workspace = true }
+futures = "0.3"
 
 # Error handling
 anyhow = { workspace = true }

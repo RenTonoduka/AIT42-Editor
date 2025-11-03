@@ -153,7 +153,7 @@ impl Buffer {
         }
 
         // Validate UTF-8 boundary
-        if !self.content.is_char_boundary(pos) {
+        if self.content.try_byte_to_char(pos).is_err() {
             return Err(EditorError::Utf8Boundary(pos));
         }
 
@@ -175,10 +175,10 @@ impl Buffer {
         }
 
         // Validate UTF-8 boundaries
-        if !self.content.is_char_boundary(range.start) {
+        if self.content.try_byte_to_char(range.start).is_err() {
             return Err(EditorError::Utf8Boundary(range.start));
         }
-        if !self.content.is_char_boundary(range.end) {
+        if self.content.try_byte_to_char(range.end).is_err() {
             return Err(EditorError::Utf8Boundary(range.end));
         }
 
@@ -199,10 +199,10 @@ impl Buffer {
         }
 
         // Validate UTF-8 boundaries
-        if !self.content.is_char_boundary(range.start) {
+        if self.content.try_byte_to_char(range.start).is_err() {
             return Err(EditorError::Utf8Boundary(range.start));
         }
-        if !self.content.is_char_boundary(range.end) {
+        if self.content.try_byte_to_char(range.end).is_err() {
             return Err(EditorError::Utf8Boundary(range.end));
         }
 
@@ -306,7 +306,7 @@ impl Buffer {
 
         // Convert byte offset to character column
         let line_slice = self.content.line(line);
-        let col = line_slice.bytes_to_chars(col_bytes.min(line_slice.len_bytes()));
+        let col = line_slice.byte_to_char(col_bytes.min(line_slice.len_bytes()));
 
         (line, col)
     }
@@ -340,9 +340,9 @@ impl Buffer {
     pub fn save(&mut self) -> Result<()> {
         let path = self.file_path.as_ref().ok_or_else(|| {
             EditorError::Other("Cannot save buffer without file path".to_string())
-        })?;
+        })?.to_path_buf();
 
-        self.save_as(path)
+        self.save_as(&path)
     }
 
     /// Save buffer to new path

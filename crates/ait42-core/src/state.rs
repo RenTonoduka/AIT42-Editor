@@ -160,11 +160,17 @@ impl EditorState {
         }
 
         // Update view to ensure cursor is visible
-        if let (Some(cursor), Some(view), Some(buffer)) =
-            (self.cursor(), self.view_mut(), self.active_buffer())
-        {
-            let (line, _) = buffer.pos_to_line_col(cursor.pos());
-            view.ensure_cursor_visible(line);
+        let cursor_line = self.cursor().and_then(|cursor| {
+            self.active_buffer().map(|buffer| {
+                let (line, _) = buffer.pos_to_line_col(cursor.pos());
+                line
+            })
+        });
+
+        if let Some(line) = cursor_line {
+            if let Some(view) = self.view_mut() {
+                view.ensure_cursor_visible(line);
+            }
         }
 
         Ok(())
@@ -174,10 +180,13 @@ impl EditorState {
     ///
     /// Returns true if undo was successful, false if nothing to undo.
     pub fn undo(&mut self) -> Result<bool> {
-        let buffer = self.active_buffer_mut()
+        let id = self.buffer_manager.active_buffer_id()
             .ok_or_else(|| crate::error::EditorError::NoActiveBuffer)?;
 
-        if let Some(history) = self.history_mut() {
+        let buffer = self.buffer_manager.active_mut()
+            .ok_or_else(|| crate::error::EditorError::NoActiveBuffer)?;
+
+        if let Some(history) = self.histories.get_mut(&id) {
             history.undo(buffer)
         } else {
             Ok(false)
@@ -188,10 +197,13 @@ impl EditorState {
     ///
     /// Returns true if redo was successful, false if nothing to redo.
     pub fn redo(&mut self) -> Result<bool> {
-        let buffer = self.active_buffer_mut()
+        let id = self.buffer_manager.active_buffer_id()
             .ok_or_else(|| crate::error::EditorError::NoActiveBuffer)?;
 
-        if let Some(history) = self.history_mut() {
+        let buffer = self.buffer_manager.active_mut()
+            .ok_or_else(|| crate::error::EditorError::NoActiveBuffer)?;
+
+        if let Some(history) = self.histories.get_mut(&id) {
             history.redo(buffer)
         } else {
             Ok(false)

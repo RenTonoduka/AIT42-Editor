@@ -192,7 +192,7 @@ impl KeyMap {
 
         // Editing
         map.insert(kb(Enter, NONE), InsertNewline);
-        map.insert(kb(Backspace, NONE), Backspace);
+        map.insert(kb(KeyCode::Backspace, NONE), EditorCommand::Backspace);
 
         // Ctrl shortcuts
         map.insert(kb(Char('s'), CTRL), Save);
@@ -230,7 +230,7 @@ impl KeyMap {
         map.insert(kb(Right, NONE), MoveRight);
 
         // Editing
-        map.insert(kb(Backspace, NONE), Backspace);
+        map.insert(kb(KeyCode::Backspace, NONE), EditorCommand::Backspace);
     }
 
     /// Look up command for key binding in current mode

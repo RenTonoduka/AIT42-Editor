@@ -327,7 +327,7 @@ impl CursorSet {
     /// Get mutable primary cursor
     #[inline]
     pub fn primary_mut(&mut self) -> &mut Cursor {
-        &self.primary
+        &mut self.primary
     }
 
     /// Add cursor at position

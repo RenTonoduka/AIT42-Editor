@@ -22,13 +22,19 @@ impl ConfigWatcher {
         let config_path = loader.path().to_path_buf();
         let loader_clone = ConfigLoader::with_path(config_path.clone());
 
+        // Get current runtime handle
+        let handle = tokio::runtime::Handle::try_current()
+            .map_err(|e| crate::ConfigError::ParseError(format!("No tokio runtime: {}", e)))?;
+
         // Create the notify watcher
         let mut watcher = RecommendedWatcher::new(
             move |res: notify::Result<Event>| {
                 let tx = tx.clone();
                 let loader = loader_clone.clone();
+                let handle = handle.clone();
 
-                tokio::spawn(async move {
+                // Spawn on the captured runtime handle
+                handle.spawn(async move {
                     match res {
                         Ok(event) => {
                             // Only reload on modify events
