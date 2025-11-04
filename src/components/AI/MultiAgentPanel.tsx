@@ -6,8 +6,8 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Play, Pause, Square, Trash2, Plus, Code2, CheckCircle, XCircle, Clock } from 'lucide-react';
-import { tauriApi, AgentExecutionResponse } from '@/services/tauri';
+import { Users, Play, Pause, Square, Trash2, Plus, Code2, CheckCircle, XCircle, Clock, Terminal } from 'lucide-react';
+import { tauriApi, AgentExecutionResponse, TmuxSession } from '@/services/tauri';
 
 export interface ClaudeCodeInstance {
   id: string;
@@ -19,6 +19,7 @@ export interface ClaudeCodeInstance {
   startTime?: number;
   endTime?: number;
   executionId?: string;
+  tmuxSessionId?: string; // For tmux-based execution
   metrics?: {
     linesOfCode?: number;
     filesModified?: number;
@@ -70,6 +71,8 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
 
   const [globalTask, setGlobalTask] = useState('');
   const [showComparison, setShowComparison] = useState(false);
+  const [desiredInstanceCount, setDesiredInstanceCount] = useState(3);
+  const [useTmuxMode, setUseTmuxMode] = useState(true); // Use tmux by default for AIT42 integration
 
   // Track active polling intervals for cleanup
   const pollingIntervalsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -129,6 +132,33 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
       output: [],
     };
     setInstances([...instances, newInstance]);
+  };
+
+  // Quick setup: Create specific number of instances
+  const quickSetup = (count: number) => {
+    const roles = [
+      'Frontend Developer',
+      'Backend Developer',
+      'Test Engineer',
+      'DevOps Engineer',
+      'Security Specialist',
+      'Database Designer',
+    ];
+
+    const newInstances: ClaudeCodeInstance[] = [];
+    for (let i = 0; i < count; i++) {
+      const role = roles[i % roles.length];
+      newInstances.push({
+        id: `${Date.now()}-${i}`,
+        name: `Claude ${i + 1}`,
+        role,
+        task: '',
+        status: 'idle',
+        output: [],
+      });
+    }
+    setInstances(newInstances);
+    setDesiredInstanceCount(count);
   };
 
   // Remove instance
@@ -219,6 +249,85 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
     pollingIntervalsRef.current.set(id, pollInterval);
   };
 
+  // Poll for tmux session output
+  const pollTmuxStatus = async (id: string, sessionId: string) => {
+    const maxPolls = 120; // 2 minutes max (120 * 1s)
+    let pollCount = 0;
+    let lastOutputLength = 0;
+
+    const cleanup = (intervalId: NodeJS.Timeout) => {
+      clearInterval(intervalId);
+      pollingIntervalsRef.current.delete(id);
+    };
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const output = await tauriApi.captureTmuxOutput(sessionId);
+        const outputLines = output.split('\n').filter(Boolean);
+
+        // Only update if there's new output
+        if (outputLines.length > lastOutputLength) {
+          const newLines = outputLines.slice(lastOutputLength);
+          lastOutputLength = outputLines.length;
+
+          setInstances((prev) =>
+            prev.map((inst) => {
+              if (inst.id === id) {
+                return {
+                  ...inst,
+                  output: [...inst.output, ...newLines],
+                };
+              }
+              return inst;
+            })
+          );
+        }
+
+        // Check if session is still running
+        const sessions = await tauriApi.listTmuxSessions();
+        const isRunning = sessions.some((s) => s.sessionId === sessionId);
+
+        if (!isRunning) {
+          cleanup(pollInterval);
+          setInstances((prev) =>
+            prev.map((inst) =>
+              inst.id === id
+                ? {
+                    ...inst,
+                    status: 'completed',
+                    endTime: Date.now(),
+                    output: [...inst.output, '✅ Tmux session completed'],
+                  }
+                : inst
+            )
+          );
+        }
+
+        pollCount++;
+        if (pollCount >= maxPolls) {
+          cleanup(pollInterval);
+          setInstances((prev) =>
+            prev.map((inst) =>
+              inst.id === id
+                ? {
+                    ...inst,
+                    status: 'completed',
+                    endTime: Date.now(),
+                    output: [...inst.output, '⏱️ Polling timeout - session may still be running'],
+                  }
+                : inst
+            )
+          );
+        }
+      } catch (error) {
+        console.error('Failed to poll tmux status:', error);
+      }
+    }, 1000); // Poll every second
+
+    // Register interval for cleanup
+    pollingIntervalsRef.current.set(id, pollInterval);
+  };
+
   // Start single instance
   const startInstance = async (id: string) => {
     const instance = instances.find((inst) => inst.id === id);
@@ -228,7 +337,12 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
     setInstances(
       instances.map((inst) =>
         inst.id === id
-          ? { ...inst, status: 'running', startTime: Date.now(), output: [`🚀 Starting ${inst.role}...`] }
+          ? {
+              ...inst,
+              status: 'running',
+              startTime: Date.now(),
+              output: [useTmuxMode ? `🚀 Starting ${inst.role} in Tmux...` : `🚀 Starting ${inst.role}...`]
+            }
           : inst
       )
     );
@@ -246,27 +360,58 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
 
       const agentName = agentMap[instance.role] || 'code-reviewer';
 
-      const response = await tauriApi.executeAgent({
-        agentName,
-        task: instance.task,
-        context: globalTask,
-      });
+      if (useTmuxMode) {
+        // Create tmux session for agent execution
+        const session = await tauriApi.createTmuxSession({
+          agentName,
+          task: instance.task,
+          context: globalTask,
+        });
 
-      // Update instance with execution ID
-      setInstances(
-        instances.map((inst) =>
-          inst.id === id
-            ? {
-                ...inst,
-                executionId: response.executionId,
-                output: [...inst.output, `🤖 Agent "${agentName}" started`, `📋 Execution ID: ${response.executionId}`],
-              }
-            : inst
-        )
-      );
+        // Update instance with tmux session ID
+        setInstances(
+          instances.map((inst) =>
+            inst.id === id
+              ? {
+                  ...inst,
+                  tmuxSessionId: session.sessionId,
+                  output: [
+                    ...inst.output,
+                    `🎬 Tmux session created: ${session.sessionId}`,
+                    `🤖 Agent "${agentName}" running in isolated environment`,
+                    `📊 Use 'tmux attach -t ${session.sessionId}' to view live output`,
+                  ],
+                }
+              : inst
+          )
+        );
 
-      // Start polling for status and output
-      await pollAgentStatus(id, response.executionId);
+        // Start polling for tmux output
+        await pollTmuxStatus(id, session.sessionId);
+      } else {
+        // Regular execution mode
+        const response = await tauriApi.executeAgent({
+          agentName,
+          task: instance.task,
+          context: globalTask,
+        });
+
+        // Update instance with execution ID
+        setInstances(
+          instances.map((inst) =>
+            inst.id === id
+              ? {
+                  ...inst,
+                  executionId: response.executionId,
+                  output: [...inst.output, `🤖 Agent "${agentName}" started`, `📋 Execution ID: ${response.executionId}`],
+                }
+              : inst
+          )
+        );
+
+        // Start polling for status and output
+        await pollAgentStatus(id, response.executionId);
+      }
     } catch (error) {
       setInstances(
         instances.map((inst) =>
@@ -295,12 +440,23 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
   };
 
   // Stop instance
-  const stopInstance = (id: string) => {
+  const stopInstance = async (id: string) => {
+    const instance = instances.find((inst) => inst.id === id);
+
     // Clear polling interval if exists
     const interval = pollingIntervalsRef.current.get(id);
     if (interval) {
       clearInterval(interval);
       pollingIntervalsRef.current.delete(id);
+    }
+
+    // Kill tmux session if exists
+    if (instance?.tmuxSessionId) {
+      try {
+        await tauriApi.killTmuxSession(instance.tmuxSessionId);
+      } catch (error) {
+        console.error('Failed to kill tmux session:', error);
+      }
     }
 
     setInstances(
@@ -361,6 +517,9 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
           <h2 className="text-sm font-semibold text-text-primary">
             Multi-Agent Parallel Development
           </h2>
+          <div className="ml-2 px-2 py-0.5 bg-accent-primary/20 text-accent-primary text-xs rounded-full font-medium">
+            {instances.length} instances
+          </div>
         </div>
         <button
           onClick={onClose}
@@ -368,6 +527,108 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
         >
           <Square size={16} className="text-text-tertiary" />
         </button>
+      </div>
+
+      {/* Instance Count Control */}
+      <div className="px-4 py-3 border-b border-editor-border bg-editor-surface">
+        <div className="flex items-center gap-3">
+          <div className="flex-1">
+            <label className="block text-xs font-medium text-text-secondary mb-1">
+              Instance Count
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="1"
+                max="20"
+                value={desiredInstanceCount}
+                onChange={(e) => setDesiredInstanceCount(parseInt(e.target.value, 10) || 1)}
+                className="w-20 px-2 py-1 text-sm bg-editor-bg text-text-primary border border-editor-border rounded focus:outline-none focus:ring-2 focus:ring-accent-primary/50"
+              />
+              <button
+                onClick={() => quickSetup(desiredInstanceCount)}
+                className="px-3 py-1 text-xs bg-accent-primary hover:bg-accent-secondary text-white rounded transition-colors"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+          <div className="flex-1">
+            <label className="block text-xs font-medium text-text-secondary mb-1">
+              Quick Presets
+            </label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => quickSetup(3)}
+                className="px-3 py-1 text-xs bg-editor-bg hover:bg-editor-border text-text-primary border border-editor-border rounded transition-colors"
+                title="3 instances (Frontend, Backend, Tester)"
+              >
+                Small (3)
+              </button>
+              <button
+                onClick={() => quickSetup(6)}
+                className="px-3 py-1 text-xs bg-editor-bg hover:bg-editor-border text-text-primary border border-editor-border rounded transition-colors"
+                title="6 instances (Full stack team)"
+              >
+                Medium (6)
+              </button>
+              <button
+                onClick={() => quickSetup(10)}
+                className="px-3 py-1 text-xs bg-editor-bg hover:bg-editor-border text-text-primary border border-editor-border rounded transition-colors"
+                title="10 instances (Large team)"
+              >
+                Large (10)
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="text-xs text-text-tertiary mt-2">
+          💡 Quick setup will replace all current instances with the specified count
+        </div>
+      </div>
+
+      {/* Execution Mode Toggle */}
+      <div className="px-4 py-3 border-b border-editor-border bg-editor-surface">
+        <div className="flex items-center justify-between">
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1">
+              Execution Mode
+            </label>
+            <p className="text-xs text-text-tertiary">
+              {useTmuxMode
+                ? '🎬 Tmux: Isolated sessions with full terminal access'
+                : '🚀 Standard: Direct agent execution'}
+            </p>
+          </div>
+          <button
+            onClick={() => setUseTmuxMode(!useTmuxMode)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              useTmuxMode ? 'bg-accent-primary' : 'bg-editor-border'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                useTmuxMode ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+        {useTmuxMode && (
+          <div className="mt-2 p-2 bg-accent-primary/10 border border-accent-primary/30 rounded text-xs text-text-secondary">
+            <div className="flex items-start gap-2">
+              <Terminal size={14} className="text-accent-primary mt-0.5 flex-shrink-0" />
+              <div>
+                <strong className="text-accent-primary">AIT42 Tmux Integration:</strong>
+                <ul className="mt-1 space-y-1 list-disc list-inside">
+                  <li>Each agent runs in isolated tmux session</li>
+                  <li>Access live output with <code className="px-1 bg-editor-bg rounded">tmux attach</code></li>
+                  <li>Maximum {instances.length} parallel sessions</li>
+                  <li>Session naming: <code className="px-1 bg-editor-bg rounded">ait42-{'{agent}'}-{'{timestamp}'}</code></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Global Task */}

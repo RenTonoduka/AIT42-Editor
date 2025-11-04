@@ -1,11 +1,14 @@
 /**
  * AIT42 Agent Commands
  *
- * Tauri commands for executing AIT42 AI agents
+ * Tauri commands for executing AIT42 AI agents with Tmux support
  */
 
 use serde::{Deserialize, Serialize};
 use tauri::State;
+use std::process::Command;
+use std::collections::HashMap;
+use std::sync::Mutex;
 
 use crate::state::AppState;
 
@@ -199,5 +202,198 @@ pub async fn cancel_agent_execution(
     // TODO: Integrate with ait42-ait42::executor for cancellation
     // For now, just return success
     tracing::info!("Cancelled agent execution: {}", execution_id);
+    Ok(())
+}
+
+//
+// ============================================================
+// Tmux Session Management
+// ============================================================
+//
+
+/// Tmux session information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TmuxSession {
+    pub session_id: String,
+    pub agent_name: String,
+    pub status: String, // "running", "completed", "failed"
+    pub created_at: String,
+}
+
+/// Tmux execution request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TmuxExecutionRequest {
+    pub agent_name: String,
+    pub task: String,
+    pub context: Option<String>,
+}
+
+/// Create a tmux session for agent execution
+#[tauri::command]
+pub async fn create_tmux_session(
+    _state: State<'_, AppState>,
+    request: TmuxExecutionRequest,
+) -> Result<TmuxSession, String> {
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_secs();
+
+    let session_id = format!("ait42-{}-{}", request.agent_name, timestamp);
+
+    // Check if tmux is available
+    let tmux_check = Command::new("tmux")
+        .arg("-V")
+        .output();
+
+    match tmux_check {
+        Err(_) => return Err("Tmux is not installed or not in PATH".to_string()),
+        Ok(output) if !output.status.success() => {
+            return Err("Tmux is not available".to_string())
+        }
+        _ => {}
+    }
+
+    // Create new tmux session
+    let mut cmd = Command::new("tmux");
+    cmd.arg("new-session")
+        .arg("-d") // Detached
+        .arg("-s")
+        .arg(&session_id)
+        .arg("-c")
+        .arg(std::env::current_dir().map_err(|e| e.to_string())?)
+        .arg("echo")
+        .arg(format!("🚀 Starting agent: {} for task: {}", request.agent_name, request.task));
+
+    let output = cmd.output().map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "Failed to create tmux session: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    tracing::info!("Created tmux session: {}", session_id);
+
+    Ok(TmuxSession {
+        session_id,
+        agent_name: request.agent_name,
+        status: "running".to_string(),
+        created_at: chrono::Utc::now().to_rfc3339(),
+    })
+}
+
+/// List all AIT42 tmux sessions
+#[tauri::command]
+pub async fn list_tmux_sessions(_state: State<'_, AppState>) -> Result<Vec<TmuxSession>, String> {
+    let output = Command::new("tmux")
+        .arg("list-sessions")
+        .arg("-F")
+        .arg("#{session_name}")
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Ok(vec![]);
+    }
+
+    let sessions_output = String::from_utf8_lossy(&output.stdout);
+    let sessions: Vec<TmuxSession> = sessions_output
+        .lines()
+        .filter(|line| line.starts_with("ait42-"))
+        .map(|session_name| {
+            let parts: Vec<&str> = session_name.split('-').collect();
+            let agent_name = if parts.len() >= 3 {
+                parts[1..parts.len()-1].join("-")
+            } else {
+                "unknown".to_string()
+            };
+
+            TmuxSession {
+                session_id: session_name.to_string(),
+                agent_name,
+                status: "running".to_string(),
+                created_at: chrono::Utc::now().to_rfc3339(),
+            }
+        })
+        .collect();
+
+    Ok(sessions)
+}
+
+/// Capture output from a tmux session
+#[tauri::command]
+pub async fn capture_tmux_output(
+    _state: State<'_, AppState>,
+    session_id: String,
+) -> Result<String, String> {
+    let output = Command::new("tmux")
+        .arg("capture-pane")
+        .arg("-p")
+        .arg("-t")
+        .arg(&session_id)
+        .arg("-S")
+        .arg("-")
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "Failed to capture tmux output: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+/// Send keys/command to a tmux session
+#[tauri::command]
+pub async fn send_tmux_keys(
+    _state: State<'_, AppState>,
+    session_id: String,
+    keys: String,
+) -> Result<(), String> {
+    let output = Command::new("tmux")
+        .arg("send-keys")
+        .arg("-t")
+        .arg(&session_id)
+        .arg(&keys)
+        .arg("C-m") // Enter key
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "Failed to send keys: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    Ok(())
+}
+
+/// Kill a tmux session
+#[tauri::command]
+pub async fn kill_tmux_session(
+    _state: State<'_, AppState>,
+    session_id: String,
+) -> Result<(), String> {
+    let output = Command::new("tmux")
+        .arg("kill-session")
+        .arg("-t")
+        .arg(&session_id)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "Failed to kill session: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    tracing::info!("Killed tmux session: {}", session_id);
     Ok(())
 }

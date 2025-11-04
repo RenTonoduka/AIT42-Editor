@@ -69,6 +69,12 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::execute_parallel,
             commands::get_agent_output,
             commands::cancel_agent_execution,
+            // AIT42 Tmux operations
+            commands::create_tmux_session,
+            commands::list_tmux_sessions,
+            commands::capture_tmux_output,
+            commands::send_tmux_keys,
+            commands::kill_tmux_session,
             // Terminal operations
             commands::execute_command,
             commands::get_terminal_output,
@@ -138,7 +144,13 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::execute_agent,
             commands::execute_parallel,
             commands::get_agent_output,
-            commands::cancel_agent_execution
+            commands::cancel_agent_execution,
+            // AIT42 Tmux operations
+            commands::create_tmux_session,
+            commands::list_tmux_sessions,
+            commands::capture_tmux_output,
+            commands::send_tmux_keys,
+            commands::kill_tmux_session
         ]
     }
 }

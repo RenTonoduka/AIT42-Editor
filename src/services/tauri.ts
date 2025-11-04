@@ -165,6 +165,25 @@ export interface ParallelExecutionRequest {
 }
 
 /**
+ * Tmux session information
+ */
+export interface TmuxSession {
+  sessionId: string;
+  agentName: string;
+  status: 'running' | 'completed' | 'failed';
+  createdAt: string;
+}
+
+/**
+ * Tmux execution request
+ */
+export interface TmuxExecutionRequest {
+  agentName: string;
+  task: string;
+  context?: string;
+}
+
+/**
  * Type-safe Tauri command wrappers
  */
 export const tauriApi = {
@@ -756,6 +775,64 @@ export const tauriApi = {
       await invoke('cancel_agent_execution', { executionId });
     } catch (error) {
       throw new Error(`Failed to cancel agent execution: ${error}`);
+    }
+  },
+
+  /**
+   * Create a new tmux session for agent execution
+   */
+  async createTmuxSession(request: TmuxExecutionRequest): Promise<TmuxSession> {
+    try {
+      const session = await invoke<TmuxSession>('create_tmux_session', { request });
+      return session;
+    } catch (error) {
+      throw new Error(`Failed to create tmux session: ${error}`);
+    }
+  },
+
+  /**
+   * List all active AIT42 tmux sessions
+   */
+  async listTmuxSessions(): Promise<TmuxSession[]> {
+    try {
+      const sessions = await invoke<TmuxSession[]>('list_tmux_sessions');
+      return sessions;
+    } catch (error) {
+      throw new Error(`Failed to list tmux sessions: ${error}`);
+    }
+  },
+
+  /**
+   * Capture output from a tmux session
+   */
+  async captureTmuxOutput(sessionId: string): Promise<string> {
+    try {
+      const output = await invoke<string>('capture_tmux_output', { sessionId });
+      return output;
+    } catch (error) {
+      throw new Error(`Failed to capture tmux output: ${error}`);
+    }
+  },
+
+  /**
+   * Send keys/command to a tmux session
+   */
+  async sendTmuxKeys(sessionId: string, keys: string): Promise<void> {
+    try {
+      await invoke('send_tmux_keys', { sessionId, keys });
+    } catch (error) {
+      throw new Error(`Failed to send tmux keys: ${error}`);
+    }
+  },
+
+  /**
+   * Kill a tmux session
+   */
+  async killTmuxSession(sessionId: string): Promise<void> {
+    try {
+      await invoke('kill_tmux_session', { sessionId });
+    } catch (error) {
+      throw new Error(`Failed to kill tmux session: ${error}`);
     }
   },
 };
