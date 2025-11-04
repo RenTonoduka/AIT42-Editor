@@ -450,11 +450,82 @@ pub async fn kill_tmux_session(
 // ============================================================
 //
 
+/// Monitor tmux session output and emit events to frontend
+async fn monitor_tmux_session(app: tauri::AppHandle, session_id: String, instance_number: usize) {
+    let mut last_output = String::new();
+    let mut last_line_count = 0;
+
+    loop {
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+        // Check if session still exists
+        let check_output = Command::new("tmux")
+            .arg("has-session")
+            .arg("-t")
+            .arg(&session_id)
+            .output();
+
+        match check_output {
+            Ok(output) if output.status.success() => {
+                // Session exists, capture output
+                let capture_output = Command::new("tmux")
+                    .arg("capture-pane")
+                    .arg("-p")
+                    .arg("-t")
+                    .arg(&session_id)
+                    .arg("-S")
+                    .arg("-")
+                    .output();
+
+                if let Ok(capture) = capture_output {
+                    if capture.status.success() {
+                        let current_output = String::from_utf8_lossy(&capture.stdout).to_string();
+                        let current_lines: Vec<&str> = current_output.lines().collect();
+
+                        // Only send new lines
+                        if current_lines.len() > last_line_count {
+                            let new_lines = &current_lines[last_line_count..];
+                            let new_content = new_lines.join("\n");
+
+                            if !new_content.trim().is_empty() {
+                                let payload = serde_json::json!({
+                                    "instance": instance_number,
+                                    "output": new_content + "\n",
+                                    "status": "running"
+                                });
+
+                                let _ = app.emit_all("competition-output", payload);
+                            }
+
+                            last_line_count = current_lines.len();
+                        }
+
+                        last_output = current_output;
+                    }
+                }
+            }
+            _ => {
+                // Session no longer exists - completed or failed
+                tracing::info!("Tmux session {} has ended", session_id);
+
+                let payload = serde_json::json!({
+                    "instance": instance_number,
+                    "output": "",
+                    "status": "completed"
+                });
+                let _ = app.emit_all("competition-output", payload);
+                break;
+            }
+        }
+    }
+}
+
 /// Execute Claude Code Competition
 ///
 /// Creates multiple git worktrees and launches Claude Code instances in parallel
 #[tauri::command]
 pub async fn execute_claude_code_competition(
+    app_handle: tauri::AppHandle,
     state: State<'_, AppState>,
     request: ClaudeCodeCompetitionRequest,
 ) -> Result<ClaudeCodeCompetitionResult, String> {
@@ -559,6 +630,15 @@ pub async fn execute_claude_code_competition(
         }
 
         tracing::info!("Launched Claude Code instance {} in session {}", i, session_id);
+
+        // Start monitoring task for this instance
+        let app = app_handle.clone();
+        let monitor_session_id = session_id.clone();
+        let monitor_instance_number = i;
+
+        tokio::spawn(async move {
+            monitor_tmux_session(app, monitor_session_id, monitor_instance_number).await;
+        });
 
         instances.push(ClaudeCodeInstanceResult {
             instance_id,
