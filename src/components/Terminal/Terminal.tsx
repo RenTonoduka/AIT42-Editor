@@ -85,23 +85,22 @@ export const Terminal: React.FC<TerminalProps> = ({
 
     // Initialize terminal
     const initTerminal = async () => {
+      let dir = process.cwd?.() || '/';
+
       try {
+        // Display welcome message first
+        xterm.writeln('\x1b[1;32mAIT42 Editor Terminal\x1b[0m');
+        xterm.writeln('\x1b[90mType commands and press Enter to execute\x1b[0m');
+        xterm.writeln('');
+
         // Set initial directory if provided
         if (initialDir) {
           await tauriApi.setCurrentDirectory(initialDir);
         }
 
         // Get current directory
-        const dir = await tauriApi.getCurrentDirectory();
+        dir = await tauriApi.getCurrentDirectory();
         setCurrentDir(dir);
-
-        // Display welcome message
-        xterm.writeln('\x1b[1;32mAIT42 Editor Terminal\x1b[0m');
-        xterm.writeln('\x1b[90mType commands and press Enter to execute\x1b[0m');
-        xterm.writeln('');
-
-        // Display prompt
-        displayPrompt(xterm, dir);
 
         // Load command history
         const history = await tauriApi.getCommandHistory();
@@ -112,7 +111,13 @@ export const Terminal: React.FC<TerminalProps> = ({
           onReady(xterm);
         }
       } catch (error) {
-        xterm.writeln(`\x1b[1;31mError initializing terminal: ${error}\x1b[0m`);
+        console.error('Terminal initialization error:', error);
+        xterm.writeln(`\x1b[1;31mWarning: ${error}\x1b[0m`);
+        xterm.writeln('\x1b[90mTerminal started in fallback mode\x1b[0m');
+        xterm.writeln('');
+      } finally {
+        // Always display prompt, even if there was an error
+        displayPrompt(xterm, dir);
       }
     };
 
@@ -220,6 +225,8 @@ export const Terminal: React.FC<TerminalProps> = ({
    * Execute a command
    */
   const executeCommand = async (command: string, xterm: XTerm) => {
+    let newDir = currentDir;
+
     try {
       // Execute command via Tauri backend
       const output = await tauriApi.executeCommand(command);
@@ -233,18 +240,18 @@ export const Terminal: React.FC<TerminalProps> = ({
       }
 
       // Update current directory (may have changed with cd command)
-      const newDir = await tauriApi.getCurrentDirectory();
+      newDir = await tauriApi.getCurrentDirectory();
       setCurrentDir(newDir);
 
       // Update command history
       const history = await tauriApi.getCommandHistory();
       setCommandHistory(history);
-
-      // Display new prompt
-      displayPrompt(xterm, newDir);
     } catch (error) {
+      console.error('Command execution error:', error);
       xterm.writeln(`\x1b[1;31mError: ${error}\x1b[0m`);
-      displayPrompt(xterm, currentDir);
+    } finally {
+      // Always display prompt, even if there was an error
+      displayPrompt(xterm, newDir);
     }
   };
 
