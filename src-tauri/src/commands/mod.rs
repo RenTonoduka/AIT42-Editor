@@ -7,6 +7,7 @@ pub mod editor;
 pub mod lsp;
 pub mod git;
 pub mod plugin;
+pub mod ait42;
 
 #[cfg(feature = "terminal")]
 pub mod terminal;
@@ -17,6 +18,7 @@ pub use editor::*;
 pub use lsp::*;
 pub use git::*;
 pub use plugin::*;
+pub use ait42::*;
 
 #[cfg(feature = "terminal")]
 pub use terminal::*;

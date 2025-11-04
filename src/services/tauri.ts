@@ -126,6 +126,45 @@ export interface PluginInfo {
 }
 
 /**
+ * AIT42 Agent information
+ */
+export interface AgentInfo {
+  name: string;
+  description: string;
+  category: string;
+  tools: string[];
+}
+
+/**
+ * Agent execution request
+ */
+export interface AgentExecutionRequest {
+  agentName: string;
+  task: string;
+  context?: string;
+}
+
+/**
+ * Agent execution response
+ */
+export interface AgentExecutionResponse {
+  executionId: string;
+  agentName: string;
+  status: 'started' | 'running' | 'completed' | 'failed';
+  output?: string;
+  error?: string;
+}
+
+/**
+ * Parallel execution request
+ */
+export interface ParallelExecutionRequest {
+  agents: string[];
+  task: string;
+  context?: string;
+}
+
+/**
  * Type-safe Tauri command wrappers
  */
 export const tauriApi = {
@@ -642,6 +681,81 @@ export const tauriApi = {
       await invoke('uninstall_plugin', { pluginId });
     } catch (error) {
       throw new Error(`Failed to uninstall plugin: ${error}`);
+    }
+  },
+
+  // ============================================================================
+  // AIT42 Agent Operations
+  // ============================================================================
+
+  /**
+   * List all available AI agents
+   */
+  async listAgents(): Promise<AgentInfo[]> {
+    try {
+      const agents = await invoke<AgentInfo[]>('list_agents');
+      return agents;
+    } catch (error) {
+      throw new Error(`Failed to list agents: ${error}`);
+    }
+  },
+
+  /**
+   * Get information about a specific agent
+   */
+  async getAgentInfo(agentName: string): Promise<AgentInfo> {
+    try {
+      const agent = await invoke<AgentInfo>('get_agent_info', { agentName });
+      return agent;
+    } catch (error) {
+      throw new Error(`Failed to get agent info: ${error}`);
+    }
+  },
+
+  /**
+   * Execute a single AI agent
+   */
+  async executeAgent(request: AgentExecutionRequest): Promise<AgentExecutionResponse> {
+    try {
+      const response = await invoke<AgentExecutionResponse>('execute_agent', { request });
+      return response;
+    } catch (error) {
+      throw new Error(`Failed to execute agent: ${error}`);
+    }
+  },
+
+  /**
+   * Execute multiple AI agents in parallel
+   */
+  async executeParallel(request: ParallelExecutionRequest): Promise<AgentExecutionResponse[]> {
+    try {
+      const responses = await invoke<AgentExecutionResponse[]>('execute_parallel', { request });
+      return responses;
+    } catch (error) {
+      throw new Error(`Failed to execute agents in parallel: ${error}`);
+    }
+  },
+
+  /**
+   * Get output from a running or completed agent execution
+   */
+  async getAgentOutput(executionId: string): Promise<AgentExecutionResponse> {
+    try {
+      const response = await invoke<AgentExecutionResponse>('get_agent_output', { executionId });
+      return response;
+    } catch (error) {
+      throw new Error(`Failed to get agent output: ${error}`);
+    }
+  },
+
+  /**
+   * Cancel a running agent execution
+   */
+  async cancelAgentExecution(executionId: string): Promise<void> {
+    try {
+      await invoke('cancel_agent_execution', { executionId });
+    } catch (error) {
+      throw new Error(`Failed to cancel agent execution: ${error}`);
     }
   },
 };

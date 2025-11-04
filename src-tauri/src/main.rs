@@ -62,6 +62,13 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::disable_plugin,
             commands::install_plugin,
             commands::uninstall_plugin,
+            // AIT42 Agent operations
+            commands::list_agents,
+            commands::get_agent_info,
+            commands::execute_agent,
+            commands::execute_parallel,
+            commands::get_agent_output,
+            commands::cancel_agent_execution,
             // Terminal operations
             commands::execute_command,
             commands::get_terminal_output,
@@ -124,7 +131,14 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::enable_plugin,
             commands::disable_plugin,
             commands::install_plugin,
-            commands::uninstall_plugin
+            commands::uninstall_plugin,
+            // AIT42 Agent operations
+            commands::list_agents,
+            commands::get_agent_info,
+            commands::execute_agent,
+            commands::execute_parallel,
+            commands::get_agent_output,
+            commands::cancel_agent_execution
         ]
     }
 }

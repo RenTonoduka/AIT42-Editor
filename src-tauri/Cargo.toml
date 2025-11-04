@@ -25,6 +25,7 @@ ait42-tui = { path = "../crates/ait42-tui", optional = true }
 ait42-lsp = { path = "../crates/ait42-lsp" }
 ait42-fs = { path = "../crates/ait42-fs" }
 ait42-config = { path = "../crates/ait42-config" }
+ait42-ait42 = { path = "../crates/ait42-ait42" }
 
 # LSP support
 lsp-types = "0.95"
