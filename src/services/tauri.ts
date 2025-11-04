@@ -233,6 +233,64 @@ export interface ClaudeCodeInstanceResult {
 }
 
 /**
+ * Role definition for debate participants
+ */
+export interface RoleDefinition {
+  id: string;
+  name: string;
+  systemPrompt: string;
+}
+
+/**
+ * Debate execution request
+ */
+export interface DebateRequest {
+  task: string;
+  roles: RoleDefinition[];  // 3 roles (Architect, Pragmatist, Innovator)
+  model: string;  // "sonnet", "haiku", "opus"
+  timeoutSeconds: number;  // Per-round timeout (default: 800s)
+  preserveWorktrees: boolean;  // Keep worktrees after completion
+}
+
+/**
+ * Debate execution result
+ */
+export interface DebateResult {
+  debateId: string;
+  status: string;  // "started", "round_1", "round_2", "round_3", "completed", "failed"
+  message: string;
+}
+
+/**
+ * Round output (result from one agent in one round)
+ */
+export interface RoundOutput {
+  round: number;
+  roleId: string;
+  roleName: string;
+  output: string;
+  status: string;  // "running", "completed", "failed"
+  startedAt: string;
+  completedAt: string | null;
+  executionTimeMs: number;
+}
+
+/**
+ * Debate status (complete state)
+ */
+export interface DebateStatus {
+  debateId: string;
+  currentRound: number;  // 1, 2, or 3
+  totalRounds: number;  // Always 3
+  status: string;  // "started", "round_1", "round_2", "round_3", "completed", "failed"
+  roundOutputs: RoundOutput[];
+  worktreePath: string;
+  contextFiles: string[];
+  startedAt: string;
+  completedAt: string | null;
+}
+
+/**
  * Type-safe Tauri command wrappers
  */
 export const tauriApi = {
@@ -984,6 +1042,58 @@ export const tauriApi = {
       await invoke('cancel_competition', { competitionId, cleanupWorktrees });
     } catch (error) {
       throw new Error(`Failed to cancel competition: ${error}`);
+    }
+  },
+
+  // ===== Claude Code Debate Commands =====
+
+  /**
+   * Execute Claude Code Debate
+   *
+   * Creates a single git worktree and executes 3 rounds of debate sequentially
+   */
+  async executeDebate(
+    request: DebateRequest
+  ): Promise<DebateResult> {
+    try {
+      const result = await invoke<DebateResult>(
+        'execute_debate',
+        { request }
+      );
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to execute debate: ${error}`);
+    }
+  },
+
+  /**
+   * Get debate status
+   */
+  async getDebateStatus(
+    debateId: string
+  ): Promise<DebateStatus> {
+    try {
+      const result = await invoke<DebateStatus>(
+        'get_debate_status',
+        { debateId }
+      );
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to get debate status: ${error}`);
+    }
+  },
+
+  /**
+   * Cancel a running debate
+   */
+  async cancelDebate(
+    debateId: string,
+    cleanupWorktrees: boolean = true
+  ): Promise<void> {
+    try {
+      await invoke('cancel_debate', { debateId, cleanupWorktrees });
+    } catch (error) {
+      throw new Error(`Failed to cancel debate: ${error}`);
     }
   },
 };

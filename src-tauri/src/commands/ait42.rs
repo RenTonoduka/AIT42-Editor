@@ -5,7 +5,7 @@
  */
 
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use tauri::{Manager, State};
 use std::process::Command;
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -451,9 +451,17 @@ pub async fn kill_tmux_session(
 //
 
 /// Monitor tmux session output and emit events to frontend
-async fn monitor_tmux_session(app: tauri::AppHandle, session_id: String, instance_number: usize) {
+async fn monitor_tmux_session(
+    app: tauri::AppHandle,
+    session_id: String,
+    instance_number: usize,
+    log_file_path: String,
+) {
+    tracing::info!("🔍 Starting monitoring for session {} (instance {})", session_id, instance_number);
+
     let mut last_output = String::new();
     let mut last_line_count = 0;
+    let mut last_log_size = 0;
 
     loop {
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
@@ -467,46 +475,83 @@ async fn monitor_tmux_session(app: tauri::AppHandle, session_id: String, instanc
 
         match check_output {
             Ok(output) if output.status.success() => {
-                // Session exists, capture output
-                let capture_output = Command::new("tmux")
-                    .arg("capture-pane")
-                    .arg("-p")
-                    .arg("-t")
-                    .arg(&session_id)
-                    .arg("-S")
-                    .arg("-")
-                    .output();
+                // Session exists, try to read from log file first (more reliable for Claude output)
+                if let Ok(log_contents) = tokio::fs::read_to_string(&log_file_path).await {
+                    let log_size = log_contents.len();
 
-                if let Ok(capture) = capture_output {
-                    if capture.status.success() {
-                        let current_output = String::from_utf8_lossy(&capture.stdout).to_string();
-                        let current_lines: Vec<&str> = current_output.lines().collect();
+                    if log_size > last_log_size {
+                        // New content in log file
+                        let new_content = &log_contents[last_log_size..];
 
-                        // Only send new lines
-                        if current_lines.len() > last_line_count {
-                            let new_lines = &current_lines[last_line_count..];
-                            let new_content = new_lines.join("\n");
+                        if !new_content.trim().is_empty() {
+                            let payload = serde_json::json!({
+                                "instance": instance_number,
+                                "output": new_content,
+                                "status": "running"
+                            });
 
-                            if !new_content.trim().is_empty() {
-                                let payload = serde_json::json!({
-                                    "instance": instance_number,
-                                    "output": new_content + "\n",
-                                    "status": "running"
-                                });
-
-                                let _ = app.emit_all("competition-output", payload);
-                            }
-
-                            last_line_count = current_lines.len();
+                            let _ = app.emit_all("competition-output", payload);
                         }
 
-                        last_output = current_output;
+                        last_log_size = log_size;
+                    }
+                } else {
+                    // Fallback to tmux capture-pane if log file not available yet
+                    let capture_output = Command::new("tmux")
+                        .arg("capture-pane")
+                        .arg("-p")
+                        .arg("-t")
+                        .arg(&session_id)
+                        .arg("-S")
+                        .arg("-")
+                        .output();
+
+                    if let Ok(capture) = capture_output {
+                        if capture.status.success() {
+                            let current_output = String::from_utf8_lossy(&capture.stdout).to_string();
+                            let current_lines: Vec<&str> = current_output.lines().collect();
+
+                            // Only send new lines
+                            if current_lines.len() > last_line_count {
+                                let new_lines = &current_lines[last_line_count..];
+                                let new_content = new_lines.join("\n");
+
+                                if !new_content.trim().is_empty() {
+                                    let payload = serde_json::json!({
+                                        "instance": instance_number,
+                                        "output": new_content + "\n",
+                                        "status": "running"
+                                    });
+
+                                    let _ = app.emit_all("competition-output", payload);
+                                }
+
+                                last_line_count = current_lines.len();
+                            }
+
+                            last_output = current_output;
+                        }
                     }
                 }
             }
             _ => {
                 // Session no longer exists - completed or failed
                 tracing::info!("Tmux session {} has ended", session_id);
+
+                // Send final output from log file
+                if let Ok(final_output) = tokio::fs::read_to_string(&log_file_path).await {
+                    if final_output.len() > last_log_size {
+                        let final_content = &final_output[last_log_size..];
+                        if !final_content.trim().is_empty() {
+                            let payload = serde_json::json!({
+                                "instance": instance_number,
+                                "output": final_content,
+                                "status": "completed"
+                            });
+                            let _ = app.emit_all("competition-output", payload);
+                        }
+                    }
+                }
 
                 let payload = serde_json::json!({
                     "instance": instance_number,
@@ -592,6 +637,7 @@ pub async fn execute_claude_code_competition(
 
         // Create tmux session for this instance
         let session_id = format!("claude-code-comp-{}-{}", &competition_id[..8], i);
+        let output_log_path = format!("{}/.claude-output.log", worktree_path);
 
         let tmux_output = Command::new("tmux")
             .arg("new-session")
@@ -608,9 +654,27 @@ pub async fn execute_claude_code_competition(
             return Err(format!("Failed to create tmux session {}: {}", i, error));
         }
 
+        // Enable pipe-pane to capture all output to a log file
+        // This ensures Claude CLI output is captured even if tmux capture-pane misses it
+        let pipe_output = Command::new("tmux")
+            .arg("pipe-pane")
+            .arg("-t")
+            .arg(&session_id)
+            .arg("-o")
+            .arg(format!("cat >> {}", output_log_path))
+            .output()
+            .map_err(|e| format!("Failed to enable pipe-pane: {}", e))?;
+
+        if !pipe_output.status.success() {
+            let error = String::from_utf8_lossy(&pipe_output.stderr);
+            tracing::warn!("Failed to enable pipe-pane for instance {}: {}", i, error);
+        }
+
         // Send Claude Code command to tmux session
+        // Use --print flag for non-interactive mode to avoid Ink raw mode errors
+        // Note: Use echo | claude because it forces non-interactive mode in tmux
         let claude_cmd = format!(
-            "echo '{}' | claude --model {} code",
+            "echo '{}' | claude --model {} --print",
             request.task.replace("'", "'\\''"),
             request.model
         );
@@ -635,9 +699,10 @@ pub async fn execute_claude_code_competition(
         let app = app_handle.clone();
         let monitor_session_id = session_id.clone();
         let monitor_instance_number = i;
+        let monitor_log_path = output_log_path.clone();
 
-        tokio::spawn(async move {
-            monitor_tmux_session(app, monitor_session_id, monitor_instance_number).await;
+        tauri::async_runtime::spawn(async move {
+            monitor_tmux_session(app, monitor_session_id, monitor_instance_number, monitor_log_path).await;
         });
 
         instances.push(ClaudeCodeInstanceResult {
@@ -737,6 +802,462 @@ pub async fn cancel_competition(
         // Remove competition directory
         let _ = std::fs::remove_dir_all(&competition_dir);
         tracing::info!("Cleaned up competition directory: {}", competition_dir);
+    }
+
+    Ok(())
+}
+
+//
+// ============================================================
+// Claude Code Debate Mode (Multi-Agent Debate System)
+// ============================================================
+//
+
+/// Role definition for debate participants
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoleDefinition {
+    pub id: String,
+    pub name: String,
+    pub system_prompt: String,
+}
+
+/// Debate execution request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DebateRequest {
+    pub task: String,
+    pub roles: Vec<RoleDefinition>,  // 3 roles (Architect, Pragmatist, Innovator)
+    pub model: String,  // "sonnet", "haiku", "opus"
+    pub timeout_seconds: u64,  // Per-round timeout (default: 800s = 13.3 min)
+    pub preserve_worktrees: bool,  // Keep worktrees after completion
+}
+
+/// Debate execution result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DebateResult {
+    pub debate_id: String,
+    pub status: String,  // "started", "round_1", "round_2", "round_3", "completed", "failed"
+    pub message: String,
+}
+
+/// Round output (result from one agent in one round)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoundOutput {
+    pub round: u8,
+    pub role_id: String,
+    pub role_name: String,
+    pub output: String,
+    pub status: String,  // "running", "completed", "failed"
+    pub started_at: String,
+    pub completed_at: Option<String>,
+    pub execution_time_ms: u64,
+}
+
+/// Debate status (complete state)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DebateStatus {
+    pub debate_id: String,
+    pub current_round: u8,  // 1, 2, or 3
+    pub total_rounds: u8,  // Always 3
+    pub status: String,  // "started", "round_1", "round_2", "round_3", "completed", "failed"
+    pub round_outputs: Vec<RoundOutput>,
+    pub worktree_path: String,
+    pub context_files: Vec<String>,
+    pub started_at: String,
+    pub completed_at: Option<String>,
+}
+
+/// Execute Claude Code Debate
+///
+/// Creates a single git worktree and executes 3 rounds of debate sequentially
+#[tauri::command]
+pub async fn execute_debate(
+    app_handle: tauri::AppHandle,
+    state: State<'_, AppState>,
+    request: DebateRequest,
+) -> Result<DebateResult, String> {
+    // Validation
+    if request.roles.len() != 3 {
+        return Err("Debate mode requires exactly 3 roles".to_string());
+    }
+
+    if request.task.trim().is_empty() {
+        return Err("Task cannot be empty".to_string());
+    }
+
+    let valid_models = ["sonnet", "haiku", "opus"];
+    if !valid_models.contains(&request.model.as_str()) {
+        return Err(format!("Invalid model. Must be one of: {:?}", valid_models));
+    }
+
+    let debate_id = uuid::Uuid::new_v4().to_string();
+    let started_at = chrono::Utc::now();
+
+    tracing::info!(
+        "Starting debate: {} with 3 roles, model: {}, task: {}",
+        debate_id,
+        request.model,
+        request.task.chars().take(50).collect::<String>()
+    );
+
+    let working_dir = state.working_dir.lock().await;
+    let base_path = working_dir.clone();
+    drop(working_dir);
+
+    // Create debate directory
+    let debate_dir = format!("{}/.worktrees/debate-{}", base_path.display(), &debate_id[..8]);
+    std::fs::create_dir_all(&debate_dir).map_err(|e| e.to_string())?;
+
+    // Create context directory for shared files
+    let context_dir = format!("{}/context", debate_dir);
+    std::fs::create_dir_all(&context_dir).map_err(|e| e.to_string())?;
+
+    // Create single worktree for debate
+    let worktree_path = format!("{}/debate-workspace", debate_dir);
+    let branch_name = format!("debate-{}", &debate_id[..8]);
+
+    tracing::info!("Creating debate worktree at {}", worktree_path);
+
+    let mut cmd = Command::new("git");
+    cmd.arg("worktree")
+        .arg("add")
+        .arg("-b")
+        .arg(&branch_name)
+        .arg(&worktree_path)
+        .current_dir(&base_path);
+
+    let output = cmd.output().map_err(|e| {
+        format!("Failed to create worktree: {}", e)
+    })?;
+
+    if !output.status.success() {
+        let error = String::from_utf8_lossy(&output.stderr);
+        tracing::error!("Worktree creation failed: {}", error);
+        return Err(format!("Failed to create worktree: {}", error));
+    }
+
+    tracing::info!("Debate worktree created successfully");
+
+    // Start debate execution in background
+    let app = app_handle.clone();
+    let debate_id_clone = debate_id.clone();
+    let request_clone = request.clone();
+    let worktree_path_clone = worktree_path.clone();
+    let context_dir_clone = context_dir.clone();
+
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = execute_debate_rounds(
+            app,
+            debate_id_clone,
+            request_clone,
+            worktree_path_clone,
+            context_dir_clone,
+        ).await {
+            tracing::error!("Debate execution failed: {}", e);
+        }
+    });
+
+    Ok(DebateResult {
+        debate_id,
+        status: "started".to_string(),
+        message: "Debate started successfully".to_string(),
+    })
+}
+
+/// Execute all 3 debate rounds sequentially
+async fn execute_debate_rounds(
+    app: tauri::AppHandle,
+    debate_id: String,
+    request: DebateRequest,
+    worktree_path: String,
+    context_dir: String,
+) -> Result<(), String> {
+    tracing::info!("Starting 3-round debate execution for {}", debate_id);
+
+    // Round 1: Independent proposals
+    emit_debate_status(&app, &debate_id, 1, "round_1");
+    execute_round(
+        app.clone(),
+        debate_id.clone(),
+        1,
+        request.clone(),
+        worktree_path.clone(),
+        context_dir.clone(),
+        None, // No previous context
+    ).await?;
+
+    // Round 2: Critical analysis with Round 1 context
+    emit_debate_status(&app, &debate_id, 2, "round_2");
+    let round1_context = load_round_context(&context_dir, 1)?;
+    execute_round(
+        app.clone(),
+        debate_id.clone(),
+        2,
+        request.clone(),
+        worktree_path.clone(),
+        context_dir.clone(),
+        Some(round1_context),
+    ).await?;
+
+    // Round 3: Consensus formation with Round 1+2 context
+    emit_debate_status(&app, &debate_id, 3, "round_3");
+    let round2_context = load_round_context(&context_dir, 2)?;
+    let combined_context = format!("{}\n\n--- Round 2 ---\n\n{}",
+        load_round_context(&context_dir, 1)?,
+        round2_context
+    );
+    execute_round(
+        app.clone(),
+        debate_id.clone(),
+        3,
+        request.clone(),
+        worktree_path.clone(),
+        context_dir.clone(),
+        Some(combined_context),
+    ).await?;
+
+    // Debate completed
+    emit_debate_status(&app, &debate_id, 3, "completed");
+    tracing::info!("Debate {} completed successfully", debate_id);
+
+    Ok(())
+}
+
+/// Execute a single round with all 3 roles
+async fn execute_round(
+    app: tauri::AppHandle,
+    debate_id: String,
+    round: u8,
+    request: DebateRequest,
+    worktree_path: String,
+    context_dir: String,
+    previous_context: Option<String>,
+) -> Result<(), String> {
+    tracing::info!("Executing round {} for debate {}", round, debate_id);
+
+    let mut round_outputs = Vec::new();
+
+    for (index, role) in request.roles.iter().enumerate() {
+        let started_at = chrono::Utc::now();
+
+        // Build prompt with context
+        let prompt = if let Some(ref context) = previous_context {
+            format!(
+                "{}\n\n--- Previous Round Context ---\n{}\n\n--- Your Task ---\n{}",
+                role.system_prompt,
+                context,
+                request.task
+            )
+        } else {
+            format!("{}\n\n{}", role.system_prompt, request.task)
+        };
+
+        // Create tmux session
+        let session_id = format!("claude-debate-{}-r{}-{}", &debate_id[..8], round, index + 1);
+        let output_log_path = format!("{}/.claude-round{}-{}.log", worktree_path, round, role.id);
+
+        let tmux_output = Command::new("tmux")
+            .arg("new-session")
+            .arg("-d")
+            .arg("-s")
+            .arg(&session_id)
+            .arg("-c")
+            .arg(&worktree_path)
+            .output()
+            .map_err(|e| format!("Failed to create tmux session: {}", e))?;
+
+        if !tmux_output.status.success() {
+            let error = String::from_utf8_lossy(&tmux_output.stderr);
+            return Err(format!("Failed to create tmux session: {}", error));
+        }
+
+        // Enable pipe-pane for output capture
+        let _ = Command::new("tmux")
+            .arg("pipe-pane")
+            .arg("-t")
+            .arg(&session_id)
+            .arg("-o")
+            .arg(format!("cat >> {}", output_log_path))
+            .output();
+
+        // Send Claude Code command
+        let claude_cmd = format!(
+            "echo '{}' | claude --model {} --print",
+            prompt.replace("'", "'\\''"),
+            request.model
+        );
+
+        let send_output = Command::new("tmux")
+            .arg("send-keys")
+            .arg("-t")
+            .arg(&session_id)
+            .arg(&claude_cmd)
+            .arg("C-m")
+            .output()
+            .map_err(|e| format!("Failed to send command: {}", e))?;
+
+        if !send_output.status.success() {
+            let error = String::from_utf8_lossy(&send_output.stderr);
+            return Err(format!("Failed to send command: {}", error));
+        }
+
+        tracing::info!("Launched role {} ({}) in round {}", role.name, role.id, round);
+
+        // Wait for completion (poll tmux session)
+        let timeout = tokio::time::Duration::from_secs(request.timeout_seconds);
+        let start_time = tokio::time::Instant::now();
+
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+            // Check if session still exists
+            let check_output = Command::new("tmux")
+                .arg("has-session")
+                .arg("-t")
+                .arg(&session_id)
+                .output();
+
+            match check_output {
+                Ok(output) if output.status.success() => {
+                    // Session still running
+                    if start_time.elapsed() > timeout {
+                        // Timeout - kill session
+                        let _ = Command::new("tmux")
+                            .arg("kill-session")
+                            .arg("-t")
+                            .arg(&session_id)
+                            .output();
+
+                        return Err(format!("Round {} role {} timed out", round, role.name));
+                    }
+                }
+                _ => {
+                    // Session completed
+                    break;
+                }
+            }
+        }
+
+        // Read output
+        let output = tokio::fs::read_to_string(&output_log_path)
+            .await
+            .unwrap_or_else(|_| String::from("No output captured"));
+
+        let completed_at = chrono::Utc::now();
+        let execution_time_ms = (completed_at - started_at).num_milliseconds() as u64;
+
+        round_outputs.push(output.clone());
+
+        // Emit round output event
+        let payload = serde_json::json!({
+            "debateId": debate_id,
+            "round": round,
+            "roleId": role.id,
+            "roleName": role.name,
+            "output": output,
+            "status": "completed",
+            "executionTimeMs": execution_time_ms
+        });
+        let _ = app.emit_all("debate-round-output", payload);
+
+        tracing::info!("Round {} role {} completed in {}ms", round, role.name, execution_time_ms);
+    }
+
+    // Save round context to file
+    let context_file_path = format!("{}/round{}.txt", context_dir, round);
+    let combined_output = round_outputs.join("\n\n--- Next Role ---\n\n");
+    tokio::fs::write(&context_file_path, combined_output)
+        .await
+        .map_err(|e| format!("Failed to save context: {}", e))?;
+
+    tracing::info!("Round {} completed and context saved", round);
+
+    Ok(())
+}
+
+/// Load context from a specific round
+fn load_round_context(context_dir: &str, round: u8) -> Result<String, String> {
+    let context_file_path = format!("{}/round{}.txt", context_dir, round);
+    std::fs::read_to_string(&context_file_path)
+        .map_err(|e| format!("Failed to load round {} context: {}", round, e))
+}
+
+/// Emit debate status event
+fn emit_debate_status(app: &tauri::AppHandle, debate_id: &str, current_round: u8, status: &str) {
+    let payload = serde_json::json!({
+        "debateId": debate_id,
+        "currentRound": current_round,
+        "status": status
+    });
+    let _ = app.emit_all("debate-status", payload);
+}
+
+/// Get debate status
+#[tauri::command]
+pub async fn get_debate_status(
+    _state: State<'_, AppState>,
+    debate_id: String,
+) -> Result<DebateStatus, String> {
+    // TODO: Implement status tracking with state management
+    Err("Status tracking not yet implemented".to_string())
+}
+
+/// Cancel a running debate
+#[tauri::command]
+pub async fn cancel_debate(
+    state: State<'_, AppState>,
+    debate_id: String,
+    cleanup_worktrees: bool,
+) -> Result<(), String> {
+    tracing::info!("Cancelling debate: {}", debate_id);
+
+    // Kill all tmux sessions for this debate
+    let session_pattern = format!("claude-debate-{}", &debate_id[..8]);
+
+    let list_output = Command::new("tmux")
+        .arg("list-sessions")
+        .arg("-F")
+        .arg("#{session_name}")
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if list_output.status.success() {
+        let sessions = String::from_utf8_lossy(&list_output.stdout);
+        for session in sessions.lines() {
+            if session.contains(&session_pattern) {
+                let _ = Command::new("tmux")
+                    .arg("kill-session")
+                    .arg("-t")
+                    .arg(session)
+                    .output();
+
+                tracing::info!("Killed session: {}", session);
+            }
+        }
+    }
+
+    // Cleanup worktrees if requested
+    if cleanup_worktrees {
+        let working_dir = state.working_dir.lock().await;
+        let debate_dir = format!("{}/.worktrees/debate-{}", working_dir.display(), &debate_id[..8]);
+        drop(working_dir);
+
+        // Remove worktree
+        let worktree_path = format!("{}/debate-workspace", debate_dir);
+        let _ = Command::new("git")
+            .arg("worktree")
+            .arg("remove")
+            .arg("--force")
+            .arg(&worktree_path)
+            .output();
+
+        // Remove debate directory
+        let _ = std::fs::remove_dir_all(&debate_dir);
+        tracing::info!("Cleaned up debate directory: {}", debate_dir);
     }
 
     Ok(())

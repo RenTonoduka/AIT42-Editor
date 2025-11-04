@@ -84,6 +84,10 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::execute_claude_code_competition,
             commands::get_competition_status,
             commands::cancel_competition,
+            // AIT42 Debate operations
+            commands::execute_debate,
+            commands::get_debate_status,
+            commands::cancel_debate,
             // Terminal operations
             commands::execute_command,
             commands::get_terminal_output,
@@ -168,7 +172,11 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             // AIT42 Competition operations
             commands::execute_claude_code_competition,
             commands::get_competition_status,
-            commands::cancel_competition
+            commands::cancel_competition,
+            // AIT42 Debate operations
+            commands::execute_debate,
+            commands::get_debate_status,
+            commands::cancel_debate
         ]
     }
 }
