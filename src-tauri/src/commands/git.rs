@@ -6,6 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::process::Command;
 use tauri::State;
 
 use crate::state::AppState;
@@ -216,7 +217,6 @@ pub async fn git_list_worktrees(state: State<'_, AppState>) -> Result<Vec<Worktr
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let mut worktrees = Vec::new();
-    let mut current_worktree = None;
     let mut path = String::new();
     let mut commit = String::new();
     let mut branch = String::new();

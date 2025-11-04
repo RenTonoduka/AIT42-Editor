@@ -15,9 +15,7 @@ mod file_command_tests {
 
     /// Create a test AppState
     fn create_test_state() -> AppState {
-        AppState {
-            editor: Arc::new(Mutex::new(Editor::new())),
-        }
+        AppState::new(std::env::current_dir().unwrap()).unwrap()
     }
 
     /// Helper to create temporary test directory

@@ -171,9 +171,13 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     // Check if tab already exists
     const existingTab = tabs.find((t) => t.id === id);
     if (existingTab) {
-      // Just activate existing tab
+      // Just activate existing tab - OPTIMIZED: only update isActive for changed tabs
       set({
-        tabs: tabs.map((t) => ({ ...t, isActive: t.id === id })),
+        tabs: tabs.map((t) =>
+          t.isActive !== (t.id === id)
+            ? { ...t, isActive: t.id === id }
+            : t
+        ),
         activeTabId: id,
       });
       return;
@@ -193,9 +197,16 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         isActive: true,
       };
 
-      // Add new tab and deactivate others
+      // Add new tab and deactivate others - OPTIMIZED: only update active tab
       set({
-        tabs: [...tabs.map((t) => ({ ...t, isActive: false })), newTab],
+        tabs: [
+          ...tabs.map((t) =>
+            t.isActive
+              ? { ...t, isActive: false }
+              : t
+          ),
+          newTab
+        ],
         activeTabId: id,
       });
     } catch (error) {
@@ -231,28 +242,40 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   },
 
   setActiveTab: (id: string) => {
-    const { tabs } = get();
+    const { tabs, activeTabId } = get();
 
+    // No-op if already active
+    if (activeTabId === id) return;
+
+    // OPTIMIZED: only update tabs that actually changed
     set({
-      tabs: tabs.map((t) => ({ ...t, isActive: t.id === id })),
+      tabs: tabs.map((t) =>
+        t.isActive !== (t.id === id)
+          ? { ...t, isActive: t.id === id }
+          : t
+      ),
       activeTabId: id,
     });
   },
 
   updateTabContent: (id: string, content: string) => {
     const { tabs } = get();
+    const tab = tabs.find((t) => t.id === id);
 
+    // No-op if content hasn't changed
+    if (!tab || tab.content === content) return;
+
+    // OPTIMIZED: only create new array if content actually changed
     set({
-      tabs: tabs.map((t) => {
-        if (t.id === id) {
-          return {
-            ...t,
-            content,
-            isDirty: t.content !== content,
-          };
-        }
-        return t;
-      }),
+      tabs: tabs.map((t) =>
+        t.id === id
+          ? {
+              ...t,
+              content,
+              isDirty: true, // Simplified: if content changed, it's dirty
+            }
+          : t
+      ),
     });
   },
 

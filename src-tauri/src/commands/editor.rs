@@ -357,17 +357,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     fn create_test_state() -> AppState {
-        let editor = Editor::new(EditorConfig::default()).unwrap();
-        let editor_state = EditorState::new();
-        let terminal = ait42_tui::terminal_executor::TerminalExecutor::new(
-            std::env::current_dir().unwrap()
-        );
-
-        AppState {
-            editor: Arc::new(Mutex::new(editor)),
-            editor_state: Arc::new(Mutex::new(editor_state)),
-            terminal: Arc::new(Mutex::new(terminal)),
-        }
+        AppState::new(std::env::current_dir().unwrap()).unwrap()
     }
 
     #[tokio::test]

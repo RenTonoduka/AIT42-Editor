@@ -5,7 +5,7 @@
  * handling tab switching and content updates.
  */
 
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useMemo } from 'react';
 import { FileText } from 'lucide-react';
 import { TabBar } from './TabBar';
 import { EditorPane } from './EditorPane';
@@ -158,17 +158,19 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({ onFileOpen, on
 
   /**
    * Handle content change in editor
+   * OPTIMIZED: Memoized to prevent unnecessary re-renders
    */
-  const handleContentChange = (content: string) => {
+  const handleContentChange = useCallback((content: string) => {
     if (activeTab) {
       updateTabContent(activeTab.id, content);
     }
-  };
+  }, [activeTab, updateTabContent]);
 
   /**
    * Handle save action (Cmd+S)
+   * OPTIMIZED: Memoized to prevent unnecessary re-renders
    */
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (activeTab) {
       try {
         await saveTab(activeTab.id);
@@ -177,7 +179,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({ onFileOpen, on
         console.error('Save failed:', error);
       }
     }
-  };
+  }, [activeTab, saveTab]);
 
   /**
    * Handle terminal resize start
@@ -214,31 +216,31 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({ onFileOpen, on
     document.addEventListener('mouseup', handleMouseUp);
   }, [setTerminalHeight, setResizing]);
 
-  // Calculate panel heights
+  // OPTIMIZED: Memoize panel height calculations
   const diagnosticsPanelHeight = 200; // Fixed height for diagnostics panel
   const gitPanelHeight = 300; // Fixed height for git panel
 
-  // Calculate editor height accounting for all visible panels
-  let editorHeight = '100%';
-  let totalBottomPanelHeight = 0;
-  let separatorCount = 0;
+  const editorHeight = useMemo(() => {
+    let totalBottomPanelHeight = 0;
+    let separatorCount = 0;
 
-  if (showDiagnosticsPanel) {
-    totalBottomPanelHeight += diagnosticsPanelHeight;
-    separatorCount += 1;
-  }
-  if (showGitPanel) {
-    totalBottomPanelHeight += gitPanelHeight;
-    separatorCount += 1;
-  }
-  if (isTerminalVisible) {
-    totalBottomPanelHeight += terminalHeight;
-    separatorCount += 1;
-  }
+    if (showDiagnosticsPanel) {
+      totalBottomPanelHeight += diagnosticsPanelHeight;
+      separatorCount += 1;
+    }
+    if (showGitPanel) {
+      totalBottomPanelHeight += gitPanelHeight;
+      separatorCount += 1;
+    }
+    if (isTerminalVisible) {
+      totalBottomPanelHeight += terminalHeight;
+      separatorCount += 1;
+    }
 
-  if (totalBottomPanelHeight > 0) {
-    editorHeight = `calc(100% - ${totalBottomPanelHeight}px - ${separatorCount}px)`; // -1px per separator
-  }
+    return totalBottomPanelHeight > 0
+      ? `calc(100% - ${totalBottomPanelHeight}px - ${separatorCount}px)`
+      : '100%';
+  }, [showDiagnosticsPanel, showGitPanel, isTerminalVisible, terminalHeight]);
 
   return (
     <div ref={containerRef} className="flex flex-col h-full">
@@ -249,7 +251,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({ onFileOpen, on
       <div className="overflow-hidden" style={{ height: editorHeight }}>
         {activeTab ? (
           <EditorPane
-            key={activeTab.id}
+            // REMOVED key prop - prevents unnecessary re-mount on tab switch
             bufferId={activeTab.id}
             filePath={activeTab.path}
             content={activeTab.content}

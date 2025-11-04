@@ -34,6 +34,9 @@ pub struct AppState {
     /// Plugin manager for extensibility
     pub plugin_manager: Arc<Mutex<PluginManager>>,
 
+    /// Working directory for git operations - uses tokio::sync::Mutex for async
+    pub working_dir: Arc<tokio::sync::Mutex<std::path::PathBuf>>,
+
     /// Terminal executor (optional feature) - uses tokio::sync::Mutex for async
     #[cfg(feature = "terminal")]
     pub terminal: Arc<tokio::sync::Mutex<TerminalExecutor>>,
@@ -72,6 +75,7 @@ impl AppState {
             config: Mutex::new(Config::default()),
             lsp_manager: Arc::new(lsp_manager),
             plugin_manager: Arc::new(Mutex::new(plugin_manager)),
+            working_dir: Arc::new(tokio::sync::Mutex::new(working_dir.clone())),
             #[cfg(feature = "terminal")]
             terminal: Arc::new(tokio::sync::Mutex::new(TerminalExecutor::new(working_dir))),
         })
