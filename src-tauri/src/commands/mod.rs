@@ -8,6 +8,7 @@ pub mod lsp;
 pub mod git;
 pub mod plugin;
 pub mod ait42;
+pub mod worktree;
 
 #[cfg(feature = "terminal")]
 pub mod terminal;
@@ -19,6 +20,7 @@ pub use lsp::*;
 pub use git::*;
 pub use plugin::*;
 pub use ait42::*;
+pub use worktree::*;
 
 #[cfg(feature = "terminal")]
 pub use terminal::*;

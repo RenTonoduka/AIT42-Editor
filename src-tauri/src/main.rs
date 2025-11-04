@@ -88,6 +88,10 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::execute_debate,
             commands::get_debate_status,
             commands::cancel_debate,
+            // Worktree visualization operations
+            commands::list_worktrees,
+            commands::get_worktree_files,
+            commands::delete_worktree,
             // Terminal operations
             commands::execute_command,
             commands::get_terminal_output,
@@ -176,7 +180,11 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             // AIT42 Debate operations
             commands::execute_debate,
             commands::get_debate_status,
-            commands::cancel_debate
+            commands::cancel_debate,
+            // Worktree visualization operations
+            commands::list_worktrees,
+            commands::get_worktree_files,
+            commands::delete_worktree
         ]
     }
 }

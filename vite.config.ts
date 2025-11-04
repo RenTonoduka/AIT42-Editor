@@ -13,6 +13,10 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    watch: {
+      // Ignore Git worktrees to prevent hot reload during Competition execution
+      ignored: ['**/src-tauri/.worktrees/**'],
+    },
   },
 
   // To access the Tauri environment variables set by the CLI with information about the current target

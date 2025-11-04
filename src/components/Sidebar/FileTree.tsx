@@ -26,7 +26,7 @@ function FileTreeItem({ node, level, onFileOpen }: FileTreeItemProps) {
   const [loading, setLoading] = useState(false);
   const [children, setChildren] = useState<FileNode[]>(node.children || []);
 
-  const isExpanded = expandedPaths.has(node.path);
+  const isExpanded = expandedPaths.includes(node.path);
   const isSelected = selectedPath === node.path;
 
   /**

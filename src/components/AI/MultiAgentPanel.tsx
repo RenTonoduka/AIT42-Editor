@@ -14,7 +14,9 @@ import {
   Cpu,
   MemoryStick,
   FileCode,
+  Folder,
 } from 'lucide-react';
+import WorktreeExplorer from '@/components/Worktree/WorktreeExplorer';
 
 export interface ClaudeCodeInstance {
   id: string;
@@ -31,11 +33,13 @@ export interface ClaudeCodeInstance {
 
 export interface MultiAgentPanelProps {
   instances: ClaudeCodeInstance[];
+  competitionId?: string;
 }
 
-const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({ instances }) => {
+const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({ instances, competitionId }) => {
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
   const [ensembleMode, setEnsembleMode] = useState(false);
+  const [activeTab, setActiveTab] = useState<'output' | 'worktrees'>('output');
 
   // Toggle log expansion for specific instance
   const toggleLog = (instanceId: string) => {
@@ -102,9 +106,9 @@ const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({ instances }) => {
   }
 
   return (
-    <div className="h-full bg-gray-900 overflow-y-auto">
+    <div className="h-full bg-gray-900 flex flex-col">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-gray-800 border-b border-gray-700 px-6 py-4">
+      <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <Users className="w-6 h-6 text-purple-400" />

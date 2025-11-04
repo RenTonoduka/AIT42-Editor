@@ -10,7 +10,7 @@ describe('fileTreeStore', () => {
     useFileTreeStore.setState({
       rootPath: null,
       tree: [],
-      expandedPaths: new Set(),
+      expandedPaths: [], // Changed from Set to array
       selectedPath: null,
       loading: false,
       error: null,
@@ -21,7 +21,7 @@ describe('fileTreeStore', () => {
     const state = useFileTreeStore.getState();
     expect(state.rootPath).toBeNull();
     expect(state.tree).toEqual([]);
-    expect(state.expandedPaths.size).toBe(0);
+    expect(state.expandedPaths.length).toBe(0);
     expect(state.selectedPath).toBeNull();
     expect(state.loading).toBe(false);
     expect(state.error).toBeNull();
@@ -37,10 +37,10 @@ describe('fileTreeStore', () => {
     const { toggleExpand } = useFileTreeStore.getState();
 
     toggleExpand('/test/dir');
-    expect(useFileTreeStore.getState().expandedPaths.has('/test/dir')).toBe(true);
+    expect(useFileTreeStore.getState().expandedPaths.includes('/test/dir')).toBe(true);
 
     toggleExpand('/test/dir');
-    expect(useFileTreeStore.getState().expandedPaths.has('/test/dir')).toBe(false);
+    expect(useFileTreeStore.getState().expandedPaths.includes('/test/dir')).toBe(false);
   });
 
   it('should select path', () => {
@@ -74,8 +74,8 @@ describe('fileTreeStore', () => {
     expandPath('/root/parent/child/file.ts');
     const expanded = useFileTreeStore.getState().expandedPaths;
 
-    expect(expanded.has('/root/parent/child')).toBe(true);
-    expect(expanded.has('/root/parent')).toBe(true);
-    expect(expanded.has('/root')).toBe(true);
+    expect(expanded.includes('/root/parent/child')).toBe(true);
+    expect(expanded.includes('/root/parent')).toBe(true);
+    expect(expanded.includes('/root')).toBe(true);
   });
 });
