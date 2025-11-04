@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Code, Terminal, Settings, Sparkles, Trophy } from 'lucide-react';
+import { Code, Terminal, Settings, Sparkles, Trophy, Users } from 'lucide-react';
 import { Sidebar } from './components/Sidebar/Sidebar';
 import { EditorContainer } from '@/components/Editor';
 import { StatusBar } from '@/components/StatusBar';
 import { SettingsPanel } from '@/components/Settings/SettingsPanel';
-import { CommandPalette, CompetitionDialog } from '@/components/AI';
+import { CommandPalette, CompetitionDialog, MultiAgentPanel } from '@/components/AI';
 import { useEditorStore } from '@/store/editorStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useTerminalStore } from '@/store/terminalStore';
@@ -15,6 +15,7 @@ function App() {
   const [activePanel, setActivePanel] = useState<'editor' | 'terminal' | 'settings'>('editor');
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isCompetitionDialogOpen, setIsCompetitionDialogOpen] = useState(false);
+  const [isMultiAgentPanelVisible, setIsMultiAgentPanelVisible] = useState(false);
   const [commandPaletteContext, setCommandPaletteContext] = useState<string | undefined>();
   const { addTab, activeTabId, tabs } = useEditorStore();
   const { toggleSettingsPanel } = useSettingsStore();
@@ -127,6 +128,20 @@ function App() {
           <Trophy size={22} className="transition-transform group-hover:scale-110" />
         </button>
         <button
+          onClick={() => setIsMultiAgentPanelVisible(!isMultiAgentPanelVisible)}
+          className={`group relative p-3 rounded-xl transition-all duration-300 ${
+            isMultiAgentPanelVisible
+              ? 'bg-gradient-to-br from-accent-primary to-accent-secondary text-white shadow-glow-md'
+              : 'text-text-tertiary hover:text-text-primary hover:bg-editor-hover hover:shadow-glow-sm'
+          }`}
+          title="Multi-Agent Parallel Development"
+        >
+          <Users size={22} className="transition-transform group-hover:scale-110" />
+          {isMultiAgentPanelVisible && (
+            <div className="absolute left-0 w-1 h-8 bg-accent-primary rounded-r-full animate-fade-in" />
+          )}
+        </button>
+        <button
           onClick={() => {
             setActivePanel('settings');
             toggleSettingsPanel();
@@ -178,6 +193,12 @@ function App() {
           console.log('Competition started:', competitionId);
           // TODO: Show competition progress panel
         }}
+      />
+
+      {/* Multi-Agent Parallel Development Panel */}
+      <MultiAgentPanel
+        isVisible={isMultiAgentPanelVisible}
+        onClose={() => setIsMultiAgentPanelVisible(false)}
       />
     </div>
   );
