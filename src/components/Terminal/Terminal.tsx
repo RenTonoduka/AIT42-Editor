@@ -214,11 +214,17 @@ export const Terminal: React.FC<TerminalProps> = ({
   }, [initialDir, onReady]);
 
   /**
-   * Display command prompt
+   * Display command prompt with full path information
    */
   const displayPrompt = (xterm: XTerm, dir: string) => {
-    const shortDir = dir.split('/').pop() || dir;
-    xterm.write(`\x1b[1;36m${shortDir}\x1b[0m \x1b[1;32m$\x1b[0m `);
+    // Get home directory and replace with ~
+    const homeDir = process.env.HOME || '/Users';
+    const displayPath = dir.startsWith(homeDir)
+      ? `~${dir.slice(homeDir.length)}`
+      : dir;
+
+    // Show full path with color coding
+    xterm.write(`\x1b[1;34m${displayPath}\x1b[0m \x1b[1;32m❯\x1b[0m `);
   };
 
   /**
@@ -226,6 +232,7 @@ export const Terminal: React.FC<TerminalProps> = ({
    */
   const executeCommand = async (command: string, xterm: XTerm) => {
     let newDir = currentDir;
+    const oldDir = currentDir;
 
     try {
       // Execute command via Tauri backend
@@ -241,6 +248,16 @@ export const Terminal: React.FC<TerminalProps> = ({
 
       // Update current directory (may have changed with cd command)
       newDir = await tauriApi.getCurrentDirectory();
+
+      // If directory changed, show a message
+      if (newDir !== oldDir) {
+        const homeDir = process.env.HOME || '/Users';
+        const displayPath = newDir.startsWith(homeDir)
+          ? `~${newDir.slice(homeDir.length)}`
+          : newDir;
+        xterm.writeln(`\x1b[90mChanged directory to: \x1b[34m${displayPath}\x1b[0m`);
+      }
+
       setCurrentDir(newDir);
 
       // Update command history
@@ -255,6 +272,14 @@ export const Terminal: React.FC<TerminalProps> = ({
     }
   };
 
+  // Format current directory for display
+  const homeDir = typeof process !== 'undefined' && process.env?.HOME || '/Users';
+  const displayCurrentDir = currentDir
+    ? currentDir.startsWith(homeDir)
+      ? `~${currentDir.slice(homeDir.length)}` || '~'
+      : currentDir
+    : '~';
+
   return (
     <div
       className="terminal-container"
@@ -262,17 +287,46 @@ export const Terminal: React.FC<TerminalProps> = ({
         width: '100%',
         height: `${height}px`,
         backgroundColor: '#1E1E1E',
-        padding: '8px',
+        display: 'flex',
+        flexDirection: 'column',
         overflow: 'hidden',
       }}
     >
+      {/* Directory indicator header */}
       <div
-        ref={containerRef}
         style={{
-          width: '100%',
-          height: '100%'
+          backgroundColor: '#252526',
+          padding: '6px 12px',
+          borderBottom: '1px solid #3E3E42',
+          fontSize: '12px',
+          fontFamily: '"Fira Code", "Monaco", "Menlo", monospace',
+          color: '#9CDCFE',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          flexShrink: 0,
         }}
-      />
+      >
+        <span style={{ color: '#858585' }}>📁</span>
+        <span style={{ fontWeight: 600 }}>{displayCurrentDir}</span>
+      </div>
+
+      {/* Terminal content */}
+      <div
+        style={{
+          flex: 1,
+          padding: '8px',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          ref={containerRef}
+          style={{
+            width: '100%',
+            height: '100%'
+          }}
+        />
+      </div>
     </div>
   );
 };
