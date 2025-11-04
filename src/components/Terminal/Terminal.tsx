@@ -36,6 +36,19 @@ export const Terminal: React.FC<TerminalProps> = ({
   const fitAddonRef = useRef<FitAddon | null>(null);
   const [currentDir, setCurrentDir] = useState<string>('');
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
+  const [homeDir, setHomeDir] = useState<string>('/Users');
+
+  /**
+   * Extract home directory from a path
+   * e.g., /Users/username/... -> /Users/username
+   */
+  const extractHomeDir = (path: string): string => {
+    const parts = path.split('/');
+    if (parts.length >= 3 && (parts[1] === 'Users' || parts[1] === 'home')) {
+      return `/${parts[1]}/${parts[2]}`;
+    }
+    return '/Users'; // Fallback
+  };
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -85,7 +98,7 @@ export const Terminal: React.FC<TerminalProps> = ({
 
     // Initialize terminal
     const initTerminal = async () => {
-      let dir = process.cwd?.() || '/';
+      let dir = '/';
 
       try {
         // Display welcome message first
@@ -101,6 +114,10 @@ export const Terminal: React.FC<TerminalProps> = ({
         // Get current directory
         dir = await tauriApi.getCurrentDirectory();
         setCurrentDir(dir);
+
+        // Extract and set home directory
+        const home = extractHomeDir(dir);
+        setHomeDir(home);
 
         // Load command history
         const history = await tauriApi.getCommandHistory();
@@ -216,11 +233,10 @@ export const Terminal: React.FC<TerminalProps> = ({
   /**
    * Display command prompt with full path information
    */
-  const displayPrompt = (xterm: XTerm, dir: string) => {
-    // Get home directory and replace with ~
-    const homeDir = process.env.HOME || '/Users';
-    const displayPath = dir.startsWith(homeDir)
-      ? `~${dir.slice(homeDir.length)}`
+  const displayPrompt = (xterm: XTerm, dir: string, home: string = homeDir) => {
+    // Replace home directory with ~
+    const displayPath = dir.startsWith(home)
+      ? `~${dir.slice(home.length)}`
       : dir;
 
     // Show full path with color coding
@@ -251,7 +267,6 @@ export const Terminal: React.FC<TerminalProps> = ({
 
       // If directory changed, show a message
       if (newDir !== oldDir) {
-        const homeDir = process.env.HOME || '/Users';
         const displayPath = newDir.startsWith(homeDir)
           ? `~${newDir.slice(homeDir.length)}`
           : newDir;
@@ -273,7 +288,6 @@ export const Terminal: React.FC<TerminalProps> = ({
   };
 
   // Format current directory for display
-  const homeDir = typeof process !== 'undefined' && process.env?.HOME || '/Users';
   const displayCurrentDir = currentDir
     ? currentDir.startsWith(homeDir)
       ? `~${currentDir.slice(homeDir.length)}` || '~'
