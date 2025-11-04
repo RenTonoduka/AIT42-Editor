@@ -64,7 +64,7 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
 
   const handleStart = async () => {
     if (!task.trim() || selectedAgents.length < 2) {
-      alert('Please enter a task and select at least 2 agents');
+      alert('タスクを入力し、最低2つのエージェントを選択してください');
       return;
     }
 
@@ -88,7 +88,7 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
       onClose();
     } catch (error) {
       console.error('Failed to start competition:', error);
-      alert(`Failed to start competition: ${error}`);
+      alert(`コンペティションの開始に失敗しました: ${error}`);
     } finally {
       setIsStarting(false);
     }
@@ -108,11 +108,11 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
         {/* Header */}
         <div className="flex items-center gap-3 px-6 py-4 border-b border-editor-border bg-editor-surface">
           <Trophy size={24} className="text-accent-primary" />
-          <h2 className="text-lg font-semibold text-text-primary">AI Agent Competition</h2>
+          <h2 className="text-lg font-semibold text-text-primary">AIエージェント コンペティション</h2>
           <button
             onClick={onClose}
             className="ml-auto p-1 hover:bg-editor-border/30 rounded transition-colors"
-            title="Close (Esc)"
+            title="閉じる (Esc)"
           >
             <X size={20} className="text-text-tertiary" />
           </button>
@@ -123,12 +123,12 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
           {/* Task Input */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-2">
-              Task Description
+              タスク説明
             </label>
             <textarea
               value={task}
               onChange={(e) => setTask(e.target.value)}
-              placeholder="Describe the task for agents to compete on... (e.g., 'Implement user authentication with JWT')"
+              placeholder="エージェントに競わせるタスクを入力してください... (例: 'JWTを使用したユーザー認証を実装')"
               className="w-full px-4 py-3 bg-editor-bg text-text-primary placeholder-text-tertiary border border-editor-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary/50 resize-none"
               rows={3}
             />
@@ -138,13 +138,13 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
           <div>
             <div className="flex items-center justify-between mb-3">
               <label className="text-sm font-medium text-text-primary">
-                Select Agents ({selectedAgents.length} selected)
+                エージェントを選択 ({selectedAgents.length} 個選択中)
               </label>
               <button
                 onClick={() => setSelectedAgents(agents.map((a) => a.name))}
                 className="text-xs text-accent-primary hover:text-accent-secondary transition-colors"
               >
-                Select All
+                すべて選択
               </button>
             </div>
             <div className="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto p-2 bg-editor-bg rounded-lg border border-editor-border">
@@ -194,7 +194,7 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
               className="flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary transition-colors"
             >
               <SettingsIcon size={16} />
-              {showAdvanced ? 'Hide' : 'Show'} Advanced Options
+              詳細設定を{showAdvanced ? '非表示' : '表示'}
             </button>
 
             {showAdvanced && (
@@ -202,7 +202,7 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
                 {/* Concurrency */}
                 <div>
                   <label className="block text-xs font-medium text-text-secondary mb-2">
-                    Concurrency (max parallel agents)
+                    並列実行数（最大同時実行エージェント数）
                   </label>
                   <input
                     type="number"
@@ -213,14 +213,14 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
                     className="w-full px-3 py-2 bg-editor-surface text-text-primary border border-editor-border rounded focus:outline-none focus:ring-2 focus:ring-accent-primary/50"
                   />
                   <div className="text-xs text-text-tertiary mt-1">
-                    Higher values = faster but more resource-intensive
+                    値が大きいほど高速ですが、リソース使用量も増加します
                   </div>
                 </div>
 
                 {/* Timeout */}
                 <div>
                   <label className="block text-xs font-medium text-text-secondary mb-2">
-                    Timeout (seconds per agent)
+                    タイムアウト（エージェントあたりの秒数）
                   </label>
                   <input
                     type="number"
@@ -232,7 +232,7 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
                     className="w-full px-3 py-2 bg-editor-surface text-text-primary border border-editor-border rounded focus:outline-none focus:ring-2 focus:ring-accent-primary/50"
                   />
                   <div className="text-xs text-text-tertiary mt-1">
-                    {timeout} seconds = {Math.floor(timeout / 60)} minutes
+                    {timeout} 秒 = {Math.floor(timeout / 60)} 分
                   </div>
                 </div>
 
@@ -246,10 +246,10 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
                   />
                   <div className="flex-1">
                     <label className="text-xs font-medium text-text-secondary">
-                      Preserve Artifacts
+                      成果物を保持
                     </label>
                     <div className="text-xs text-text-tertiary mt-1">
-                      Keep Git worktrees and output files for later inspection
+                      Git worktreeと出力ファイルを保持して後で確認できるようにします
                     </div>
                   </div>
                 </div>
@@ -261,23 +261,23 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-editor-border bg-editor-surface">
           <div className="text-sm text-text-tertiary">
-            {selectedAgents.length < 2 && 'Select at least 2 agents to start'}
+            {selectedAgents.length < 2 && '開始するには最低2つのエージェントを選択してください'}
             {selectedAgents.length >= 2 &&
-              `Ready to compete ${selectedAgents.length} agents`}
+              `${selectedAgents.length} 個のエージェントで対戦準備完了`}
           </div>
           <div className="flex gap-3">
             <button
               onClick={onClose}
               className="px-4 py-2 text-text-secondary hover:text-text-primary transition-colors"
             >
-              Cancel
+              キャンセル
             </button>
             <button
               onClick={handleStart}
               disabled={!task.trim() || selectedAgents.length < 2 || isStarting}
               className="px-6 py-2 bg-gradient-to-r from-accent-primary to-accent-secondary hover:from-accent-secondary hover:to-accent-primary disabled:from-editor-border disabled:to-editor-border disabled:text-text-tertiary text-white font-semibold rounded-lg transition-all shadow-glow-sm hover:shadow-glow-md"
             >
-              {isStarting ? 'Starting...' : '🏆 Start Competition'}
+              {isStarting ? '開始中...' : '🏆 コンペティション開始'}
             </button>
           </div>
         </div>
