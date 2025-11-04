@@ -5,7 +5,7 @@
  * on different aspects of a project (Frontend, Backend, Testing, etc.)
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Users, Play, Pause, Square, Trash2, Plus, Code2, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { tauriApi, AgentExecutionResponse } from '@/services/tauri';
 
@@ -70,6 +70,18 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
 
   const [globalTask, setGlobalTask] = useState('');
   const [showComparison, setShowComparison] = useState(false);
+
+  // Track active polling intervals for cleanup
+  const pollingIntervalsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+
+  // Cleanup polling intervals on unmount
+  useEffect(() => {
+    return () => {
+      // Clear all active polling intervals when component unmounts
+      pollingIntervalsRef.current.forEach((interval) => clearInterval(interval));
+      pollingIntervalsRef.current.clear();
+    };
+  }, []);
 
   // Decompose global task into subtasks for each role
   const decomposeTask = (globalTaskDescription: string, role: string): string => {
@@ -143,6 +155,11 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
     const maxPolls = 120; // 2 minutes max (120 * 1s)
     let pollCount = 0;
 
+    const cleanup = (intervalId: NodeJS.Timeout) => {
+      clearInterval(intervalId);
+      pollingIntervalsRef.current.delete(id);
+    };
+
     const pollInterval = setInterval(async () => {
       try {
         const output = await tauriApi.getAgentOutput(executionId);
@@ -154,7 +171,7 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
 
               // Check if execution is complete
               if (output.status === 'completed') {
-                clearInterval(pollInterval);
+                cleanup(pollInterval);
                 return {
                   ...inst,
                   status: 'completed',
@@ -162,7 +179,7 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
                   output: [...newOutput, '✅ Task completed successfully!'],
                 };
               } else if (output.status === 'failed') {
-                clearInterval(pollInterval);
+                cleanup(pollInterval);
                 return {
                   ...inst,
                   status: 'failed',
@@ -179,7 +196,7 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
 
         pollCount++;
         if (pollCount >= maxPolls) {
-          clearInterval(pollInterval);
+          cleanup(pollInterval);
           setInstances((prev) =>
             prev.map((inst) =>
               inst.id === id
@@ -197,6 +214,9 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
         console.error('Failed to poll agent status:', error);
       }
     }, 1000); // Poll every second
+
+    // Register interval for cleanup
+    pollingIntervalsRef.current.set(id, pollInterval);
   };
 
   // Start single instance
@@ -276,9 +296,16 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
 
   // Stop instance
   const stopInstance = (id: string) => {
+    // Clear polling interval if exists
+    const interval = pollingIntervalsRef.current.get(id);
+    if (interval) {
+      clearInterval(interval);
+      pollingIntervalsRef.current.delete(id);
+    }
+
     setInstances(
       instances.map((inst) =>
-        inst.id === id ? { ...inst, status: 'paused' } : inst
+        inst.id === id ? { ...inst, status: 'paused', endTime: Date.now() } : inst
       )
     );
   };
