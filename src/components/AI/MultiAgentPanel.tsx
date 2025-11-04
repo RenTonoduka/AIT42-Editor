@@ -6,8 +6,8 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Play, Pause, Square, Trash2, Plus, Code2, CheckCircle, XCircle, Clock, Terminal } from 'lucide-react';
-import { tauriApi, AgentExecutionResponse, TmuxSession } from '@/services/tauri';
+import { Users, Play, Pause, Square, Trash2, Plus, Code2, CheckCircle, XCircle, Clock, Terminal, GitBranch } from 'lucide-react';
+import { tauriApi, AgentExecutionResponse, TmuxSession, WorktreeInfo } from '@/services/tauri';
 
 export interface ClaudeCodeInstance {
   id: string;
@@ -20,6 +20,8 @@ export interface ClaudeCodeInstance {
   endTime?: number;
   executionId?: string;
   tmuxSessionId?: string; // For tmux-based execution
+  worktreePath?: string; // For git worktree-based execution
+  worktreeBranch?: string; // Branch name for the worktree
   metrics?: {
     linesOfCode?: number;
     filesModified?: number;
@@ -361,33 +363,78 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
       const agentName = agentMap[instance.role] || 'code-reviewer';
 
       if (useTmuxMode) {
-        // Create tmux session for agent execution
-        const session = await tauriApi.createTmuxSession({
-          agentName,
-          task: instance.task,
-          context: globalTask,
-        });
+        const timestamp = Date.now();
+        const worktreeBasename = `ait42-${instance.role.toLowerCase().replace(/\s+/g, '-')}-${timestamp}`;
+        const worktreePath = `../ait42-worktrees/${worktreeBasename}`;
+        const worktreeBranch = `ait42/${instance.role.toLowerCase().replace(/\s+/g, '-')}/${timestamp}`;
 
-        // Update instance with tmux session ID
-        setInstances(
-          instances.map((inst) =>
-            inst.id === id
-              ? {
-                  ...inst,
-                  tmuxSessionId: session.sessionId,
-                  output: [
-                    ...inst.output,
-                    `🎬 Tmux session created: ${session.sessionId}`,
-                    `🤖 Agent "${agentName}" running in isolated environment`,
-                    `📊 Use 'tmux attach -t ${session.sessionId}' to view live output`,
-                  ],
-                }
-              : inst
-          )
-        );
+        try {
+          // 1. Create dedicated git worktree for this agent
+          const worktree = await tauriApi.createWorktree(worktreePath, worktreeBranch, true);
 
-        // Start polling for tmux output
-        await pollTmuxStatus(id, session.sessionId);
+          // Update instance with worktree info
+          setInstances(
+            instances.map((inst) =>
+              inst.id === id
+                ? {
+                    ...inst,
+                    worktreePath: worktree.path,
+                    worktreeBranch: worktree.branch,
+                    output: [
+                      ...inst.output,
+                      `📁 Worktree created: ${worktree.path}`,
+                      `🌿 Branch: ${worktree.branch}`,
+                      `📌 Commit: ${worktree.commit.substring(0, 7)}`,
+                    ],
+                  }
+                : inst
+            )
+          );
+
+          // 2. Create tmux session for agent execution
+          const session = await tauriApi.createTmuxSession({
+            agentName,
+            task: instance.task,
+            context: globalTask,
+          });
+
+          // Update instance with tmux session ID
+          setInstances(
+            instances.map((inst) =>
+              inst.id === id
+                ? {
+                    ...inst,
+                    tmuxSessionId: session.sessionId,
+                    output: [
+                      ...inst.output,
+                      `🎬 Tmux session created: ${session.sessionId}`,
+                      `🤖 Agent "${agentName}" running in isolated environment`,
+                      `🔧 Working directory: ${worktree.path}`,
+                      `📊 Use 'tmux attach -t ${session.sessionId}' to view live output`,
+                    ],
+                  }
+                : inst
+            )
+          );
+
+          // Start polling for tmux output
+          await pollTmuxStatus(id, session.sessionId);
+        } catch (worktreeError) {
+          // Handle worktree creation error
+          setInstances(
+            instances.map((inst) =>
+              inst.id === id
+                ? {
+                    ...inst,
+                    status: 'failed',
+                    endTime: Date.now(),
+                    output: [...inst.output, `❌ Failed to create worktree: ${worktreeError}`],
+                  }
+                : inst
+            )
+          );
+          return;
+        }
       } else {
         // Regular execution mode
         const response = await tauriApi.executeAgent({
@@ -456,6 +503,16 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
         await tauriApi.killTmuxSession(instance.tmuxSessionId);
       } catch (error) {
         console.error('Failed to kill tmux session:', error);
+      }
+    }
+
+    // Remove worktree if exists
+    if (instance?.worktreePath) {
+      try {
+        await tauriApi.removeWorktree(instance.worktreePath, true);
+        console.log(`Removed worktree: ${instance.worktreePath}`);
+      } catch (error) {
+        console.error('Failed to remove worktree:', error);
       }
     }
 
@@ -617,15 +674,18 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
           <div className="mt-2 p-2 bg-accent-primary/10 border border-accent-primary/30 rounded text-xs text-text-secondary">
             <div className="flex items-start gap-2">
               <Terminal size={14} className="text-accent-primary mt-0.5 flex-shrink-0" />
-              <div>
-                <strong className="text-accent-primary">AIT42 Tmux Integration:</strong>
+              <div className="flex-1">
+                <strong className="text-accent-primary">AIT42 Tmux + Worktree Integration:</strong>
                 <ul className="mt-1 space-y-1 list-disc list-inside">
-                  <li>Each agent runs in isolated tmux session</li>
-                  <li>Access live output with <code className="px-1 bg-editor-bg rounded">tmux attach</code></li>
+                  <li>Each agent runs in <strong>isolated tmux session</strong></li>
+                  <li>Each agent works in <strong>dedicated git worktree</strong></li>
+                  <li>Access live output: <code className="px-1 bg-editor-bg rounded">tmux attach -t ait42-{'{agent}'}</code></li>
                   <li>Maximum {instances.length} parallel sessions</li>
-                  <li>Session naming: <code className="px-1 bg-editor-bg rounded">ait42-{'{agent}'}-{'{timestamp}'}</code></li>
+                  <li>Worktree path: <code className="px-1 bg-editor-bg rounded">../ait42-worktrees/</code></li>
+                  <li>Branch naming: <code className="px-1 bg-editor-bg rounded">ait42/{'{role}'}/{'{timestamp}'}</code></li>
                 </ul>
               </div>
+              <GitBranch size={14} className="text-accent-primary mt-0.5 flex-shrink-0" />
             </div>
           </div>
         )}

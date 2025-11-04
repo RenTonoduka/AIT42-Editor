@@ -184,6 +184,17 @@ export interface TmuxExecutionRequest {
 }
 
 /**
+ * Git Worktree information
+ */
+export interface WorktreeInfo {
+  path: string;
+  branch: string;
+  commit: string;
+  isBare: boolean;
+  isDetached: boolean;
+}
+
+/**
  * Type-safe Tauri command wrappers
  */
 export const tauriApi = {
@@ -833,6 +844,56 @@ export const tauriApi = {
       await invoke('kill_tmux_session', { sessionId });
     } catch (error) {
       throw new Error(`Failed to kill tmux session: ${error}`);
+    }
+  },
+
+  /**
+   * List all git worktrees
+   */
+  async listWorktrees(): Promise<WorktreeInfo[]> {
+    try {
+      const worktrees = await invoke<WorktreeInfo[]>('git_list_worktrees');
+      return worktrees;
+    } catch (error) {
+      throw new Error(`Failed to list worktrees: ${error}`);
+    }
+  },
+
+  /**
+   * Create a new git worktree
+   */
+  async createWorktree(path: string, branch: string, createBranch: boolean = true): Promise<WorktreeInfo> {
+    try {
+      const worktree = await invoke<WorktreeInfo>('git_create_worktree', {
+        path,
+        branch,
+        createBranch,
+      });
+      return worktree;
+    } catch (error) {
+      throw new Error(`Failed to create worktree: ${error}`);
+    }
+  },
+
+  /**
+   * Remove a git worktree
+   */
+  async removeWorktree(path: string, force: boolean = false): Promise<void> {
+    try {
+      await invoke('git_remove_worktree', { path, force });
+    } catch (error) {
+      throw new Error(`Failed to remove worktree: ${error}`);
+    }
+  },
+
+  /**
+   * Prune stale worktree data
+   */
+  async pruneWorktrees(): Promise<void> {
+    try {
+      await invoke('git_prune_worktrees');
+    } catch (error) {
+      throw new Error(`Failed to prune worktrees: ${error}`);
     }
   },
 };

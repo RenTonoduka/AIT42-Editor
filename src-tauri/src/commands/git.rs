@@ -181,6 +181,202 @@ pub async fn git_create_branch(
     Ok(())
 }
 
+//
+// ============================================================
+// Git Worktree Management
+// ============================================================
+//
+
+/// Worktree information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorktreeInfo {
+    pub path: String,
+    pub branch: String,
+    pub commit: String,
+    pub is_bare: bool,
+    pub is_detached: bool,
+}
+
+/// List all worktrees
+#[tauri::command]
+pub async fn git_list_worktrees(state: State<'_, AppState>) -> Result<Vec<WorktreeInfo>, String> {
+    let working_dir = state.working_dir.lock().await;
+
+    let output = Command::new("git")
+        .arg("worktree")
+        .arg("list")
+        .arg("--porcelain")
+        .current_dir(&*working_dir)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut worktrees = Vec::new();
+    let mut current_worktree = None;
+    let mut path = String::new();
+    let mut commit = String::new();
+    let mut branch = String::new();
+    let mut is_bare = false;
+    let mut is_detached = false;
+
+    for line in stdout.lines() {
+        if line.starts_with("worktree ") {
+            // Save previous worktree if exists
+            if !path.is_empty() {
+                worktrees.push(WorktreeInfo {
+                    path: path.clone(),
+                    branch: branch.clone(),
+                    commit: commit.clone(),
+                    is_bare,
+                    is_detached,
+                });
+            }
+
+            // Start new worktree
+            path = line.strip_prefix("worktree ").unwrap_or("").to_string();
+            commit = String::new();
+            branch = String::new();
+            is_bare = false;
+            is_detached = false;
+        } else if line.starts_with("HEAD ") {
+            commit = line.strip_prefix("HEAD ").unwrap_or("").to_string();
+        } else if line.starts_with("branch ") {
+            branch = line.strip_prefix("branch ").unwrap_or("").to_string();
+            // Remove refs/heads/ prefix
+            if branch.starts_with("refs/heads/") {
+                branch = branch.strip_prefix("refs/heads/").unwrap_or(&branch).to_string();
+            }
+        } else if line == "bare" {
+            is_bare = true;
+        } else if line == "detached" {
+            is_detached = true;
+        }
+    }
+
+    // Save last worktree
+    if !path.is_empty() {
+        worktrees.push(WorktreeInfo {
+            path,
+            branch,
+            commit,
+            is_bare,
+            is_detached,
+        });
+    }
+
+    tracing::info!("Listed {} worktrees", worktrees.len());
+    Ok(worktrees)
+}
+
+/// Create a new worktree
+#[tauri::command]
+pub async fn git_create_worktree(
+    state: State<'_, AppState>,
+    path: String,
+    branch: String,
+    create_branch: bool,
+) -> Result<WorktreeInfo, String> {
+    let working_dir = state.working_dir.lock().await;
+
+    let mut cmd = Command::new("git");
+    cmd.arg("worktree")
+        .arg("add");
+
+    if create_branch {
+        cmd.arg("-b").arg(&branch);
+    }
+
+    cmd.arg(&path);
+
+    if !create_branch {
+        cmd.arg(&branch);
+    }
+
+    cmd.current_dir(&*working_dir);
+
+    let output = cmd.output().map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    // Get commit hash of the new worktree
+    let commit_output = Command::new("git")
+        .arg("rev-parse")
+        .arg("HEAD")
+        .current_dir(&path)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    let commit = String::from_utf8_lossy(&commit_output.stdout)
+        .trim()
+        .to_string();
+
+    tracing::info!("Created worktree at {} for branch {}", path, branch);
+
+    Ok(WorktreeInfo {
+        path,
+        branch,
+        commit,
+        is_bare: false,
+        is_detached: false,
+    })
+}
+
+/// Remove a worktree
+#[tauri::command]
+pub async fn git_remove_worktree(
+    state: State<'_, AppState>,
+    path: String,
+    force: bool,
+) -> Result<(), String> {
+    let working_dir = state.working_dir.lock().await;
+
+    let mut cmd = Command::new("git");
+    cmd.arg("worktree")
+        .arg("remove");
+
+    if force {
+        cmd.arg("--force");
+    }
+
+    cmd.arg(&path)
+        .current_dir(&*working_dir);
+
+    let output = cmd.output().map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    tracing::info!("Removed worktree at {}", path);
+    Ok(())
+}
+
+/// Prune stale worktree administrative data
+#[tauri::command]
+pub async fn git_prune_worktrees(state: State<'_, AppState>) -> Result<(), String> {
+    let working_dir = state.working_dir.lock().await;
+
+    let output = Command::new("git")
+        .arg("worktree")
+        .arg("prune")
+        .current_dir(&*working_dir)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    tracing::info!("Pruned stale worktrees");
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

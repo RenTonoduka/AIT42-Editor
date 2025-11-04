@@ -55,6 +55,11 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::git_branches,
             commands::git_checkout,
             commands::git_create_branch,
+            // Git worktree operations
+            commands::git_list_worktrees,
+            commands::git_create_worktree,
+            commands::git_remove_worktree,
+            commands::git_prune_worktrees,
             // Plugin operations
             commands::list_plugins,
             commands::get_plugin,
@@ -131,6 +136,11 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::git_branches,
             commands::git_checkout,
             commands::git_create_branch,
+            // Git worktree operations
+            commands::git_list_worktrees,
+            commands::git_create_worktree,
+            commands::git_remove_worktree,
+            commands::git_prune_worktrees,
             // Plugin operations
             commands::list_plugins,
             commands::get_plugin,
