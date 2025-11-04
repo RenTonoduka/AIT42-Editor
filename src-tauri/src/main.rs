@@ -80,6 +80,10 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::capture_tmux_output,
             commands::send_tmux_keys,
             commands::kill_tmux_session,
+            // AIT42 Competition operations
+            commands::execute_claude_code_competition,
+            commands::get_competition_status,
+            commands::cancel_competition,
             // Terminal operations
             commands::execute_command,
             commands::get_terminal_output,
@@ -160,7 +164,11 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::list_tmux_sessions,
             commands::capture_tmux_output,
             commands::send_tmux_keys,
-            commands::kill_tmux_session
+            commands::kill_tmux_session,
+            // AIT42 Competition operations
+            commands::execute_claude_code_competition,
+            commands::get_competition_status,
+            commands::cancel_competition
         ]
     }
 }

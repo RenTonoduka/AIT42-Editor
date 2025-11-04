@@ -195,6 +195,44 @@ export interface WorktreeInfo {
 }
 
 /**
+ * Claude Code Competition Request
+ */
+export interface ClaudeCodeCompetitionRequest {
+  task: string;
+  instanceCount: number;  // 2-10
+  model: string;  // "sonnet", "haiku", "opus"
+  timeoutSeconds: number;  // default: 300
+  preserveWorktrees: boolean;  // keep worktrees after completion
+}
+
+/**
+ * Claude Code Competition Result
+ */
+export interface ClaudeCodeCompetitionResult {
+  competitionId: string;
+  instances: ClaudeCodeInstanceResult[];
+  startedAt: string;
+  completedAt: string | null;
+  status: string;  // "running", "completed", "failed"
+}
+
+/**
+ * Individual Claude Code Instance Result
+ */
+export interface ClaudeCodeInstanceResult {
+  instanceId: string;
+  instanceNumber: number;
+  worktreePath: string;
+  tmuxSessionId: string;
+  status: string;  // "starting", "running", "completed", "failed", "timeout"
+  output: string;
+  error: string | null;
+  executionTimeMs: number;
+  startedAt: string;
+  completedAt: string | null;
+}
+
+/**
  * Type-safe Tauri command wrappers
  */
 export const tauriApi = {
@@ -894,6 +932,58 @@ export const tauriApi = {
       await invoke('git_prune_worktrees');
     } catch (error) {
       throw new Error(`Failed to prune worktrees: ${error}`);
+    }
+  },
+
+  // ===== Claude Code Competition Commands =====
+
+  /**
+   * Execute Claude Code Competition
+   *
+   * Creates multiple git worktrees and launches Claude Code instances in parallel
+   */
+  async executeClaudeCodeCompetition(
+    request: ClaudeCodeCompetitionRequest
+  ): Promise<ClaudeCodeCompetitionResult> {
+    try {
+      const result = await invoke<ClaudeCodeCompetitionResult>(
+        'execute_claude_code_competition',
+        { request }
+      );
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to execute Claude Code competition: ${error}`);
+    }
+  },
+
+  /**
+   * Get competition status and results
+   */
+  async getCompetitionStatus(
+    competitionId: string
+  ): Promise<ClaudeCodeCompetitionResult> {
+    try {
+      const result = await invoke<ClaudeCodeCompetitionResult>(
+        'get_competition_status',
+        { competitionId }
+      );
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to get competition status: ${error}`);
+    }
+  },
+
+  /**
+   * Cancel a running competition
+   */
+  async cancelCompetition(
+    competitionId: string,
+    cleanupWorktrees: boolean = true
+  ): Promise<void> {
+    try {
+      await invoke('cancel_competition', { competitionId, cleanupWorktrees });
+    } catch (error) {
+      throw new Error(`Failed to cancel competition: ${error}`);
     }
   },
 };

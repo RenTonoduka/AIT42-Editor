@@ -1,13 +1,13 @@
 /**
- * CompetitionDialog - AI Agent Competition Mode
+ * CompetitionDialog - Claude Code Competition Mode
  *
- * Allows users to run competitions between multiple AI agents
- * and compare their performance on the same task.
+ * Launches multiple Claude Code instances in parallel using Git worktrees
+ * and compares their results for the same task.
  */
 
 import React, { useState, useEffect } from 'react';
-import { Trophy, X, Plus, Trash2, Settings as SettingsIcon } from 'lucide-react';
-import { tauriApi, AgentInfo } from '@/services/tauri';
+import { Trophy, X, Settings as SettingsIcon, Code2, Cpu } from 'lucide-react';
+import { tauriApi, ClaudeCodeCompetitionRequest } from '@/services/tauri';
 
 export interface CompetitionDialogProps {
   /** Whether the dialog is visible */
@@ -18,6 +18,26 @@ export interface CompetitionDialogProps {
   onStart?: (competitionId: string) => void;
 }
 
+type ClaudeModel = 'sonnet' | 'haiku' | 'opus';
+
+const MODEL_INFO: Record<ClaudeModel, { label: string; description: string; emoji: string }> = {
+  sonnet: {
+    label: 'Sonnet 4.5',
+    description: 'バランス型：速度と品質の最適バランス',
+    emoji: '⚡',
+  },
+  haiku: {
+    label: 'Haiku 3.5',
+    description: '高速型：最速の応答速度',
+    emoji: '🚀',
+  },
+  opus: {
+    label: 'Opus 4',
+    description: '高品質型：最高の出力品質',
+    emoji: '💎',
+  },
+};
+
 /**
  * CompetitionDialog component
  */
@@ -27,62 +47,47 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
   onStart,
 }) => {
   const [task, setTask] = useState('');
-  const [agents, setAgents] = useState<AgentInfo[]>([]);
-  const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
-  const [concurrency, setConcurrency] = useState(3);
-  const [timeout, setTimeout] = useState(300);
-  const [preserve, setPreserve] = useState(false);
+  const [instanceCount, setInstanceCount] = useState(3);
+  const [selectedModel, setSelectedModel] = useState<ClaudeModel>('sonnet');
+  const [timeoutSeconds, setTimeoutSeconds] = useState(300);
+  const [preserveWorktrees, setPreserveWorktrees] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
 
-  // Load agents when dialog opens
+  // Reset state when dialog opens
   useEffect(() => {
     if (isOpen) {
-      loadAgents();
       setTask('');
-      setSelectedAgents([]);
+      setInstanceCount(3);
+      setSelectedModel('sonnet');
+      setTimeoutSeconds(300);
+      setPreserveWorktrees(false);
       setShowAdvanced(false);
     }
   }, [isOpen]);
 
-  const loadAgents = async () => {
-    try {
-      const agentList = await tauriApi.listAgents();
-      setAgents(agentList);
-    } catch (error) {
-      console.error('Failed to load agents:', error);
-    }
-  };
-
-  const toggleAgent = (agentName: string) => {
-    setSelectedAgents((prev) =>
-      prev.includes(agentName)
-        ? prev.filter((name) => name !== agentName)
-        : [...prev, agentName]
-    );
-  };
-
   const handleStart = async () => {
-    if (!task.trim() || selectedAgents.length < 2) {
-      alert('タスクを入力し、最低2つのエージェントを選択してください');
+    if (!task.trim()) {
+      alert('タスクを入力してください');
       return;
     }
 
     setIsStarting(true);
     try {
-      const responses = await tauriApi.executeParallel({
-        agents: selectedAgents,
+      const request: ClaudeCodeCompetitionRequest = {
         task: task.trim(),
-        context: undefined,
-      });
+        instanceCount,
+        model: selectedModel,
+        timeoutSeconds,
+        preserveWorktrees,
+      };
 
-      console.log('Competition started:', responses);
+      const result = await tauriApi.executeClaudeCodeCompetition(request);
 
-      // Generate competition ID from first execution
-      const competitionId = responses[0]?.execution_id || Date.now().toString();
+      console.log('Competition started:', result);
 
       if (onStart) {
-        onStart(competitionId);
+        onStart(result.competitionId);
       }
 
       onClose();
@@ -102,16 +107,23 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-4xl max-h-[85vh] bg-editor-elevated border border-editor-border rounded-xl shadow-2xl overflow-hidden flex flex-col"
+        className="w-full max-w-3xl max-h-[85vh] bg-editor-elevated border border-editor-border rounded-xl shadow-2xl overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center gap-3 px-6 py-4 border-b border-editor-border bg-editor-surface">
           <Trophy size={24} className="text-accent-primary" />
-          <h2 className="text-lg font-semibold text-text-primary">AIエージェント コンペティション</h2>
+          <div className="flex-1">
+            <h2 className="text-lg font-semibold text-text-primary">
+              Claude Code コンペティション
+            </h2>
+            <p className="text-xs text-text-tertiary mt-0.5">
+              複数のClaude Codeインスタンスを並列実行して結果を比較
+            </p>
+          </div>
           <button
             onClick={onClose}
-            className="ml-auto p-1 hover:bg-editor-border/30 rounded transition-colors"
+            className="p-1 hover:bg-editor-border/30 rounded transition-colors"
             title="閉じる (Esc)"
           >
             <X size={20} className="text-text-tertiary" />
@@ -128,62 +140,66 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
             <textarea
               value={task}
               onChange={(e) => setTask(e.target.value)}
-              placeholder="エージェントに競わせるタスクを入力してください... (例: 'JWTを使用したユーザー認証を実装')"
+              placeholder="各インスタンスに実行させるタスクを入力してください...&#10;例: 'ユーザー認証機能をJWTで実装してください'"
               className="w-full px-4 py-3 bg-editor-bg text-text-primary placeholder-text-tertiary border border-editor-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary/50 resize-none"
-              rows={3}
+              rows={4}
             />
           </div>
 
-          {/* Agent Selection */}
+          {/* Instance Count Slider */}
           <div>
             <div className="flex items-center justify-between mb-3">
               <label className="text-sm font-medium text-text-primary">
-                エージェントを選択 ({selectedAgents.length} 個選択中)
+                <Cpu size={16} className="inline mr-2" />
+                インスタンス数
               </label>
-              <button
-                onClick={() => setSelectedAgents(agents.map((a) => a.name))}
-                className="text-xs text-accent-primary hover:text-accent-secondary transition-colors"
-              >
-                すべて選択
-              </button>
+              <span className="text-2xl font-bold text-accent-primary">{instanceCount}</span>
             </div>
-            <div className="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto p-2 bg-editor-bg rounded-lg border border-editor-border">
-              {agents.map((agent) => (
-                <div
-                  key={agent.name}
-                  onClick={() => toggleAgent(agent.name)}
-                  className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                    selectedAgents.includes(agent.name)
-                      ? 'border-accent-primary bg-accent-primary/10'
-                      : 'border-editor-border hover:border-editor-border/60 bg-editor-surface'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="font-medium text-sm text-text-primary">{agent.name}</div>
-                      <div className="text-xs text-text-secondary mt-1 line-clamp-2">
-                        {agent.description}
-                      </div>
-                      <div className="text-xs text-text-tertiary mt-2">
-                        <span className="px-2 py-0.5 bg-editor-border/30 rounded">
-                          {agent.category}
-                        </span>
-                      </div>
+            <input
+              type="range"
+              min="2"
+              max="10"
+              value={instanceCount}
+              onChange={(e) => setInstanceCount(parseInt(e.target.value, 10))}
+              className="w-full h-2 bg-editor-border rounded-lg appearance-none cursor-pointer accent-accent-primary"
+            />
+            <div className="flex justify-between text-xs text-text-tertiary mt-1">
+              <span>2</span>
+              <span>10</span>
+            </div>
+          </div>
+
+          {/* Model Selection */}
+          <div>
+            <label className="block text-sm font-medium text-text-primary mb-3">
+              <Code2 size={16} className="inline mr-2" />
+              Claude モデル
+            </label>
+            <div className="grid grid-cols-3 gap-3">
+              {(Object.keys(MODEL_INFO) as ClaudeModel[]).map((model) => {
+                const info = MODEL_INFO[model];
+                const isSelected = selectedModel === model;
+
+                return (
+                  <button
+                    key={model}
+                    onClick={() => setSelectedModel(model)}
+                    className={`p-4 rounded-lg border-2 transition-all text-left ${
+                      isSelected
+                        ? 'border-accent-primary bg-accent-primary/10 shadow-glow-sm'
+                        : 'border-editor-border hover:border-editor-border/60 bg-editor-surface'
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">{info.emoji}</div>
+                    <div className="font-semibold text-sm text-text-primary mb-1">
+                      {info.label}
                     </div>
-                    {selectedAgents.includes(agent.name) && (
-                      <div className="flex-shrink-0 w-5 h-5 bg-accent-primary rounded-full flex items-center justify-center ml-2">
-                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                          <path
-                            fillRule="evenodd"
-                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+                    <div className="text-xs text-text-tertiary leading-tight">
+                      {info.description}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -199,57 +215,41 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
 
             {showAdvanced && (
               <div className="mt-4 p-4 bg-editor-bg rounded-lg border border-editor-border space-y-4">
-                {/* Concurrency */}
-                <div>
-                  <label className="block text-xs font-medium text-text-secondary mb-2">
-                    並列実行数（最大同時実行エージェント数）
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={concurrency}
-                    onChange={(e) => setConcurrency(parseInt(e.target.value, 10))}
-                    className="w-full px-3 py-2 bg-editor-surface text-text-primary border border-editor-border rounded focus:outline-none focus:ring-2 focus:ring-accent-primary/50"
-                  />
-                  <div className="text-xs text-text-tertiary mt-1">
-                    値が大きいほど高速ですが、リソース使用量も増加します
-                  </div>
-                </div>
-
                 {/* Timeout */}
                 <div>
                   <label className="block text-xs font-medium text-text-secondary mb-2">
-                    タイムアウト（エージェントあたりの秒数）
+                    タイムアウト（各インスタンスの制限時間）
                   </label>
-                  <input
-                    type="number"
-                    min="60"
-                    max="3600"
-                    step="60"
-                    value={timeout}
-                    onChange={(e) => setTimeout(parseInt(e.target.value, 10))}
-                    className="w-full px-3 py-2 bg-editor-surface text-text-primary border border-editor-border rounded focus:outline-none focus:ring-2 focus:ring-accent-primary/50"
-                  />
-                  <div className="text-xs text-text-tertiary mt-1">
-                    {timeout} 秒 = {Math.floor(timeout / 60)} 分
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      min="60"
+                      max="3600"
+                      step="60"
+                      value={timeoutSeconds}
+                      onChange={(e) => setTimeoutSeconds(parseInt(e.target.value, 10))}
+                      className="flex-1 px-3 py-2 bg-editor-surface text-text-primary border border-editor-border rounded focus:outline-none focus:ring-2 focus:ring-accent-primary/50"
+                    />
+                    <span className="text-sm text-text-tertiary">
+                      = {Math.floor(timeoutSeconds / 60)} 分
+                    </span>
                   </div>
                 </div>
 
-                {/* Preserve */}
+                {/* Preserve Worktrees */}
                 <div className="flex items-start gap-3">
                   <input
                     type="checkbox"
-                    checked={preserve}
-                    onChange={(e) => setPreserve(e.target.checked)}
+                    checked={preserveWorktrees}
+                    onChange={(e) => setPreserveWorktrees(e.target.checked)}
                     className="mt-1"
                   />
                   <div className="flex-1">
                     <label className="text-xs font-medium text-text-secondary">
-                      成果物を保持
+                      完了後もworktreeを保持
                     </label>
                     <div className="text-xs text-text-tertiary mt-1">
-                      Git worktreeと出力ファイルを保持して後で確認できるようにします
+                      コンペティション完了後もGit worktreeと出力を保持し、後で確認できるようにします
                     </div>
                   </div>
                 </div>
@@ -261,9 +261,13 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-editor-border bg-editor-surface">
           <div className="text-sm text-text-tertiary">
-            {selectedAgents.length < 2 && '開始するには最低2つのエージェントを選択してください'}
-            {selectedAgents.length >= 2 &&
-              `${selectedAgents.length} 個のエージェントで対戦準備完了`}
+            {!task.trim() ? (
+              'タスクを入力してください'
+            ) : (
+              <>
+                {instanceCount} 個のインスタンス × {MODEL_INFO[selectedModel].label} で実行準備完了
+              </>
+            )}
           </div>
           <div className="flex gap-3">
             <button
@@ -274,10 +278,10 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
             </button>
             <button
               onClick={handleStart}
-              disabled={!task.trim() || selectedAgents.length < 2 || isStarting}
+              disabled={!task.trim() || isStarting}
               className="px-6 py-2 bg-gradient-to-r from-accent-primary to-accent-secondary hover:from-accent-secondary hover:to-accent-primary disabled:from-editor-border disabled:to-editor-border disabled:text-text-tertiary text-white font-semibold rounded-lg transition-all shadow-glow-sm hover:shadow-glow-md"
             >
-              {isStarting ? '開始中...' : '🏆 コンペティション開始'}
+              {isStarting ? '起動中...' : '🏆 コンペティション開始'}
             </button>
           </div>
         </div>

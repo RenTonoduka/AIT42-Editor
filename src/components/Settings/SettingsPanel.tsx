@@ -30,7 +30,7 @@ export function SettingsPanel() {
       <div className="bg-[#1E1E1E] border border-gray-700 rounded-lg w-[600px] max-h-[80vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-100">Settings</h2>
+          <h2 className="text-lg font-semibold text-gray-100">設定</h2>
           <button
             onClick={toggleSettingsPanel}
             className="p-1 hover:bg-gray-700 rounded transition-colors"
@@ -43,7 +43,7 @@ export function SettingsPanel() {
         <div className="p-4 space-y-6">
           {/* Editor Settings */}
           <section>
-            <h3 className="text-md font-semibold text-gray-200 mb-3">Editor</h3>
+            <h3 className="text-md font-semibold text-gray-200 mb-3">エディター</h3>
             <div className="space-y-3">
               {/* Font Size */}
               <div className="flex items-center justify-between">
