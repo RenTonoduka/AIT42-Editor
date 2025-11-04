@@ -29,6 +29,8 @@ export interface EditorPaneProps {
   onChange: (content: string) => void;
   /** Callback when save is triggered (Cmd+S) */
   onSave: () => void;
+  /** Callback when AI action is triggered from context menu */
+  onAIAction?: (action: string, selectedText: string) => void;
 }
 
 /**
@@ -41,6 +43,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   language,
   onChange,
   onSave,
+  onAIAction,
 }) => {
   const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
@@ -73,6 +76,90 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
       notifyDidSave();
     });
 
+    // Add AI context menu actions
+    if (onAIAction) {
+      // Helper function to get selected text
+      const getSelectedText = () => {
+        const selection = editor.getSelection();
+        if (!selection) return '';
+        return editor.getModel()?.getValueInRange(selection) || '';
+      };
+
+      // Explain Code
+      editor.addAction({
+        id: 'ai.explainCode',
+        label: '✨ Explain Code',
+        contextMenuGroupId: 'ai',
+        contextMenuOrder: 1,
+        precondition: 'editorHasSelection',
+        run: () => {
+          const selectedText = getSelectedText();
+          if (selectedText) {
+            onAIAction('explain', selectedText);
+          }
+        },
+      });
+
+      // Generate Tests
+      editor.addAction({
+        id: 'ai.generateTests',
+        label: '✨ Generate Tests',
+        contextMenuGroupId: 'ai',
+        contextMenuOrder: 2,
+        precondition: 'editorHasSelection',
+        run: () => {
+          const selectedText = getSelectedText();
+          if (selectedText) {
+            onAIAction('generate-tests', selectedText);
+          }
+        },
+      });
+
+      // Refactor Code
+      editor.addAction({
+        id: 'ai.refactorCode',
+        label: '✨ Refactor Code',
+        contextMenuGroupId: 'ai',
+        contextMenuOrder: 3,
+        precondition: 'editorHasSelection',
+        run: () => {
+          const selectedText = getSelectedText();
+          if (selectedText) {
+            onAIAction('refactor', selectedText);
+          }
+        },
+      });
+
+      // Find Bugs
+      editor.addAction({
+        id: 'ai.findBugs',
+        label: '✨ Find Bugs',
+        contextMenuGroupId: 'ai',
+        contextMenuOrder: 4,
+        precondition: 'editorHasSelection',
+        run: () => {
+          const selectedText = getSelectedText();
+          if (selectedText) {
+            onAIAction('find-bugs', selectedText);
+          }
+        },
+      });
+
+      // Ask AI (opens CommandPalette)
+      editor.addAction({
+        id: 'ai.askAI',
+        label: '✨ Ask AI...',
+        contextMenuGroupId: 'ai',
+        contextMenuOrder: 5,
+        precondition: 'editorHasSelection',
+        keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK],
+        run: () => {
+          const selectedText = getSelectedText();
+          onAIAction('ask-ai', selectedText);
+        },
+      });
+    }
+
     // Focus editor
     editor.focus();
 
@@ -104,7 +191,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
         indentation: true,
       },
     });
-  }, [onSave]);
+  }, [onSave, onAIAction]);
 
   /**
    * Handle content change

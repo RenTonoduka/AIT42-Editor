@@ -5,6 +5,7 @@
  * - File operations (Cmd+O, Cmd+N, Cmd+S, Cmd+Shift+S)
  * - Tab navigation (Cmd+1-9, Cmd+W, Cmd+Tab)
  * - Editor actions (Cmd+F, Cmd+H, Cmd+P)
+ * - AI Command Palette (Cmd+K)
  * - Terminal (Ctrl+`, Cmd+J)
  */
 
@@ -116,10 +117,17 @@ export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers = {}) {
         return;
       }
 
-      // Cmd+P - Command palette
-      if (matchesShortcut(e, 'p', { cmd: true })) {
+      // Cmd+K - AI Command Palette
+      if (matchesShortcut(e, 'k', { cmd: true })) {
         e.preventDefault();
         handlers.onCommandPalette?.();
+        return;
+      }
+
+      // Cmd+P - Quick file open (TODO: implement)
+      if (matchesShortcut(e, 'p', { cmd: true })) {
+        e.preventDefault();
+        // handlers.onQuickFileOpen?.();
         return;
       }
 

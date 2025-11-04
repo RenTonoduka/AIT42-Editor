@@ -132,12 +132,13 @@ const ResizeHandle: React.FC<{
 
 interface EditorContainerProps {
   onFileOpen?: (path: string) => void;
+  onAIAction?: (action: string, selectedText: string) => void;
 }
 
 /**
  * EditorContainer - Main editor UI
  */
-export const EditorContainer: React.FC<EditorContainerProps> = ({ onFileOpen }) => {
+export const EditorContainer: React.FC<EditorContainerProps> = ({ onFileOpen, onAIAction }) => {
   const { tabs, activeTabId, updateTabContent, saveTab } = useEditorStore();
   const {
     isVisible: isTerminalVisible,
@@ -255,6 +256,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({ onFileOpen }) 
             language={activeTab.language}
             onChange={handleContentChange}
             onSave={handleSave}
+            onAIAction={onAIAction}
           />
         ) : (
           <EmptyState onFileOpen={onFileOpen} />
