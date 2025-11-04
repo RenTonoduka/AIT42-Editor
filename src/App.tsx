@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, Settings, Activity, Users, Layout, Sparkles, Trophy } from 'lucide-react';
+import { FileText, Settings, Activity, Users, Layout, Sparkles, Trophy, MessageSquare } from 'lucide-react';
 import { Sidebar } from './components/Sidebar/Sidebar';
 import { EditorContainer } from '@/components/Editor';
 import { StatusBar } from '@/components/StatusBar';
@@ -7,18 +7,23 @@ import { SettingsPanel } from '@/components/Settings/SettingsPanel';
 import MultiAgentPanel, { ClaudeCodeInstance } from '@/components/AI/MultiAgentPanel';
 import { CompetitionDialog } from '@/components/AI/CompetitionDialog';
 import { EnsembleDialog } from '@/components/AI/EnsembleDialog';
+import { DebateDialog } from '@/components/AI/DebateDialog';
+import DebateStatusPanel from '@/components/AI/DebateStatusPanel';
 import { useEditorStore } from '@/store/editorStore';
 import { useSettingsStore } from '@/store/settingsStore';
 
 // View Mode Type
-type ViewMode = 'editor' | 'multi-agent';
+type ViewMode = 'editor' | 'multi-agent' | 'debate';
 
 function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('editor');
   const [showSettings, setShowSettings] = useState(false);
   const [showCompetitionDialog, setShowCompetitionDialog] = useState(false);
   const [showEnsembleDialog, setShowEnsembleDialog] = useState(false);
+  const [showDebateDialog, setShowDebateDialog] = useState(false);
   const [claudeInstances, setClaudeInstances] = useState<ClaudeCodeInstance[]>([]);
+  const [debateId, setDebateId] = useState<string | null>(null);
+  const [debateTask, setDebateTask] = useState<string>('');
 
   const { activeFile } = useEditorStore();
   const { showDiagnostics } = useSettingsStore();
@@ -61,6 +66,20 @@ function App() {
     setViewMode('multi-agent');
   };
 
+  // Handle debate start (ディベートモード)
+  const handleDebateStart = (newDebateId: string, task: string) => {
+    setDebateId(newDebateId);
+    setDebateTask(task);
+    setShowDebateDialog(false);
+    setViewMode('debate');
+  };
+
+  // Handle debate close
+  const handleDebateClose = () => {
+    setViewMode('editor');
+    // Keep debateId and debateTask for history viewing
+  };
+
   return (
     <div className="flex flex-col h-screen bg-gray-900 text-gray-100">
       {/* Header */}
@@ -96,6 +115,16 @@ function App() {
               <Sparkles className="w-4 h-4 inline-block mr-1.5" />
               アンサンブル
             </button>
+
+            {/* Debate Mode Button */}
+            <button
+              onClick={() => setShowDebateDialog(true)}
+              className="px-3 py-1.5 rounded-md text-sm font-medium transition-all bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-md hover:shadow-lg"
+              title="ディベートモード: 3ラウンドの役割ベース議論"
+            >
+              <MessageSquare className="w-4 h-4 inline-block mr-1.5" />
+              ディベート
+            </button>
           </div>
 
           {/* View Mode Toggle */}
@@ -122,6 +151,18 @@ function App() {
             >
               <Users className="w-4 h-4 inline-block mr-1" />
               Multi-Agent ({claudeInstances.length})
+            </button>
+            <button
+              onClick={() => setViewMode('debate')}
+              className={`px-3 py-1 rounded-md text-sm transition-colors ${
+                viewMode === 'debate'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              } ${!debateId ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={!debateId}
+            >
+              <MessageSquare className="w-4 h-4 inline-block mr-1" />
+              Debate
             </button>
           </div>
         </div>
@@ -156,6 +197,17 @@ function App() {
             <MultiAgentPanel instances={claudeInstances} />
           </div>
         )}
+
+        {/* Debate View Mode */}
+        {viewMode === 'debate' && debateId && (
+          <div className="flex-1 bg-gray-900">
+            <DebateStatusPanel
+              debateId={debateId}
+              task={debateTask}
+              onClose={handleDebateClose}
+            />
+          </div>
+        )}
       </div>
 
       {/* Settings Modal */}
@@ -175,6 +227,13 @@ function App() {
         isOpen={showEnsembleDialog}
         onClose={() => setShowEnsembleDialog(false)}
         onStart={handleEnsembleStart}
+      />
+
+      {/* Debate Dialog (ディベートモード) */}
+      <DebateDialog
+        isOpen={showDebateDialog}
+        onClose={() => setShowDebateDialog(false)}
+        onStart={handleDebateStart}
       />
 
       {/* Status Bar */}
