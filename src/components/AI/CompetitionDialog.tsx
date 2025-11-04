@@ -160,7 +160,10 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
               min="2"
               max="10"
               value={instanceCount}
-              onChange={(e) => setInstanceCount(parseInt(e.target.value, 10))}
+              onChange={(e) => {
+                const value = parseInt(e.target.value, 10);
+                setInstanceCount(isNaN(value) ? 3 : value);
+              }}
               className="w-full h-2 bg-editor-border rounded-lg appearance-none cursor-pointer accent-accent-primary"
             />
             <div className="flex justify-between text-xs text-text-tertiary mt-1">
@@ -227,7 +230,10 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
                       max="3600"
                       step="60"
                       value={timeoutSeconds}
-                      onChange={(e) => setTimeoutSeconds(parseInt(e.target.value, 10))}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value, 10);
+                        setTimeoutSeconds(isNaN(value) ? 300 : value);
+                      }}
                       className="flex-1 px-3 py-2 bg-editor-surface text-text-primary border border-editor-border rounded focus:outline-none focus:ring-2 focus:ring-accent-primary/50"
                     />
                     <span className="text-sm text-text-tertiary">

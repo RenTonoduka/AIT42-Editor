@@ -61,6 +61,7 @@ pub struct ParallelExecutionRequest {
  * Executes multiple Claude Code instances in parallel worktrees
  */
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ClaudeCodeCompetitionRequest {
     pub task: String,
     pub instance_count: usize,  // 2-10 instances
@@ -73,6 +74,7 @@ pub struct ClaudeCodeCompetitionRequest {
  * Claude Code Competition Result
  */
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ClaudeCodeCompetitionResult {
     pub competition_id: String,
     pub instances: Vec<ClaudeCodeInstanceResult>,
@@ -85,6 +87,7 @@ pub struct ClaudeCodeCompetitionResult {
  * Individual Claude Code Instance Result
  */
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ClaudeCodeInstanceResult {
     pub instance_id: String,
     pub instance_number: usize,
