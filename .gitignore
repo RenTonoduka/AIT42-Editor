@@ -58,3 +58,7 @@ lerna-debug.log*
 .vscode/*
 !.vscode/extensions.json
 .idea
+
+# AIT42 Worktrees
+ait42-worktrees/
+src-tauri/.worktrees/

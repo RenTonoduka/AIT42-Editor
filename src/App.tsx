@@ -5,6 +5,7 @@ import { EditorContainer } from '@/components/Editor';
 import { StatusBar } from '@/components/StatusBar';
 import { SettingsPanel } from '@/components/Settings/SettingsPanel';
 import { CommandPalette, CompetitionDialog, MultiAgentPanel } from '@/components/AI';
+import { CompetitionMonitorPanel } from '@/components/AI/CompetitionMonitorPanel';
 import { useEditorStore } from '@/store/editorStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useTerminalStore } from '@/store/terminalStore';
@@ -16,6 +17,12 @@ function App() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isCompetitionDialogOpen, setIsCompetitionDialogOpen] = useState(false);
   const [isMultiAgentPanelVisible, setIsMultiAgentPanelVisible] = useState(false);
+  const [isCompetitionMonitorVisible, setIsCompetitionMonitorVisible] = useState(false);
+  const [competitionState, setCompetitionState] = useState<{
+    id: string;
+    instanceCount: number;
+    task: string;
+  } | null>(null);
   const [commandPaletteContext, setCommandPaletteContext] = useState<string | undefined>();
   const { addTab, activeTabId, tabs } = useEditorStore();
   const { toggleSettingsPanel } = useSettingsStore();
@@ -189,11 +196,32 @@ function App() {
       <CompetitionDialog
         isOpen={isCompetitionDialogOpen}
         onClose={() => setIsCompetitionDialogOpen(false)}
-        onStart={(competitionId) => {
+        onStart={(competitionId, instanceCount, task) => {
           console.log('Competition started:', competitionId);
-          // TODO: Show competition progress panel
+
+          // コンペティション状態を保存
+          setCompetitionState({
+            id: competitionId,
+            instanceCount: instanceCount,
+            task: task,
+          });
+
+          // ダイアログを閉じてモニターパネルを表示
+          setIsCompetitionDialogOpen(false);
+          setIsCompetitionMonitorVisible(true);
         }}
       />
+
+      {/* Competition Monitor Panel */}
+      {competitionState && (
+        <CompetitionMonitorPanel
+          isVisible={isCompetitionMonitorVisible}
+          onClose={() => setIsCompetitionMonitorVisible(false)}
+          competitionId={competitionState.id}
+          instanceCount={competitionState.instanceCount}
+          task={competitionState.task}
+        />
+      )}
 
       {/* Multi-Agent Parallel Development Panel */}
       <MultiAgentPanel

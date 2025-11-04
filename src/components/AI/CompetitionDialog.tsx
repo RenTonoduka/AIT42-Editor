@@ -8,6 +8,9 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, X, Settings as SettingsIcon, Code2, Cpu } from 'lucide-react';
 import { tauriApi, ClaudeCodeCompetitionRequest } from '@/services/tauri';
+import { ModeIndicator } from './ModeIndicator';
+import { CompetitiveFlowDiagram } from './CompetitiveFlowDiagram';
+import { ModeTooltip } from './ModeTooltip';
 
 export interface CompetitionDialogProps {
   /** Whether the dialog is visible */
@@ -15,7 +18,7 @@ export interface CompetitionDialogProps {
   /** Callback when dialog should close */
   onClose: () => void;
   /** Callback when competition starts */
-  onStart?: (competitionId: string) => void;
+  onStart?: (competitionId: string, instanceCount: number, task: string) => void;
 }
 
 type ClaudeModel = 'sonnet' | 'haiku' | 'opus';
@@ -87,14 +90,14 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
       console.log('Competition started:', result);
 
       if (onStart) {
-        onStart(result.competitionId);
+        // タスクとインスタンス数も渡す
+        onStart(result.competitionId, instanceCount, task.trim());
       }
 
-      onClose();
+      // onCloseはonStart内で処理されるため、ここでは呼ばない
     } catch (error) {
       console.error('Failed to start competition:', error);
       alert(`コンペティションの開始に失敗しました: ${error}`);
-    } finally {
       setIsStarting(false);
     }
   };
@@ -114,10 +117,14 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
         <div className="flex items-center gap-3 px-6 py-4 border-b border-editor-border bg-editor-surface">
           <Trophy size={24} className="text-accent-primary" />
           <div className="flex-1">
-            <h2 className="text-lg font-semibold text-text-primary">
-              Claude Code コンペティション
-            </h2>
-            <p className="text-xs text-text-tertiary mt-0.5">
+            <div className="flex items-center gap-2 mb-1">
+              <h2 className="text-lg font-semibold text-text-primary">
+                Claude Code コンペティション
+              </h2>
+              <ModeIndicator mode="competitive" />
+              <ModeTooltip mode="competitive" />
+            </div>
+            <p className="text-xs text-text-tertiary">
               複数のClaude Codeインスタンスを並列実行して結果を比較
             </p>
           </div>
@@ -132,6 +139,9 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Flow Diagram */}
+          <CompetitiveFlowDiagram />
+
           {/* Task Input */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-2">

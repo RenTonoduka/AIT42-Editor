@@ -6,8 +6,11 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Play, Pause, Square, Trash2, Plus, Code2, CheckCircle, XCircle, Clock, Terminal, GitBranch } from 'lucide-react';
+import { Users, Play, Pause, Square, Trash2, Plus, Code2, CheckCircle, XCircle, Clock, Terminal, GitBranch, Sparkles } from 'lucide-react';
 import { tauriApi, AgentExecutionResponse, TmuxSession, WorktreeInfo } from '@/services/tauri';
+import { ModeIndicator } from './ModeIndicator';
+import { CollaborativeFlowDiagram } from './CollaborativeFlowDiagram';
+import { ModeTooltip } from './ModeTooltip';
 
 export interface ClaudeCodeInstance {
   id: string;
@@ -75,9 +78,12 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
   const [showComparison, setShowComparison] = useState(false);
   const [desiredInstanceCount, setDesiredInstanceCount] = useState(3);
   const [useTmuxMode, setUseTmuxMode] = useState(true); // Use tmux by default for AIT42 integration
+  const [ensembleResult, setEnsembleResult] = useState<string>(''); // Integrated result from all instances
+  const [isIntegrating, setIsIntegrating] = useState(false); // Integration in progress
 
   // Track active polling intervals for cleanup
   const pollingIntervalsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const hasIntegratedRef = useRef<boolean>(false); // Prevent duplicate integration
 
   // Cleanup polling intervals on unmount
   useEffect(() => {
@@ -87,6 +93,134 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
       pollingIntervalsRef.current.clear();
     };
   }, []);
+
+  // Auto-integrate results when all instances complete (Ensemble Mode)
+  useEffect(() => {
+    // Check if all instances have completed (successfully or with failure)
+    const allCompleted = instances.length > 0 && instances.every(
+      (inst) => inst.status === 'completed' || inst.status === 'failed'
+    );
+
+    // Check if at least one instance succeeded
+    const hasSuccess = instances.some((inst) => inst.status === 'completed');
+
+    // Trigger integration if:
+    // 1. All instances are done
+    // 2. At least one succeeded
+    // 3. Haven't integrated yet
+    // 4. Not currently integrating
+    if (allCompleted && hasSuccess && !hasIntegratedRef.current && !isIntegrating) {
+      hasIntegratedRef.current = true;
+      performEnsembleIntegration();
+    }
+  }, [instances, isIntegrating]);
+
+  // Perform ensemble integration - merge results from all instances
+  const performEnsembleIntegration = async () => {
+    setIsIntegrating(true);
+
+    try {
+      console.log('🔮 Starting Ensemble Integration...');
+
+      // Collect outputs from all completed instances
+      const completedInstances = instances.filter((inst) => inst.status === 'completed');
+
+      if (completedInstances.length === 0) {
+        setEnsembleResult('⚠️ No instances completed successfully. Cannot perform integration.');
+        setIsIntegrating(false);
+        return;
+      }
+
+      // Build integration context
+      const integrationContext = {
+        task: globalTask,
+        instanceCount: completedInstances.length,
+        results: completedInstances.map((inst) => ({
+          role: inst.role,
+          name: inst.name,
+          output: inst.output.join('\n'),
+          duration: inst.endTime && inst.startTime ? inst.endTime - inst.startTime : 0,
+        })),
+      };
+
+      // Call integration AI agent (using code-reviewer or a dedicated integration agent)
+      const integrationPrompt = `
+# Ensemble Integration Task
+
+## Global Task
+${globalTask}
+
+## Individual Results
+
+${completedInstances.map((inst, idx) => `
+### Instance ${idx + 1}: ${inst.name} (${inst.role})
+**Duration**: ${inst.endTime && inst.startTime ? Math.floor((inst.endTime - inst.startTime) / 1000) : '?'}s
+**Output**:
+\`\`\`
+${inst.output.slice(-20).join('\n')}
+\`\`\`
+`).join('\n')}
+
+## Your Task
+Analyze all ${completedInstances.length} results and synthesize the best integrated solution that:
+1. Combines the strengths of each approach
+2. Identifies and resolves conflicts
+3. Provides a unified, coherent recommendation
+4. Highlights key insights from each instance
+
+**Output Format**: Provide a clear, structured integration report.
+`;
+
+      console.log('📤 Sending integration request to AI...');
+
+      // Execute integration using code-reviewer agent (or create dedicated integration agent)
+      const response = await tauriApi.executeAgent({
+        agentName: 'code-reviewer', // Using code-reviewer for integration analysis
+        task: integrationPrompt,
+        context: 'Ensemble Mode Integration',
+      });
+
+      console.log(`✅ Integration started: ${response.executionId}`);
+
+      // Poll for integration result
+      const pollIntegrationResult = async () => {
+        const maxPolls = 60; // 60 seconds max
+        let pollCount = 0;
+
+        const pollInterval = setInterval(async () => {
+          try {
+            const output = await tauriApi.getAgentOutput(response.executionId);
+
+            if (output.status === 'completed') {
+              clearInterval(pollInterval);
+              setEnsembleResult(output.output || 'Integration completed (no output)');
+              setIsIntegrating(false);
+              console.log('🎉 Ensemble Integration Complete!');
+            } else if (output.status === 'failed') {
+              clearInterval(pollInterval);
+              setEnsembleResult(`❌ Integration failed: ${output.error || 'Unknown error'}`);
+              setIsIntegrating(false);
+            }
+
+            pollCount++;
+            if (pollCount >= maxPolls) {
+              clearInterval(pollInterval);
+              setEnsembleResult('⏱️ Integration timeout');
+              setIsIntegrating(false);
+            }
+          } catch (error) {
+            console.error('Failed to poll integration result:', error);
+          }
+        }, 1000);
+      };
+
+      await pollIntegrationResult();
+    } catch (error) {
+      console.error('Ensemble integration error:', error);
+      setEnsembleResult(`❌ Integration error: ${error}`);
+      setIsIntegrating(false);
+    }
+  };
 
   // Decompose global task into subtasks for each role
   const decomposeTask = (globalTaskDescription: string, role: string): string => {
@@ -475,14 +609,42 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
     }
   };
 
-  // Start all instances in parallel
+  // Start all instances in parallel (TRUE PARALLEL EXECUTION)
   const startAll = async () => {
-    const runnableInstances = instances.filter(
-      (inst) => inst.task && inst.status === 'idle'
-    );
+    try {
+      const runnableInstances = instances.filter(
+        (inst) => inst.task && inst.status === 'idle'
+      );
 
-    for (const instance of runnableInstances) {
-      await startInstance(instance.id);
+      if (runnableInstances.length === 0) {
+        console.warn('No runnable instances found');
+        return;
+      }
+
+      console.log(`🚀 Starting ${runnableInstances.length} instances in parallel (Ensemble Mode)`);
+
+      // Execute ALL instances in parallel using Promise.all
+      const startPromises = runnableInstances.map((instance) =>
+        startInstance(instance.id).catch((error) => {
+          console.error(`Failed to start instance ${instance.id}:`, error);
+          // Return error but don't throw - Promise.all will continue
+          return { error, instanceId: instance.id };
+        })
+      );
+
+      // Wait for all instances to start (not complete, just start)
+      const results = await Promise.all(startPromises);
+
+      // Log any failures
+      const failures = results.filter((r) => r && typeof r === 'object' && 'error' in r);
+      if (failures.length > 0) {
+        console.warn(`${failures.length} instance(s) failed to start`);
+      }
+
+      console.log(`✅ All ${runnableInstances.length} instances started in parallel`);
+    } catch (error) {
+      console.error('Error in startAll:', error);
+      // Don't close the panel, just log the error
     }
   };
 
@@ -521,6 +683,22 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
         inst.id === id ? { ...inst, status: 'paused', endTime: Date.now() } : inst
       )
     );
+  };
+
+  // Get status text in Japanese
+  const getStatusText = (status: ClaudeCodeInstance['status']): string => {
+    switch (status) {
+      case 'idle':
+        return 'アイドル';
+      case 'running':
+        return '実行中';
+      case 'completed':
+        return '完了';
+      case 'failed':
+        return '失敗';
+      case 'paused':
+        return '一時停止';
+    }
   };
 
   // Get status icon
@@ -572,10 +750,12 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
         <div className="flex items-center gap-2">
           <Users size={20} className="text-accent-primary" />
           <h2 className="text-sm font-semibold text-text-primary">
-            Multi-Agent Parallel Development
+            マルチエージェント並列開発
           </h2>
+          <ModeIndicator mode="collaborative" />
+          <ModeTooltip mode="collaborative" />
           <div className="ml-2 px-2 py-0.5 bg-accent-primary/20 text-accent-primary text-xs rounded-full font-medium">
-            {instances.length} instances
+            {instances.length} インスタンス
           </div>
         </div>
         <button
@@ -586,12 +766,17 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
         </button>
       </div>
 
+      {/* Flow Diagram */}
+      <div className="px-4 py-3 border-b border-editor-border bg-editor-bg">
+        <CollaborativeFlowDiagram />
+      </div>
+
       {/* Instance Count Control */}
       <div className="px-4 py-3 border-b border-editor-border bg-editor-surface">
         <div className="flex items-center gap-3">
           <div className="flex-1">
             <label className="block text-xs font-medium text-text-secondary mb-1">
-              Instance Count
+              インスタンス数
             </label>
             <div className="flex items-center gap-2">
               <input
@@ -606,41 +791,41 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
                 onClick={() => quickSetup(desiredInstanceCount)}
                 className="px-3 py-1 text-xs bg-accent-primary hover:bg-accent-secondary text-white rounded transition-colors"
               >
-                Apply
+                適用
               </button>
             </div>
           </div>
           <div className="flex-1">
             <label className="block text-xs font-medium text-text-secondary mb-1">
-              Quick Presets
+              クイックプリセット
             </label>
             <div className="flex gap-2">
               <button
                 onClick={() => quickSetup(3)}
                 className="px-3 py-1 text-xs bg-editor-bg hover:bg-editor-border text-text-primary border border-editor-border rounded transition-colors"
-                title="3 instances (Frontend, Backend, Tester)"
+                title="3インスタンス (Frontend, Backend, Tester)"
               >
-                Small (3)
+                小 (3)
               </button>
               <button
                 onClick={() => quickSetup(6)}
                 className="px-3 py-1 text-xs bg-editor-bg hover:bg-editor-border text-text-primary border border-editor-border rounded transition-colors"
-                title="6 instances (Full stack team)"
+                title="6インスタンス (フルスタックチーム)"
               >
-                Medium (6)
+                中 (6)
               </button>
               <button
                 onClick={() => quickSetup(10)}
                 className="px-3 py-1 text-xs bg-editor-bg hover:bg-editor-border text-text-primary border border-editor-border rounded transition-colors"
-                title="10 instances (Large team)"
+                title="10インスタンス (大規模チーム)"
               >
-                Large (10)
+                大 (10)
               </button>
             </div>
           </div>
         </div>
         <div className="text-xs text-text-tertiary mt-2">
-          💡 Quick setup will replace all current instances with the specified count
+          💡 クイックセットアップは現在のインスタンスをすべて指定数に置き換えます
         </div>
       </div>
 
@@ -649,12 +834,12 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
         <div className="flex items-center justify-between">
           <div>
             <label className="block text-xs font-medium text-text-secondary mb-1">
-              Execution Mode
+              実行モード
             </label>
             <p className="text-xs text-text-tertiary">
               {useTmuxMode
-                ? '🎬 Tmux: Isolated sessions with full terminal access'
-                : '🚀 Standard: Direct agent execution'}
+                ? '🎬 Tmux: 完全なターミナルアクセスを持つ分離セッション'
+                : '🚀 標準: 直接エージェント実行'}
             </p>
           </div>
           <button
@@ -675,14 +860,14 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
             <div className="flex items-start gap-2">
               <Terminal size={14} className="text-accent-primary mt-0.5 flex-shrink-0" />
               <div className="flex-1">
-                <strong className="text-accent-primary">AIT42 Tmux + Worktree Integration:</strong>
+                <strong className="text-accent-primary">AIT42 Tmux + Worktree 統合:</strong>
                 <ul className="mt-1 space-y-1 list-disc list-inside">
-                  <li>Each agent runs in <strong>isolated tmux session</strong></li>
-                  <li>Each agent works in <strong>dedicated git worktree</strong></li>
-                  <li>Access live output: <code className="px-1 bg-editor-bg rounded">tmux attach -t ait42-{'{agent}'}</code></li>
-                  <li>Maximum {instances.length} parallel sessions</li>
-                  <li>Worktree path: <code className="px-1 bg-editor-bg rounded">../ait42-worktrees/</code></li>
-                  <li>Branch naming: <code className="px-1 bg-editor-bg rounded">ait42/{'{role}'}/{'{timestamp}'}</code></li>
+                  <li>各エージェントは<strong>分離されたtmuxセッション</strong>で実行</li>
+                  <li>各エージェントは<strong>専用のgit worktree</strong>で作業</li>
+                  <li>ライブ出力へアクセス: <code className="px-1 bg-editor-bg rounded">tmux attach -t ait42-{'{agent}'}</code></li>
+                  <li>最大 {instances.length} 個の並列セッション</li>
+                  <li>Worktreeパス: <code className="px-1 bg-editor-bg rounded">../ait42-worktrees/</code></li>
+                  <li>ブランチ命名: <code className="px-1 bg-editor-bg rounded">ait42/{'{role}'}/{'{timestamp}'}</code></li>
                 </ul>
               </div>
               <GitBranch size={14} className="text-accent-primary mt-0.5 flex-shrink-0" />
@@ -695,26 +880,26 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
       <div className="px-4 py-3 border-b border-editor-border bg-editor-bg">
         <div className="flex items-center justify-between mb-2">
           <label className="block text-xs font-medium text-text-secondary">
-            Global Project Task
+            全体プロジェクトタスク
           </label>
           <button
             onClick={handleDistributeTasks}
             disabled={!globalTask.trim() || instances.length === 0}
             className="px-3 py-1 text-xs text-accent-primary hover:text-accent-secondary disabled:text-text-tertiary disabled:cursor-not-allowed transition-colors"
-            title="Auto-distribute tasks to all instances based on their roles"
+            title="役割に基づいてすべてのインスタンスにタスクを自動分配"
           >
-            📋 Distribute Tasks
+            📋 タスクを分配
           </button>
         </div>
         <textarea
           value={globalTask}
           onChange={(e) => setGlobalTask(e.target.value)}
-          placeholder="e.g., Build a full-stack e-commerce application with user authentication, product catalog, and payment integration"
+          placeholder="例: ユーザー認証、商品カタログ、決済統合を備えたフルスタックECアプリケーションを構築"
           className="w-full px-3 py-2 bg-editor-surface text-text-primary placeholder-text-tertiary border border-editor-border rounded focus:outline-none focus:ring-2 focus:ring-accent-primary/50 resize-none"
           rows={3}
         />
         <div className="text-xs text-text-tertiary mt-1">
-          💡 Tip: Click "Distribute Tasks" to automatically generate role-specific subtasks from the global task
+          💡 ヒント: 「タスクを分配」をクリックすると、全体タスクから役割別のサブタスクが自動生成されます
         </div>
       </div>
 
@@ -734,7 +919,7 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
                     {instance.name}
                   </div>
                   <div className={`text-xs ${getStatusColor(instance.status)}`}>
-                    {instance.status} • {getDuration(instance)}
+                    {getStatusText(instance.status)} • {getDuration(instance)}
                   </div>
                 </div>
               </div>
@@ -770,30 +955,30 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
 
             {/* Role */}
             <div>
-              <label className="block text-xs text-text-tertiary mb-1">Role</label>
+              <label className="block text-xs text-text-tertiary mb-1">役割</label>
               <select
                 value={instance.role}
                 onChange={(e) => updateInstanceRole(instance.id, e.target.value)}
                 disabled={instance.status !== 'idle'}
                 className="w-full px-2 py-1 text-xs bg-editor-bg text-text-primary border border-editor-border rounded focus:outline-none focus:ring-1 focus:ring-accent-primary/50 disabled:opacity-50"
               >
-                <option value="Frontend Developer">Frontend Developer</option>
-                <option value="Backend Developer">Backend Developer</option>
-                <option value="Test Engineer">Test Engineer</option>
-                <option value="DevOps Engineer">DevOps Engineer</option>
-                <option value="Security Specialist">Security Specialist</option>
-                <option value="Database Designer">Database Designer</option>
+                <option value="Frontend Developer">フロントエンド開発者</option>
+                <option value="Backend Developer">バックエンド開発者</option>
+                <option value="Test Engineer">テストエンジニア</option>
+                <option value="DevOps Engineer">DevOpsエンジニア</option>
+                <option value="Security Specialist">セキュリティスペシャリスト</option>
+                <option value="Database Designer">データベース設計者</option>
               </select>
             </div>
 
             {/* Task */}
             <div>
-              <label className="block text-xs text-text-tertiary mb-1">Specific Task</label>
+              <label className="block text-xs text-text-tertiary mb-1">具体的なタスク</label>
               <textarea
                 value={instance.task}
                 onChange={(e) => updateInstanceTask(instance.id, e.target.value)}
                 disabled={instance.status !== 'idle'}
-                placeholder={`What should ${instance.name} work on?`}
+                placeholder={`${instance.name}に何を作業させますか？`}
                 className="w-full px-2 py-1 text-xs bg-editor-bg text-text-primary placeholder-text-tertiary border border-editor-border rounded focus:outline-none focus:ring-1 focus:ring-accent-primary/50 resize-none disabled:opacity-50"
                 rows={2}
               />
@@ -802,7 +987,7 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
             {/* Output */}
             {instance.output.length > 0 && (
               <div className="mt-2">
-                <label className="block text-xs text-text-tertiary mb-1">Output</label>
+                <label className="block text-xs text-text-tertiary mb-1">出力</label>
                 <div className="bg-editor-bg border border-editor-border rounded p-2 max-h-32 overflow-y-auto">
                   {instance.output.map((line, idx) => (
                     <div key={idx} className="text-xs text-text-secondary font-mono">
@@ -824,16 +1009,16 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
             className="flex items-center gap-2 px-3 py-2 text-sm text-accent-primary hover:bg-accent-primary/10 rounded transition-colors"
           >
             <Plus size={16} />
-            Add Claude Instance
+            Claude インスタンスを追加
           </button>
           <button
             onClick={() => setShowComparison(!showComparison)}
             disabled={instances.filter((i) => i.status === 'completed' || i.status === 'failed').length < 2}
             className="flex items-center gap-2 px-3 py-2 text-sm text-blue-400 hover:bg-blue-400/10 rounded transition-colors disabled:text-text-tertiary disabled:cursor-not-allowed"
-            title="Compare results from completed instances"
+            title="完了したインスタンスの結果を比較"
           >
             <Code2 size={16} />
-            {showComparison ? 'Hide' : 'Compare'} Results
+            結果を{showComparison ? '非表示' : '比較'}
           </button>
         </div>
         <button
@@ -842,16 +1027,75 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
           className="px-4 py-2 bg-gradient-to-r from-accent-primary to-accent-secondary hover:from-accent-secondary hover:to-accent-primary disabled:from-editor-border disabled:to-editor-border disabled:text-text-tertiary text-white text-sm font-semibold rounded-lg transition-all"
         >
           <Play size={16} className="inline mr-2" />
-          Start All Instances
+          すべてのインスタンスを開始
         </button>
       </div>
+
+      {/* Ensemble Integration Result Panel */}
+      {(ensembleResult || isIntegrating) && (
+        <div className="border-t border-purple-500/30 bg-gradient-to-r from-purple-900/10 to-blue-900/10">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Sparkles size={18} className="text-purple-400" />
+                <h3 className="text-sm font-semibold text-text-primary">
+                  アンサンブル統合結果
+                </h3>
+                {isIntegrating && (
+                  <span className="text-xs text-purple-400 animate-pulse">
+                    統合中...
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setEnsembleResult('');
+                  hasIntegratedRef.current = false;
+                }}
+                className="p-1 hover:bg-editor-border/30 rounded transition-colors"
+                title="統合結果をクリア"
+              >
+                <XCircle size={16} className="text-text-tertiary" />
+              </button>
+            </div>
+
+            <div className="bg-editor-surface border border-purple-500/30 rounded-lg p-4">
+              {isIntegrating ? (
+                <div className="flex items-center justify-center gap-3 py-8">
+                  <div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-sm text-text-secondary">
+                    統合AIが全インスタンスの結果を分析・統合しています...
+                  </span>
+                </div>
+              ) : (
+                <div className="prose prose-sm max-w-none text-text-primary">
+                  <pre className="whitespace-pre-wrap text-xs font-mono bg-editor-bg p-3 rounded border border-editor-border overflow-x-auto">
+                    {ensembleResult}
+                  </pre>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-3 p-3 bg-purple-900/10 rounded-lg border border-purple-500/20">
+              <div className="text-xs text-text-secondary">
+                <strong className="text-purple-400">💡 アンサンブル統合:</strong>
+                <ul className="mt-1 space-y-1 list-disc list-inside">
+                  <li>全インスタンスの完了後に自動的に統合AIが起動</li>
+                  <li>各インスタンスの結果を分析し、強みを組み合わせた最適解を生成</li>
+                  <li>矛盾点を検出・解決し、統一された推奨事項を提供</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Comparison Panel */}
       {showComparison && (
         <div className="border-t border-editor-border bg-editor-bg max-h-96 overflow-y-auto">
           <div className="p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-text-primary">Results Comparison</h3>
+              <h3 className="text-sm font-semibold text-text-primary">結果比較</h3>
               <button
                 onClick={() => setShowComparison(false)}
                 className="p-1 hover:bg-editor-border/30 rounded transition-colors"
@@ -883,7 +1127,7 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
 
                     {/* Role & Status */}
                     <div className="text-xs text-text-secondary mb-2">
-                      {instance.role} • {instance.status}
+                      {instance.role} • {getStatusText(instance.status)}
                     </div>
 
                     {/* Metrics */}
@@ -891,7 +1135,7 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
                       <div className="grid grid-cols-2 gap-2 mb-2 p-2 bg-editor-bg rounded">
                         {instance.metrics.linesOfCode !== undefined && (
                           <div className="text-xs">
-                            <span className="text-text-tertiary">Lines:</span>{' '}
+                            <span className="text-text-tertiary">行数:</span>{' '}
                             <span className="text-text-primary font-medium">
                               {instance.metrics.linesOfCode}
                             </span>
@@ -899,7 +1143,7 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
                         )}
                         {instance.metrics.filesModified !== undefined && (
                           <div className="text-xs">
-                            <span className="text-text-tertiary">Files:</span>{' '}
+                            <span className="text-text-tertiary">ファイル数:</span>{' '}
                             <span className="text-text-primary font-medium">
                               {instance.metrics.filesModified}
                             </span>
@@ -907,7 +1151,7 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
                         )}
                         {instance.metrics.testsAdded !== undefined && (
                           <div className="text-xs">
-                            <span className="text-text-tertiary">Tests:</span>{' '}
+                            <span className="text-text-tertiary">テスト:</span>{' '}
                             <span className="text-text-primary font-medium">
                               {instance.metrics.testsAdded}
                             </span>
@@ -915,7 +1159,7 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
                         )}
                         {instance.metrics.coveragePercent !== undefined && (
                           <div className="text-xs">
-                            <span className="text-text-tertiary">Coverage:</span>{' '}
+                            <span className="text-text-tertiary">カバレッジ:</span>{' '}
                             <span className="text-text-primary font-medium">
                               {instance.metrics.coveragePercent}%
                             </span>
@@ -926,7 +1170,7 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
 
                     {/* Output Summary */}
                     <div className="text-xs text-text-tertiary">
-                      {instance.output.length} output lines
+                      {instance.output.length} 行の出力
                     </div>
 
                     {/* Last output line */}
@@ -941,28 +1185,28 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
 
             {/* Summary Statistics */}
             <div className="mt-4 p-3 bg-editor-surface border border-editor-border rounded-lg">
-              <div className="text-xs font-semibold text-text-secondary mb-2">Summary</div>
+              <div className="text-xs font-semibold text-text-secondary mb-2">集計</div>
               <div className="grid grid-cols-4 gap-4 text-xs">
                 <div>
-                  <div className="text-text-tertiary">Completed</div>
+                  <div className="text-text-tertiary">完了</div>
                   <div className="text-lg font-bold text-green-400">
                     {instances.filter((i) => i.status === 'completed').length}
                   </div>
                 </div>
                 <div>
-                  <div className="text-text-tertiary">Failed</div>
+                  <div className="text-text-tertiary">失敗</div>
                   <div className="text-lg font-bold text-red-400">
                     {instances.filter((i) => i.status === 'failed').length}
                   </div>
                 </div>
                 <div>
-                  <div className="text-text-tertiary">Running</div>
+                  <div className="text-text-tertiary">実行中</div>
                   <div className="text-lg font-bold text-blue-400">
                     {instances.filter((i) => i.status === 'running').length}
                   </div>
                 </div>
                 <div>
-                  <div className="text-text-tertiary">Avg Duration</div>
+                  <div className="text-text-tertiary">平均時間</div>
                   <div className="text-lg font-bold text-text-primary">
                     {(() => {
                       const completed = instances.filter(
@@ -972,7 +1216,7 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
                       const avgMs =
                         completed.reduce((sum, i) => sum + ((i.endTime || 0) - (i.startTime || 0)), 0) /
                         completed.length;
-                      return `${Math.floor(avgMs / 1000)}s`;
+                      return `${Math.floor(avgMs / 1000)}秒`;
                     })()}
                   </div>
                 </div>
