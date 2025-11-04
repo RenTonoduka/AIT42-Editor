@@ -138,7 +138,7 @@ export const TabBar: React.FC = () => {
   }
 
   return (
-    <div className="h-11 bg-editor-surface/50 backdrop-blur-sm border-b border-editor-border/30 shadow-sm">
+    <div className="h-11 bg-editor-surface/80 border-b border-editor-border/30 shadow-sm" style={{ willChange: 'transform' }}>
       <div
         ref={scrollContainerRef}
         className="flex overflow-x-auto scrollbar-thin scrollbar-thumb-editor-border/50 scrollbar-track-transparent hover:scrollbar-thumb-editor-border"

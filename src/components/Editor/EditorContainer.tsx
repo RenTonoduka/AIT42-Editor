@@ -68,8 +68,8 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onFileOpen }) => {
     <div className="flex items-center justify-center h-full bg-editor-bg text-text-primary animate-fade-in">
       <div className="text-center space-y-6 max-w-md px-8">
         {/* Icon with glow effect */}
-        <div className="relative mb-8">
-          <div className="absolute inset-0 bg-gradient-to-br from-accent-primary/30 to-accent-secondary/30 rounded-full blur-3xl animate-glow" />
+        <div className="relative mb-8" style={{ transform: 'translateZ(0)' }}>
+          <div className="absolute inset-0 bg-gradient-to-br from-accent-primary/20 to-accent-secondary/20 rounded-full blur-xl" />
           <FileText size={72} className="relative mx-auto text-text-tertiary drop-shadow-lg" />
         </div>
 

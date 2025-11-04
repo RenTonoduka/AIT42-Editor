@@ -47,7 +47,7 @@ export const StatusBar: React.FC = () => {
   const hasProblems = errorCount > 0 || warningCount > 0;
 
   return (
-    <div className="h-7 bg-editor-surface/60 backdrop-blur-md border-t border-editor-border/20 flex items-center justify-between px-4 text-xs font-medium shadow-sm">
+    <div className="h-7 bg-editor-surface/85 border-t border-editor-border/20 flex items-center justify-between px-4 text-xs font-medium shadow-sm" style={{ willChange: 'transform' }}>
       {/* Left side - File info with elegant badges */}
       <div className="flex items-center space-x-3">
         {activeTab ? (

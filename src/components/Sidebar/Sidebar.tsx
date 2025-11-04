@@ -99,7 +99,7 @@ export function Sidebar({ onFileOpen }: SidebarProps) {
   };
 
   return (
-    <aside className="w-72 bg-editor-surface/40 backdrop-blur-xl border-r border-editor-border/30 flex flex-col shadow-glass">
+    <aside className="w-72 bg-editor-surface/90 border-r border-editor-border/30 flex flex-col shadow-glass" style={{ willChange: 'transform' }}>
       {/* Header - Glass morphism with gradient */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-editor-border/20 bg-gradient-to-r from-editor-elevated/30 to-transparent">
         <div className="flex items-center space-x-2.5">
@@ -147,10 +147,11 @@ export function Sidebar({ onFileOpen }: SidebarProps) {
             <FileTree onFileOpen={onFileOpen} />
           </>
         ) : (
-          /* Empty State - Elegant and inviting */}
-          <div className="flex flex-col items-center justify-center h-full px-6 animate-fade-in">
-            <div className="relative mb-6">
-              <div className="absolute inset-0 bg-gradient-to-br from-accent-primary/20 to-accent-secondary/20 rounded-full blur-2xl" />
+          <>
+            {/* Empty State - Elegant and inviting */}
+            <div className="flex flex-col items-center justify-center h-full px-6 animate-fade-in">
+            <div className="relative mb-6" style={{ transform: 'translateZ(0)' }}>
+              <div className="absolute inset-0 bg-gradient-to-br from-accent-primary/15 to-accent-secondary/15 rounded-full blur-xl" />
               <FolderOpen size={56} className="relative text-text-tertiary" />
             </div>
             <h3 className="text-base font-semibold text-text-primary mb-2">
@@ -170,6 +171,7 @@ export function Sidebar({ onFileOpen }: SidebarProps) {
               <div className="absolute inset-0 bg-gradient-to-r from-accent-secondary to-accent-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             </button>
           </div>
+          </>
         )}
       </div>
     </aside>
