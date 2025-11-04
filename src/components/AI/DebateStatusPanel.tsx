@@ -14,6 +14,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import { tauriApi, DebateStatus, RoundOutput } from '@/services/tauri';
+import { DebateFlowDiagram } from './DebateFlowDiagram';
 
 export interface DebateStatusPanelProps {
   debateId: string;
@@ -261,6 +262,11 @@ const DebateStatusPanel: React.FC<DebateStatusPanelProps> = ({
           {getStatusIcon(status.status)}
           <span className="font-medium capitalize">{status.status.replace('_', ' ')}</span>
         </div>
+      </div>
+
+      {/* Flow Diagram */}
+      <div className="px-4 pt-4">
+        <DebateFlowDiagram currentRound={status.currentRound} />
       </div>
 
       {/* Debate Info */}
