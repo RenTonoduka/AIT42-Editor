@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Code, Terminal, Settings, Sparkles } from 'lucide-react';
+import { Code, Terminal, Settings, Sparkles, Trophy } from 'lucide-react';
 import { Sidebar } from './components/Sidebar/Sidebar';
 import { EditorContainer } from '@/components/Editor';
 import { StatusBar } from '@/components/StatusBar';
 import { SettingsPanel } from '@/components/Settings/SettingsPanel';
-import { CommandPalette } from '@/components/AI';
+import { CommandPalette, CompetitionDialog } from '@/components/AI';
 import { useEditorStore } from '@/store/editorStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useTerminalStore } from '@/store/terminalStore';
@@ -14,6 +14,7 @@ import { tauriApi } from '@/services/tauri';
 function App() {
   const [activePanel, setActivePanel] = useState<'editor' | 'terminal' | 'settings'>('editor');
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isCompetitionDialogOpen, setIsCompetitionDialogOpen] = useState(false);
   const [commandPaletteContext, setCommandPaletteContext] = useState<string | undefined>();
   const { addTab, activeTabId, tabs } = useEditorStore();
   const { toggleSettingsPanel } = useSettingsStore();
@@ -119,6 +120,13 @@ function App() {
           <Sparkles size={22} className="transition-transform group-hover:scale-110" />
         </button>
         <button
+          onClick={() => setIsCompetitionDialogOpen(true)}
+          className="group relative p-3 rounded-xl transition-all duration-300 text-text-tertiary hover:text-text-primary hover:bg-editor-hover hover:shadow-glow-sm"
+          title="🏆 AI Competition Mode"
+        >
+          <Trophy size={22} className="transition-transform group-hover:scale-110" />
+        </button>
+        <button
           onClick={() => {
             setActivePanel('settings');
             toggleSettingsPanel();
@@ -160,6 +168,16 @@ function App() {
           setCommandPaletteContext(undefined);
         }}
         initialContext={commandPaletteContext || getSelectedText()}
+      />
+
+      {/* AI Competition Dialog */}
+      <CompetitionDialog
+        isOpen={isCompetitionDialogOpen}
+        onClose={() => setIsCompetitionDialogOpen(false)}
+        onStart={(competitionId) => {
+          console.log('Competition started:', competitionId);
+          // TODO: Show competition progress panel
+        }}
       />
     </div>
   );
