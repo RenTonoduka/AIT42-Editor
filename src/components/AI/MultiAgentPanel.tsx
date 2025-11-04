@@ -64,6 +64,41 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
 
   const [globalTask, setGlobalTask] = useState('');
 
+  // Decompose global task into subtasks for each role
+  const decomposeTask = (globalTaskDescription: string, role: string): string => {
+    if (!globalTaskDescription.trim()) return '';
+
+    const taskTemplates: Record<string, (task: string) => string> = {
+      'Frontend Developer': (task) =>
+        `Build the frontend UI for: ${task}\n- Create React components with TypeScript\n- Implement responsive design\n- Add proper state management\n- Ensure accessibility (WCAG)`,
+      'Backend Developer': (task) =>
+        `Implement backend services for: ${task}\n- Design and implement REST/GraphQL APIs\n- Set up database schemas and queries\n- Implement business logic and validation\n- Add error handling and logging`,
+      'Test Engineer': (task) =>
+        `Create comprehensive tests for: ${task}\n- Write unit tests with high coverage\n- Implement integration tests\n- Add E2E test scenarios\n- Set up CI/CD test automation`,
+      'DevOps Engineer': (task) =>
+        `Set up DevOps infrastructure for: ${task}\n- Configure CI/CD pipelines\n- Set up deployment automation\n- Implement monitoring and logging\n- Configure security scanning`,
+      'Security Specialist': (task) =>
+        `Perform security analysis for: ${task}\n- Conduct threat modeling\n- Implement OWASP best practices\n- Add authentication/authorization\n- Perform vulnerability scanning`,
+      'Database Designer': (task) =>
+        `Design database architecture for: ${task}\n- Design normalized schema\n- Optimize queries and indexes\n- Plan migration strategy\n- Implement data validation`,
+    };
+
+    const template = taskTemplates[role];
+    return template ? template(globalTaskDescription) : globalTaskDescription;
+  };
+
+  // Auto-distribute tasks when global task changes
+  const handleDistributeTasks = () => {
+    if (!globalTask.trim()) return;
+
+    setInstances((prev) =>
+      prev.map((inst) => ({
+        ...inst,
+        task: decomposeTask(globalTask, inst.role),
+      }))
+    );
+  };
+
   // Add new Claude Code instance
   const addInstance = () => {
     const newInstance: ClaudeCodeInstance = {
@@ -96,6 +131,67 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
     );
   };
 
+  // Poll for agent output and status
+  const pollAgentStatus = async (id: string, executionId: string) => {
+    const maxPolls = 120; // 2 minutes max (120 * 1s)
+    let pollCount = 0;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const output = await tauriApi.getAgentOutput(executionId);
+
+        setInstances((prev) =>
+          prev.map((inst) => {
+            if (inst.id === id) {
+              const newOutput = output.output ? [...inst.output, ...output.output.split('\n').filter(Boolean)] : inst.output;
+
+              // Check if execution is complete
+              if (output.status === 'completed') {
+                clearInterval(pollInterval);
+                return {
+                  ...inst,
+                  status: 'completed',
+                  endTime: Date.now(),
+                  output: [...newOutput, '✅ Task completed successfully!'],
+                };
+              } else if (output.status === 'failed') {
+                clearInterval(pollInterval);
+                return {
+                  ...inst,
+                  status: 'failed',
+                  endTime: Date.now(),
+                  output: [...newOutput, `❌ Task failed: ${output.error || 'Unknown error'}`],
+                };
+              }
+
+              return { ...inst, output: newOutput };
+            }
+            return inst;
+          })
+        );
+
+        pollCount++;
+        if (pollCount >= maxPolls) {
+          clearInterval(pollInterval);
+          setInstances((prev) =>
+            prev.map((inst) =>
+              inst.id === id
+                ? {
+                    ...inst,
+                    status: 'failed',
+                    endTime: Date.now(),
+                    output: [...inst.output, '⏱️ Execution timeout'],
+                  }
+                : inst
+            )
+          );
+        }
+      } catch (error) {
+        console.error('Failed to poll agent status:', error);
+      }
+    }, 1000); // Poll every second
+  };
+
   // Start single instance
   const startInstance = async (id: string) => {
     const instance = instances.find((inst) => inst.id === id);
@@ -105,7 +201,7 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
     setInstances(
       instances.map((inst) =>
         inst.id === id
-          ? { ...inst, status: 'running', startTime: Date.now(), output: [`Starting ${inst.role}...`] }
+          ? { ...inst, status: 'running', startTime: Date.now(), output: [`🚀 Starting ${inst.role}...`] }
           : inst
       )
     );
@@ -136,27 +232,14 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
             ? {
                 ...inst,
                 executionId: response.executionId,
-                output: [...inst.output, `Agent ${agentName} started`, `Execution ID: ${response.executionId}`],
+                output: [...inst.output, `🤖 Agent "${agentName}" started`, `📋 Execution ID: ${response.executionId}`],
               }
             : inst
         )
       );
 
-      // Simulate progress updates (in real implementation, poll for status)
-      setTimeout(() => {
-        setInstances((prev) =>
-          prev.map((inst) =>
-            inst.id === id
-              ? {
-                  ...inst,
-                  status: 'completed',
-                  endTime: Date.now(),
-                  output: [...inst.output, 'Task completed successfully!'],
-                }
-              : inst
-          )
-        );
-      }, 5000);
+      // Start polling for status and output
+      await pollAgentStatus(id, response.executionId);
     } catch (error) {
       setInstances(
         instances.map((inst) =>
@@ -165,7 +248,7 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
                 ...inst,
                 status: 'failed',
                 endTime: Date.now(),
-                output: [...inst.output, `Error: ${error}`],
+                output: [...inst.output, `❌ Error: ${error}`],
               }
             : inst
         )
@@ -255,16 +338,29 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
 
       {/* Global Task */}
       <div className="px-4 py-3 border-b border-editor-border bg-editor-bg">
-        <label className="block text-xs font-medium text-text-secondary mb-2">
-          Global Project Task
-        </label>
-        <input
-          type="text"
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-xs font-medium text-text-secondary">
+            Global Project Task
+          </label>
+          <button
+            onClick={handleDistributeTasks}
+            disabled={!globalTask.trim() || instances.length === 0}
+            className="px-3 py-1 text-xs text-accent-primary hover:text-accent-secondary disabled:text-text-tertiary disabled:cursor-not-allowed transition-colors"
+            title="Auto-distribute tasks to all instances based on their roles"
+          >
+            📋 Distribute Tasks
+          </button>
+        </div>
+        <textarea
           value={globalTask}
           onChange={(e) => setGlobalTask(e.target.value)}
-          placeholder="e.g., Build a full-stack e-commerce application"
-          className="w-full px-3 py-2 bg-editor-surface text-text-primary placeholder-text-tertiary border border-editor-border rounded focus:outline-none focus:ring-2 focus:ring-accent-primary/50"
+          placeholder="e.g., Build a full-stack e-commerce application with user authentication, product catalog, and payment integration"
+          className="w-full px-3 py-2 bg-editor-surface text-text-primary placeholder-text-tertiary border border-editor-border rounded focus:outline-none focus:ring-2 focus:ring-accent-primary/50 resize-none"
+          rows={3}
         />
+        <div className="text-xs text-text-tertiary mt-1">
+          💡 Tip: Click "Distribute Tasks" to automatically generate role-specific subtasks from the global task
+        </div>
       </div>
 
       {/* Instances List */}
