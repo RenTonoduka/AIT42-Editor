@@ -19,6 +19,12 @@ export interface ClaudeCodeInstance {
   startTime?: number;
   endTime?: number;
   executionId?: string;
+  metrics?: {
+    linesOfCode?: number;
+    filesModified?: number;
+    testsAdded?: number;
+    coveragePercent?: number;
+  };
 }
 
 export interface MultiAgentPanelProps {
@@ -63,6 +69,7 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
   ]);
 
   const [globalTask, setGlobalTask] = useState('');
+  const [showComparison, setShowComparison] = useState(false);
 
   // Decompose global task into subtasks for each role
   const decomposeTask = (globalTaskDescription: string, role: string): string => {
@@ -463,13 +470,24 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
 
       {/* Footer Actions */}
       <div className="flex items-center justify-between px-4 py-3 border-t border-editor-border bg-editor-surface">
-        <button
-          onClick={addInstance}
-          className="flex items-center gap-2 px-3 py-2 text-sm text-accent-primary hover:bg-accent-primary/10 rounded transition-colors"
-        >
-          <Plus size={16} />
-          Add Claude Instance
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={addInstance}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-accent-primary hover:bg-accent-primary/10 rounded transition-colors"
+          >
+            <Plus size={16} />
+            Add Claude Instance
+          </button>
+          <button
+            onClick={() => setShowComparison(!showComparison)}
+            disabled={instances.filter((i) => i.status === 'completed' || i.status === 'failed').length < 2}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-blue-400 hover:bg-blue-400/10 rounded transition-colors disabled:text-text-tertiary disabled:cursor-not-allowed"
+            title="Compare results from completed instances"
+          >
+            <Code2 size={16} />
+            {showComparison ? 'Hide' : 'Compare'} Results
+          </button>
+        </div>
         <button
           onClick={startAll}
           disabled={instances.every((inst) => !inst.task || inst.status !== 'idle')}
@@ -479,6 +497,142 @@ export const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({
           Start All Instances
         </button>
       </div>
+
+      {/* Comparison Panel */}
+      {showComparison && (
+        <div className="border-t border-editor-border bg-editor-bg max-h-96 overflow-y-auto">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-text-primary">Results Comparison</h3>
+              <button
+                onClick={() => setShowComparison(false)}
+                className="p-1 hover:bg-editor-border/30 rounded transition-colors"
+              >
+                <XCircle size={16} className="text-text-tertiary" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {instances
+                .filter((inst) => inst.status === 'completed' || inst.status === 'failed')
+                .map((instance) => (
+                  <div
+                    key={instance.id}
+                    className="bg-editor-surface border border-editor-border rounded-lg p-3"
+                  >
+                    {/* Instance Header */}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        {getStatusIcon(instance.status)}
+                        <div className="text-sm font-medium text-text-primary">
+                          {instance.name}
+                        </div>
+                      </div>
+                      <div className="text-xs text-text-tertiary">
+                        {getDuration(instance)}
+                      </div>
+                    </div>
+
+                    {/* Role & Status */}
+                    <div className="text-xs text-text-secondary mb-2">
+                      {instance.role} • {instance.status}
+                    </div>
+
+                    {/* Metrics */}
+                    {instance.metrics && (
+                      <div className="grid grid-cols-2 gap-2 mb-2 p-2 bg-editor-bg rounded">
+                        {instance.metrics.linesOfCode !== undefined && (
+                          <div className="text-xs">
+                            <span className="text-text-tertiary">Lines:</span>{' '}
+                            <span className="text-text-primary font-medium">
+                              {instance.metrics.linesOfCode}
+                            </span>
+                          </div>
+                        )}
+                        {instance.metrics.filesModified !== undefined && (
+                          <div className="text-xs">
+                            <span className="text-text-tertiary">Files:</span>{' '}
+                            <span className="text-text-primary font-medium">
+                              {instance.metrics.filesModified}
+                            </span>
+                          </div>
+                        )}
+                        {instance.metrics.testsAdded !== undefined && (
+                          <div className="text-xs">
+                            <span className="text-text-tertiary">Tests:</span>{' '}
+                            <span className="text-text-primary font-medium">
+                              {instance.metrics.testsAdded}
+                            </span>
+                          </div>
+                        )}
+                        {instance.metrics.coveragePercent !== undefined && (
+                          <div className="text-xs">
+                            <span className="text-text-tertiary">Coverage:</span>{' '}
+                            <span className="text-text-primary font-medium">
+                              {instance.metrics.coveragePercent}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Output Summary */}
+                    <div className="text-xs text-text-tertiary">
+                      {instance.output.length} output lines
+                    </div>
+
+                    {/* Last output line */}
+                    {instance.output.length > 0 && (
+                      <div className="mt-2 p-2 bg-editor-bg rounded text-xs font-mono text-text-secondary truncate">
+                        {instance.output[instance.output.length - 1]}
+                      </div>
+                    )}
+                  </div>
+                ))}
+            </div>
+
+            {/* Summary Statistics */}
+            <div className="mt-4 p-3 bg-editor-surface border border-editor-border rounded-lg">
+              <div className="text-xs font-semibold text-text-secondary mb-2">Summary</div>
+              <div className="grid grid-cols-4 gap-4 text-xs">
+                <div>
+                  <div className="text-text-tertiary">Completed</div>
+                  <div className="text-lg font-bold text-green-400">
+                    {instances.filter((i) => i.status === 'completed').length}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-text-tertiary">Failed</div>
+                  <div className="text-lg font-bold text-red-400">
+                    {instances.filter((i) => i.status === 'failed').length}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-text-tertiary">Running</div>
+                  <div className="text-lg font-bold text-blue-400">
+                    {instances.filter((i) => i.status === 'running').length}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-text-tertiary">Avg Duration</div>
+                  <div className="text-lg font-bold text-text-primary">
+                    {(() => {
+                      const completed = instances.filter(
+                        (i) => (i.status === 'completed' || i.status === 'failed') && i.startTime && i.endTime
+                      );
+                      if (completed.length === 0) return '-';
+                      const avgMs =
+                        completed.reduce((sum, i) => sum + ((i.endTime || 0) - (i.startTime || 0)), 0) /
+                        completed.length;
+                      return `${Math.floor(avgMs / 1000)}s`;
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
