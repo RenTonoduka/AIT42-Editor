@@ -135,11 +135,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-editor-border bg-editor-surface">
           <Sparkles size={20} className="text-accent-primary" />
-          <h2 className="text-sm font-semibold text-text-primary">AI Agent Command Palette</h2>
+          <h2 className="text-sm font-semibold text-text-primary">AIエージェント コマンドパレット</h2>
           <button
             onClick={onClose}
             className="ml-auto p-1 hover:bg-editor-border/30 rounded transition-colors"
-            title="Close (Esc)"
+            title="閉じる (Esc)"
           >
             <X size={16} className="text-text-tertiary" />
           </button>
@@ -156,7 +156,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search agents... (e.g., code-reviewer, test-generator)"
+            placeholder="エージェントを検索... (例: code-reviewer, test-generator)"
             className="w-full pl-12 pr-4 py-3 bg-editor-bg text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary/50"
           />
         </div>
@@ -165,7 +165,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         <div className="max-h-64 overflow-y-auto">
           {filteredAgents.length === 0 ? (
             <div className="py-8 text-center text-text-tertiary text-sm">
-              No agents found matching "{query}"
+              "{query}" に一致するエージェントが見つかりません
             </div>
           ) : (
             filteredAgents.map((agent, index) => (
@@ -187,7 +187,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                         {agent.category}
                       </span>
                       <span className="text-xs text-text-tertiary">
-                        {agent.tools.length} tools
+                        {agent.tools.length} 個のツール
                       </span>
                     </div>
                   </div>
@@ -201,27 +201,27 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         {filteredAgents.length > 0 && (
           <div className="border-t border-editor-border p-4">
             <label className="block text-xs font-medium text-text-secondary mb-2">
-              Task Description
+              タスク説明
             </label>
             <textarea
               ref={taskInputRef}
               value={task}
               onChange={(e) => setTask(e.target.value)}
-              placeholder="Describe what you want the agent to do..."
+              placeholder="エージェントに実行させたい内容を入力してください..."
               className="w-full px-3 py-2 bg-editor-bg text-text-primary placeholder-text-tertiary border border-editor-border rounded focus:outline-none focus:ring-2 focus:ring-accent-primary/50 resize-none"
               rows={3}
             />
             <div className="flex items-center justify-between mt-3">
               <span className="text-xs text-text-tertiary">
-                Press <kbd className="px-1.5 py-0.5 bg-editor-elevated rounded border border-editor-border">⌘</kbd> +{' '}
-                <kbd className="px-1.5 py-0.5 bg-editor-elevated rounded border border-editor-border">Enter</kbd> to execute
+                <kbd className="px-1.5 py-0.5 bg-editor-elevated rounded border border-editor-border">⌘</kbd> +{' '}
+                <kbd className="px-1.5 py-0.5 bg-editor-elevated rounded border border-editor-border">Enter</kbd> で実行
               </span>
               <button
                 onClick={handleExecute}
                 disabled={!task.trim() || isExecuting}
                 className="px-4 py-2 bg-accent-primary hover:bg-accent-primary/90 disabled:bg-editor-border disabled:text-text-tertiary text-white text-sm font-medium rounded transition-colors"
               >
-                {isExecuting ? 'Executing...' : 'Execute Agent'}
+                {isExecuting ? '実行中...' : 'エージェントを実行'}
               </button>
             </div>
           </div>
@@ -230,7 +230,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         {/* Execution Result */}
         {executionResult && (
           <div className="border-t border-editor-border p-4 bg-editor-surface">
-            <div className="text-xs font-medium text-text-secondary mb-2">Result:</div>
+            <div className="text-xs font-medium text-text-secondary mb-2">結果:</div>
             <div
               className={`p-3 rounded text-sm ${
                 executionResult.status === 'completed'
@@ -240,7 +240,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                   : 'bg-blue-500/10 text-blue-400'
               }`}
             >
-              {executionResult.output || executionResult.error || 'Processing...'}
+              {executionResult.output || executionResult.error || '処理中...'}
             </div>
           </div>
         )}
