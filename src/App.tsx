@@ -1,233 +1,168 @@
-import { useState } from 'react';
-import { Code, Terminal, Settings, Sparkles, Trophy, Users } from 'lucide-react';
-import { Sidebar } from './components/Sidebar/Sidebar';
-import { EditorContainer } from '@/components/Editor';
-import { StatusBar } from '@/components/StatusBar';
-import { SettingsPanel } from '@/components/Settings/SettingsPanel';
-import { CommandPalette, CompetitionDialog, MultiAgentPanel } from '@/components/AI';
-import { CompetitionMonitorPanel } from '@/components/AI/CompetitionMonitorPanel';
-import { useEditorStore } from '@/store/editorStore';
-import { useSettingsStore } from '@/store/settingsStore';
-import { useTerminalStore } from '@/store/terminalStore';
-import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { tauriApi } from '@/services/tauri';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Terminal, FileText, Settings, Activity, GitBranch, Users, Layout } from 'lucide-react';
+import Editor from './components/Editor/Editor';
+import TerminalPanel from './components/Terminal/TerminalPanel';
+import FileTree from './components/FileTree/FileTree';
+import StatusBar from './components/StatusBar/StatusBar';
+import SettingsPanel from './components/Settings/SettingsPanel';
+import AIAssistantPanel from './components/AI/AIAssistantPanel';
+import MultiAgentPanel, { ClaudeCodeInstance } from './components/AI/MultiAgentPanel';
+import { setupEventHandlers } from './events/eventHandlers';
+import type { FileTreeItem, Settings as SettingsType } from './types';
+
+// View Mode Type
+type ViewMode = 'editor' | 'multi-agent';
 
 function App() {
-  const [activePanel, setActivePanel] = useState<'editor' | 'terminal' | 'settings'>('editor');
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [isCompetitionDialogOpen, setIsCompetitionDialogOpen] = useState(false);
-  const [isMultiAgentPanelVisible, setIsMultiAgentPanelVisible] = useState(false);
-  const [isCompetitionMonitorVisible, setIsCompetitionMonitorVisible] = useState(false);
-  const [competitionState, setCompetitionState] = useState<{
-    id: string;
-    instanceCount: number;
-    task: string;
-  } | null>(null);
-  const [commandPaletteContext, setCommandPaletteContext] = useState<string | undefined>();
-  const { addTab, activeTabId, tabs } = useEditorStore();
-  const { toggleSettingsPanel } = useSettingsStore();
-  const { toggleTerminal } = useTerminalStore();
-
-  const handleFileOpen = async (path: string) => {
-    try {
-      await addTab(path);
-    } catch (error) {
-      console.error('Failed to open file:', error);
-    }
-  };
-
-  // Get selected text from active editor (for AI context)
-  const getSelectedText = (): string | undefined => {
-    const activeTab = tabs.find(t => t.id === activeTabId);
-    // TODO: Get actual selection from Monaco editor
-    return activeTab?.content;
-  };
-
-  // Handle AI actions from editor context menu
-  const handleAIAction = async (action: string, selectedText: string) => {
-    if (action === 'ask-ai') {
-      // Open CommandPalette with selected text as context
-      setCommandPaletteContext(selectedText);
-      setIsCommandPaletteOpen(true);
-    } else {
-      // Execute appropriate agent based on action
-      const agentMap: Record<string, string> = {
-        'explain': 'code-reviewer',
-        'generate-tests': 'test-generator',
-        'refactor': 'refactor-specialist',
-        'find-bugs': 'bug-fixer',
-      };
-
-      const agentName = agentMap[action];
-      if (agentName) {
-        try {
-          const response = await tauriApi.executeAgent({
-            agentName,
-            task: `${action} this code: ${selectedText}`,
-            context: selectedText,
-          });
-          console.log('Agent execution started:', response);
-          // TODO: Show notification/toast with execution status
-        } catch (error) {
-          console.error('Failed to execute agent:', error);
-          // TODO: Show error notification
-        }
-      }
-    }
-  };
-
-  // Register global keyboard shortcuts
-  useKeyboardShortcuts({
-    onOpenFile: () => console.log('TODO: Open file dialog'),
-    onNewFile: () => console.log('TODO: New file dialog'),
-    onSave: () => console.log('File saved'),
-    onSaveAll: () => console.log('All files saved'),
-    onCommandPalette: () => setIsCommandPaletteOpen(true),
+  const [files, setFiles] = useState<FileTreeItem[]>([]);
+  const [selectedFile, setSelectedFile] = useState<FileTreeItem | null>(null);
+  const [settings, setSettings] = useState<SettingsType>({
+    theme: 'dark',
+    fontSize: 14,
+    tabSize: 2,
   });
+  const [showSettings, setShowSettings] = useState(false);
+  const [showAI, setShowAI] = useState(false);
+  const [claudeInstances, setClaudeInstances] = useState<ClaudeCodeInstance[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>('editor');
+
+  useEffect(() => {
+    setupEventHandlers({
+      setFiles,
+      setSelectedFile,
+      setClaudeInstances,
+    });
+  }, []);
+
+  const handleFileSelect = useCallback((file: FileTreeItem) => {
+    setSelectedFile(file);
+  }, []);
+
+  const handleSave = useCallback((content: string) => {
+    if (selectedFile) {
+      console.log('Saving file:', selectedFile.path);
+    }
+  }, [selectedFile]);
+
+  const handleSettingsSave = useCallback((newSettings: SettingsType) => {
+    setSettings(newSettings);
+    setShowSettings(false);
+  }, []);
+
+  // Auto-switch to multi-agent view when instances exist
+  useEffect(() => {
+    if (claudeInstances.length > 0) {
+      setViewMode('multi-agent');
+    }
+  }, [claudeInstances.length]);
 
   return (
-    <div className="flex h-screen bg-editor-bg text-text-primary font-sans">
-      {/* Activity Bar - Modern gradient with glass effect */}
-      <aside className="w-16 bg-gradient-to-b from-editor-surface to-editor-elevated border-r border-editor-border/50 flex flex-col items-center py-6 space-y-3 backdrop-blur-sm">
-        <button
-          onClick={() => setActivePanel('editor')}
-          className={`group relative p-3 rounded-xl transition-all duration-300 ${
-            activePanel === 'editor'
-              ? 'bg-gradient-to-br from-accent-primary to-accent-secondary text-white shadow-glow-md'
-              : 'text-text-tertiary hover:text-text-primary hover:bg-editor-hover hover:shadow-glow-sm'
-          }`}
-          title="Editor"
-        >
-          <Code size={22} className="transition-transform group-hover:scale-110" />
-          {activePanel === 'editor' && (
-            <div className="absolute left-0 w-1 h-8 bg-accent-primary rounded-r-full animate-fade-in" />
+    <div className="flex flex-col h-screen bg-gray-900 text-gray-100">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
+        <div className="flex items-center space-x-4">
+          <FileText className="w-5 h-5 text-blue-400" />
+          <span className="text-sm font-semibold">AIT42-Editor</span>
+          {selectedFile && (
+            <span className="text-xs text-gray-400">{selectedFile.name}</span>
           )}
-        </button>
-        <button
-          onClick={() => {
-            setActivePanel('terminal');
-            toggleTerminal();
-          }}
-          className={`group relative p-3 rounded-xl transition-all duration-300 ${
-            activePanel === 'terminal'
-              ? 'bg-gradient-to-br from-accent-primary to-accent-secondary text-white shadow-glow-md'
-              : 'text-text-tertiary hover:text-text-primary hover:bg-editor-hover hover:shadow-glow-sm'
-          }`}
-          title="Terminal"
-        >
-          <Terminal size={22} className="transition-transform group-hover:scale-110" />
-          {activePanel === 'terminal' && (
-            <div className="absolute left-0 w-1 h-8 bg-accent-primary rounded-r-full animate-fade-in" />
-          )}
-        </button>
-        <button
-          onClick={() => setIsCommandPaletteOpen(true)}
-          className="group relative p-3 rounded-xl transition-all duration-300 text-text-tertiary hover:text-text-primary hover:bg-editor-hover hover:shadow-glow-sm"
-          title="AI Command Palette (⌘K)"
-        >
-          <Sparkles size={22} className="transition-transform group-hover:scale-110" />
-        </button>
-        <button
-          onClick={() => setIsCompetitionDialogOpen(true)}
-          className="group relative p-3 rounded-xl transition-all duration-300 text-text-tertiary hover:text-text-primary hover:bg-editor-hover hover:shadow-glow-sm"
-          title="🏆 AI Competition Mode"
-        >
-          <Trophy size={22} className="transition-transform group-hover:scale-110" />
-        </button>
-        <button
-          onClick={() => setIsMultiAgentPanelVisible(!isMultiAgentPanelVisible)}
-          className={`group relative p-3 rounded-xl transition-all duration-300 ${
-            isMultiAgentPanelVisible
-              ? 'bg-gradient-to-br from-accent-primary to-accent-secondary text-white shadow-glow-md'
-              : 'text-text-tertiary hover:text-text-primary hover:bg-editor-hover hover:shadow-glow-sm'
-          }`}
-          title="Multi-Agent Parallel Development"
-        >
-          <Users size={22} className="transition-transform group-hover:scale-110" />
-          {isMultiAgentPanelVisible && (
-            <div className="absolute left-0 w-1 h-8 bg-accent-primary rounded-r-full animate-fade-in" />
-          )}
-        </button>
-        <button
-          onClick={() => {
-            setActivePanel('settings');
-            toggleSettingsPanel();
-          }}
-          className={`group relative p-3 rounded-xl transition-all duration-300 ${
-            activePanel === 'settings'
-              ? 'bg-gradient-to-br from-accent-primary to-accent-secondary text-white shadow-glow-md'
-              : 'text-text-tertiary hover:text-text-primary hover:bg-editor-hover hover:shadow-glow-sm'
-          }`}
-          title="Settings"
-        >
-          <Settings size={22} className="transition-transform group-hover:scale-110" />
-          {activePanel === 'settings' && (
-            <div className="absolute left-0 w-1 h-8 bg-accent-primary rounded-r-full animate-fade-in" />
-          )}
-        </button>
-      </aside>
+        </div>
 
-      {/* File Explorer Sidebar */}
-      <Sidebar onFileOpen={handleFileOpen} />
+        {/* View Mode Toggle */}
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setViewMode('editor')}
+            className={`px-3 py-1 rounded-md text-sm transition-colors ${
+              viewMode === 'editor'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+          >
+            <Layout className="w-4 h-4 inline-block mr-1" />
+            Editor
+          </button>
+          <button
+            onClick={() => setViewMode('multi-agent')}
+            className={`px-3 py-1 rounded-md text-sm transition-colors ${
+              viewMode === 'multi-agent'
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            } ${claudeInstances.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={claudeInstances.length === 0}
+          >
+            <Users className="w-4 h-4 inline-block mr-1" />
+            Multi-Agent ({claudeInstances.length})
+          </button>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setShowAI(!showAI)}
+            className={`p-2 rounded hover:bg-gray-700 ${
+              showAI ? 'bg-gray-700' : ''
+            }`}
+          >
+            <Activity className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className={`p-2 rounded hover:bg-gray-700 ${
+              showSettings ? 'bg-gray-700' : ''
+            }`}
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col">
-        {/* Editor Container with Tab Bar and Editor */}
-        <EditorContainer onFileOpen={handleFileOpen} onAIAction={handleAIAction} />
+      <div className="flex flex-1 overflow-hidden">
+        {/* Editor View Mode */}
+        {viewMode === 'editor' && (
+          <>
+            {/* Left Sidebar - File Tree */}
+            <div className="w-64 bg-gray-800 border-r border-gray-700 overflow-y-auto">
+              <FileTree files={files} onFileSelect={handleFileSelect} />
+            </div>
 
-        {/* Status Bar */}
-        <StatusBar />
-      </main>
+            {/* Main Editor Area */}
+            <div className="flex-1 flex flex-col">
+              <Editor
+                file={selectedFile}
+                settings={settings}
+                onSave={handleSave}
+              />
+              <TerminalPanel />
+            </div>
 
-      {/* Settings Panel (Modal) */}
-      <SettingsPanel />
+            {/* Right Sidebar - AI Assistant */}
+            {showAI && (
+              <div className="w-96 bg-gray-800 border-l border-gray-700 overflow-y-auto">
+                <AIAssistantPanel />
+              </div>
+            )}
+          </>
+        )}
 
-      {/* AI Command Palette (Cmd+K) */}
-      <CommandPalette
-        isOpen={isCommandPaletteOpen}
-        onClose={() => {
-          setIsCommandPaletteOpen(false);
-          setCommandPaletteContext(undefined);
-        }}
-        initialContext={commandPaletteContext || getSelectedText()}
-      />
+        {/* Multi-Agent View Mode */}
+        {viewMode === 'multi-agent' && (
+          <div className="flex-1 bg-gray-900">
+            <MultiAgentPanel instances={claudeInstances} />
+          </div>
+        )}
+      </div>
 
-      {/* AI Competition Dialog */}
-      <CompetitionDialog
-        isOpen={isCompetitionDialogOpen}
-        onClose={() => setIsCompetitionDialogOpen(false)}
-        onStart={(competitionId, instanceCount, task) => {
-          console.log('Competition started:', competitionId);
-
-          // コンペティション状態を保存
-          setCompetitionState({
-            id: competitionId,
-            instanceCount: instanceCount,
-            task: task,
-          });
-
-          // ダイアログを閉じてモニターパネルを表示
-          setIsCompetitionDialogOpen(false);
-          setIsCompetitionMonitorVisible(true);
-        }}
-      />
-
-      {/* Competition Monitor Panel */}
-      {competitionState && (
-        <CompetitionMonitorPanel
-          isVisible={isCompetitionMonitorVisible}
-          onClose={() => setIsCompetitionMonitorVisible(false)}
-          competitionId={competitionState.id}
-          instanceCount={competitionState.instanceCount}
-          task={competitionState.task}
+      {/* Settings Modal */}
+      {showSettings && (
+        <SettingsPanel
+          settings={settings}
+          onSave={handleSettingsSave}
+          onClose={() => setShowSettings(false)}
         />
       )}
 
-      {/* Multi-Agent Parallel Development Panel */}
-      <MultiAgentPanel
-        isVisible={isMultiAgentPanelVisible}
-        onClose={() => setIsMultiAgentPanelVisible(false)}
-      />
+      {/* Status Bar */}
+      <StatusBar selectedFile={selectedFile} settings={settings} />
     </div>
   );
 }

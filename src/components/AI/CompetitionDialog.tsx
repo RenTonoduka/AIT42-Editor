@@ -66,6 +66,7 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
       setTimeoutSeconds(300);
       setPreserveWorktrees(false);
       setShowAdvanced(false);
+      setIsStarting(false);
     }
   }, [isOpen]);
 
@@ -94,7 +95,8 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
         onStart(result.competitionId, instanceCount, task.trim());
       }
 
-      // onCloseはonStart内で処理されるため、ここでは呼ばない
+      // 成功後にリセット（onStart内でダイアログが閉じられる）
+      setIsStarting(false);
     } catch (error) {
       console.error('Failed to start competition:', error);
       alert(`コンペティションの開始に失敗しました: ${error}`);
