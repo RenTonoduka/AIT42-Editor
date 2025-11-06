@@ -8,6 +8,7 @@ mod optimizer;
 mod plugin;
 mod state;
 
+use commands::optimizer::OptimizerState;
 use state::AppState;
 
 /// Generate invoke handler with conditional terminal commands
@@ -103,7 +104,11 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::get_current_directory,
             commands::set_current_directory,
             commands::get_command_history,
-            commands::get_terminal_info
+            commands::get_terminal_info,
+            // Optimizer operations (v1.6.0)
+            commands::optimize_task,
+            commands::calculate_instances,
+            commands::get_complexity_info
         ]
     }
 
@@ -187,7 +192,11 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             // Worktree visualization operations
             commands::list_worktrees,
             commands::get_worktree_files,
-            commands::delete_worktree
+            commands::delete_worktree,
+            // Optimizer operations (v1.6.0)
+            commands::optimize_task,
+            commands::calculate_instances,
+            commands::get_complexity_info
         ]
     }
 }
@@ -207,8 +216,12 @@ fn main() {
     let working_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
     let app_state = AppState::new(working_dir).expect("Failed to initialize application state");
 
+    // Initialize optimizer state (lazy initialization on first use)
+    let optimizer_state = OptimizerState::new();
+
     tauri::Builder::default()
         .manage(app_state)
+        .manage(optimizer_state)
         .invoke_handler(generate_handler())
         .setup(|_app| {
             info!("AIT42 Editor GUI initialized successfully");

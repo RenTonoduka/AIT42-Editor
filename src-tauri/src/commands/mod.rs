@@ -9,6 +9,7 @@ pub mod git;
 pub mod plugin;
 pub mod ait42;
 pub mod worktree;
+pub mod optimizer;
 
 #[cfg(feature = "terminal")]
 pub mod terminal;
@@ -21,9 +22,13 @@ pub use git::*;
 pub use plugin::*;
 pub use ait42::*;
 pub use worktree::*;
+pub use optimizer::*;
 
 #[cfg(feature = "terminal")]
 pub use terminal::*;
 
 #[cfg(test)]
 mod file_tests;
+
+#[cfg(test)]
+mod optimizer_tests;
