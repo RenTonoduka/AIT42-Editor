@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{Manager, State};
 use std::process::Command;
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use crate::state::AppState;
 
@@ -683,7 +683,7 @@ pub async fn execute_claude_code_competition(
             .arg("send-keys")
             .arg("-t")
             .arg(&session_id)
-            .arg(&claude_cmd)
+            .arg(format!("{} && exit", claude_cmd))
             .arg("C-m")
             .output()
             .map_err(|e| format!("Failed to send command: {}", e))?;
@@ -942,16 +942,37 @@ pub async fn execute_debate(
 
     tracing::info!("Debate worktree created successfully");
 
+    // Initialize debate status in state
+    let initial_status = DebateStatus {
+        debate_id: debate_id.clone(),
+        current_round: 0,
+        total_rounds: 3,
+        status: "started".to_string(),
+        round_outputs: Vec::new(),
+        worktree_path: worktree_path.clone(),
+        context_files: Vec::new(),
+        started_at: started_at.to_rfc3339(),
+        completed_at: None,
+    };
+
+    {
+        let mut debates = state.debates.lock()
+            .map_err(|e| format!("Failed to lock debates: {}", e))?;
+        debates.insert(debate_id.clone(), initial_status);
+    }
+
     // Start debate execution in background
     let app = app_handle.clone();
     let debate_id_clone = debate_id.clone();
     let request_clone = request.clone();
     let worktree_path_clone = worktree_path.clone();
     let context_dir_clone = context_dir.clone();
+    let debates_clone = Arc::clone(&state.debates);
 
     tauri::async_runtime::spawn(async move {
         if let Err(e) = execute_debate_rounds(
             app,
+            debates_clone,
             debate_id_clone,
             request_clone,
             worktree_path_clone,
@@ -971,6 +992,7 @@ pub async fn execute_debate(
 /// Execute all 3 debate rounds sequentially
 async fn execute_debate_rounds(
     app: tauri::AppHandle,
+    debates: Arc<Mutex<HashMap<String, DebateStatus>>>,
     debate_id: String,
     request: DebateRequest,
     worktree_path: String,
@@ -978,7 +1000,18 @@ async fn execute_debate_rounds(
 ) -> Result<(), String> {
     tracing::info!("Starting 3-round debate execution for {}", debate_id);
 
+    // Helper function to update debate status
+    let update_status = |round: u8, status: &str| {
+        if let Ok(mut debates_lock) = debates.lock() {
+            if let Some(debate) = debates_lock.get_mut(&debate_id) {
+                debate.current_round = round;
+                debate.status = status.to_string();
+            }
+        }
+    };
+
     // Round 1: Independent proposals
+    update_status(1, "round_1");
     emit_debate_status(&app, &debate_id, 1, "round_1");
     execute_round(
         app.clone(),
@@ -991,6 +1024,7 @@ async fn execute_debate_rounds(
     ).await?;
 
     // Round 2: Critical analysis with Round 1 context
+    update_status(2, "round_2");
     emit_debate_status(&app, &debate_id, 2, "round_2");
     let round1_context = load_round_context(&context_dir, 1)?;
     execute_round(
@@ -1004,6 +1038,7 @@ async fn execute_debate_rounds(
     ).await?;
 
     // Round 3: Consensus formation with Round 1+2 context
+    update_status(3, "round_3");
     emit_debate_status(&app, &debate_id, 3, "round_3");
     let round2_context = load_round_context(&context_dir, 2)?;
     let combined_context = format!("{}\n\n--- Round 2 ---\n\n{}",
@@ -1020,7 +1055,13 @@ async fn execute_debate_rounds(
         Some(combined_context),
     ).await?;
 
-    // Debate completed
+    // Debate completed - update final status
+    if let Ok(mut debates_lock) = debates.lock() {
+        if let Some(debate) = debates_lock.get_mut(&debate_id) {
+            debate.status = "completed".to_string();
+            debate.completed_at = Some(chrono::Utc::now().to_rfc3339());
+        }
+    }
     emit_debate_status(&app, &debate_id, 3, "completed");
     tracing::info!("Debate {} completed successfully", debate_id);
 
@@ -1086,7 +1127,7 @@ async fn execute_round(
 
         // Send Claude Code command
         let claude_cmd = format!(
-            "echo '{}' | claude --model {} --print",
+            "echo '{}' | claude --model {} code --print",
             prompt.replace("'", "'\\''"),
             request.model
         );
@@ -1095,7 +1136,7 @@ async fn execute_round(
             .arg("send-keys")
             .arg("-t")
             .arg(&session_id)
-            .arg(&claude_cmd)
+            .arg(format!("{} && exit", claude_cmd))
             .arg("C-m")
             .output()
             .map_err(|e| format!("Failed to send command: {}", e))?;
@@ -1199,11 +1240,15 @@ fn emit_debate_status(app: &tauri::AppHandle, debate_id: &str, current_round: u8
 /// Get debate status
 #[tauri::command]
 pub async fn get_debate_status(
-    _state: State<'_, AppState>,
+    state: State<'_, AppState>,
     debate_id: String,
 ) -> Result<DebateStatus, String> {
-    // TODO: Implement status tracking with state management
-    Err("Status tracking not yet implemented".to_string())
+    let debates = state.debates.lock()
+        .map_err(|e| format!("Failed to lock debates: {}", e))?;
+
+    debates.get(&debate_id)
+        .cloned()
+        .ok_or_else(|| format!("Debate {} not found", debate_id))
 }
 
 /// Cancel a running debate
