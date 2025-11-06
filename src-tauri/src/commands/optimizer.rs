@@ -5,6 +5,7 @@
 //! This module exposes the Rust optimizer backend (SubtaskOptimizer, InstanceCalculator)
 //! to the TypeScript frontend via Tauri IPC.
 
+use crate::ab_test::{ABTestResult, ABTestRunner};
 use crate::optimizer::{
     ComplexityClass, ComplexityEstimate, InstanceCalculation, InstanceCalculator,
     MemoryAdjustment, OptimizationResult, OptimizerError, SubtaskOptimizer,
@@ -501,4 +502,54 @@ mod tests {
         assert!((response.subtasks_per_instance - 1.67).abs() < 0.01);
         assert!(!response.resource_constrained);
     }
+}
+
+// ===== A/B Testing Commands =====
+
+/// Run A/B test comparing v1.5.0 (keyword) vs v1.6.0 (LLM + Ω-theory)
+///
+/// This command executes the complete A/B testing framework on 30 ground truth test cases,
+/// comparing the keyword-based baseline with the LLM + Ω-theory approach.
+///
+/// # Returns
+///
+/// Complete A/B test results including:
+/// - Strategy A (v1.5.0) metrics
+/// - Strategy B (v1.6.0) metrics
+/// - Statistical comparison (t-test, Cohen's d, confidence intervals)
+/// - Winner determination
+///
+/// # Errors
+///
+/// - "ANTHROPIC_API_KEY not set": Environment variable missing
+/// - "A/B test execution failed": Runtime error during test execution
+///
+/// # Performance
+///
+/// Expected duration: 1-3 minutes (depending on LLM API latency)
+#[tauri::command]
+pub async fn run_ab_test() -> Result<ABTestResult, String> {
+    info!("Starting A/B test execution");
+
+    // Create A/B test runner
+    let runner = ABTestRunner::from_env().map_err(|e| {
+        error!("Failed to create A/B test runner: {}", e);
+        format!(
+            "Failed to initialize A/B test. Ensure ANTHROPIC_API_KEY is set: {}",
+            e
+        )
+    })?;
+
+    // Run test
+    let result = runner.run().await.map_err(|e| {
+        error!("A/B test execution failed: {}", e);
+        format!("A/B test execution failed: {}", e)
+    })?;
+
+    info!(
+        "A/B test completed successfully. Winner: {}",
+        result.comparison.winner
+    );
+
+    Ok(result)
 }

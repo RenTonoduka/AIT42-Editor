@@ -3,6 +3,7 @@
 
 use tracing::info;
 
+mod ab_test;
 mod commands;
 mod optimizer;
 mod plugin;
@@ -108,7 +109,9 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             // Optimizer operations (v1.6.0)
             commands::optimize_task,
             commands::calculate_instances,
-            commands::get_complexity_info
+            commands::get_complexity_info,
+            // A/B Testing operations (v1.6.0)
+            commands::run_ab_test
         ]
     }
 
@@ -196,7 +199,9 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             // Optimizer operations (v1.6.0)
             commands::optimize_task,
             commands::calculate_instances,
-            commands::get_complexity_info
+            commands::get_complexity_info,
+            // A/B Testing operations (v1.6.0)
+            commands::run_ab_test
         ]
     }
 }

@@ -7,6 +7,7 @@
 #![warn(clippy::all)]
 #![allow(clippy::module_name_repetitions)]
 
+pub mod ab_test;
 pub mod optimizer;
 
 // Re-export commonly used types
