@@ -4,6 +4,7 @@
 use tracing::info;
 
 mod commands;
+mod optimizer;
 mod plugin;
 mod state;
 

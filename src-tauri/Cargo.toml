@@ -6,6 +6,14 @@ authors = ["AIT42 Team"]
 edition = "2021"
 rust-version = "1.91"
 
+[lib]
+name = "ait42_editor"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ait42-editor"
+path = "src/main.rs"
+
 [build-dependencies]
 tauri-build = { version = "1.5", features = [] }
 
@@ -26,6 +34,10 @@ ait42-lsp = { path = "../crates/ait42-lsp" }
 ait42-fs = { path = "../crates/ait42-fs" }
 ait42-config = { path = "../crates/ait42-config" }
 ait42-ait42 = { path = "../crates/ait42-ait42" }
+
+# v1.6.0 optimizer crates
+omega-theory = { path = "../crates/omega-theory" }
+llm-estimator = { path = "../crates/llm-estimator" }
 
 # LSP support
 lsp-types = "0.95"
