@@ -384,6 +384,230 @@ fn build_file_tree(
     Ok(nodes)
 }
 
+/// Diff hunk representing a change in a file
+#[derive(Serialize, Clone, Debug)]
+pub struct DiffHunk {
+    pub old_start: usize,
+    pub old_lines: usize,
+    pub new_start: usize,
+    pub new_lines: usize,
+    pub lines: Vec<DiffLine>,
+}
+
+/// Individual line in a diff
+#[derive(Serialize, Clone, Debug)]
+pub struct DiffLine {
+    pub line_type: String, // "add", "delete", "context"
+    pub content: String,
+    pub old_line_num: Option<usize>,
+    pub new_line_num: Option<usize>,
+}
+
+/// File diff information
+#[derive(Serialize, Clone, Debug)]
+pub struct FileDiff {
+    pub file_path: String,
+    pub old_path: Option<String>,
+    pub change_type: String, // "modified", "added", "deleted", "renamed"
+    pub hunks: Vec<DiffHunk>,
+    pub additions: usize,
+    pub deletions: usize,
+}
+
+/// Get git diff for a specific file in a worktree
+#[tauri::command]
+pub async fn get_file_diff(
+    worktree_path: String,
+    file_path: String,
+) -> Result<FileDiff, String> {
+    info!("Getting diff for file: {} in {}", file_path, worktree_path);
+
+    let worktree = PathBuf::from(&worktree_path);
+
+    // Security: validate path
+    let canonical = worktree.canonicalize()
+        .map_err(|e| format!("Invalid worktree path: {}", e))?;
+
+    // Run git diff for the specific file
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(&canonical)
+        .arg("diff")
+        .arg("HEAD")
+        .arg("--")
+        .arg(&file_path)
+        .output()
+        .map_err(|e| format!("Failed to run git diff: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!("Git diff failed: {}", String::from_utf8_lossy(&output.stderr)));
+    }
+
+    let diff_output = String::from_utf8_lossy(&output.stdout);
+
+    // Parse diff output
+    parse_diff(&diff_output, &file_path)
+}
+
+/// Get git diff for entire worktree
+#[tauri::command]
+pub async fn get_worktree_diff(
+    worktree_path: String,
+) -> Result<Vec<FileDiff>, String> {
+    info!("Getting diff for entire worktree: {}", worktree_path);
+
+    let worktree = PathBuf::from(&worktree_path);
+
+    // Security: validate path
+    let canonical = worktree.canonicalize()
+        .map_err(|e| format!("Invalid worktree path: {}", e))?;
+
+    // Run git diff for all files
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(&canonical)
+        .arg("diff")
+        .arg("HEAD")
+        .output()
+        .map_err(|e| format!("Failed to run git diff: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!("Git diff failed: {}", String::from_utf8_lossy(&output.stderr)));
+    }
+
+    let diff_output = String::from_utf8_lossy(&output.stdout);
+
+    // Parse diff output for multiple files
+    parse_multi_file_diff(&diff_output)
+}
+
+/// Parse unified diff format
+fn parse_diff(diff: &str, file_path: &str) -> Result<FileDiff, String> {
+    let mut hunks = Vec::new();
+    let mut additions = 0;
+    let mut deletions = 0;
+    let mut current_hunk: Option<DiffHunk> = None;
+    let mut old_line_num = 0;
+    let mut new_line_num = 0;
+
+    for line in diff.lines() {
+        if line.starts_with("@@") {
+            // Save previous hunk
+            if let Some(hunk) = current_hunk.take() {
+                hunks.push(hunk);
+            }
+
+            // Parse hunk header: @@ -old_start,old_lines +new_start,new_lines @@
+            if let Some(captures) = parse_hunk_header(line) {
+                old_line_num = captures.0;
+                new_line_num = captures.2;
+                current_hunk = Some(DiffHunk {
+                    old_start: captures.0,
+                    old_lines: captures.1,
+                    new_start: captures.2,
+                    new_lines: captures.3,
+                    lines: Vec::new(),
+                });
+            }
+        } else if let Some(ref mut hunk) = current_hunk {
+            let line_type = if line.starts_with('+') {
+                additions += 1;
+                new_line_num += 1;
+                "add"
+            } else if line.starts_with('-') {
+                deletions += 1;
+                old_line_num += 1;
+                "delete"
+            } else {
+                old_line_num += 1;
+                new_line_num += 1;
+                "context"
+            };
+
+            hunk.lines.push(DiffLine {
+                line_type: line_type.to_string(),
+                content: line[1..].to_string(), // Skip the +/- prefix
+                old_line_num: if line_type == "add" { None } else { Some(old_line_num) },
+                new_line_num: if line_type == "delete" { None } else { Some(new_line_num) },
+            });
+        }
+    }
+
+    // Save last hunk
+    if let Some(hunk) = current_hunk {
+        hunks.push(hunk);
+    }
+
+    Ok(FileDiff {
+        file_path: file_path.to_string(),
+        old_path: None,
+        change_type: "modified".to_string(),
+        hunks,
+        additions,
+        deletions,
+    })
+}
+
+/// Parse multiple file diffs
+fn parse_multi_file_diff(diff: &str) -> Result<Vec<FileDiff>, String> {
+    let mut file_diffs = Vec::new();
+    let mut current_file: Option<String> = None;
+    let mut current_diff = String::new();
+
+    for line in diff.lines() {
+        if line.starts_with("diff --git") {
+            // Save previous file diff
+            if let Some(file_path) = current_file.take() {
+                if let Ok(file_diff) = parse_diff(&current_diff, &file_path) {
+                    file_diffs.push(file_diff);
+                }
+                current_diff.clear();
+            }
+
+            // Extract file path from "diff --git a/path b/path"
+            if let Some(path) = line.split_whitespace().nth(2) {
+                current_file = Some(path[2..].to_string()); // Remove "a/" prefix
+            }
+        } else {
+            current_diff.push_str(line);
+            current_diff.push('\n');
+        }
+    }
+
+    // Save last file diff
+    if let Some(file_path) = current_file {
+        if let Ok(file_diff) = parse_diff(&current_diff, &file_path) {
+            file_diffs.push(file_diff);
+        }
+    }
+
+    Ok(file_diffs)
+}
+
+/// Parse hunk header: @@ -old_start,old_lines +new_start,new_lines @@
+fn parse_hunk_header(line: &str) -> Option<(usize, usize, usize, usize)> {
+    let parts: Vec<&str> = line.split_whitespace().collect();
+    if parts.len() < 3 {
+        return None;
+    }
+
+    let old_part = parts[1].trim_start_matches('-');
+    let new_part = parts[2].trim_start_matches('+');
+
+    let old_nums: Vec<usize> = old_part.split(',')
+        .filter_map(|s| s.parse().ok())
+        .collect();
+    let new_nums: Vec<usize> = new_part.split(',')
+        .filter_map(|s| s.parse().ok())
+        .collect();
+
+    if old_nums.len() == 2 && new_nums.len() == 2 {
+        Some((old_nums[0], old_nums[1], new_nums[0], new_nums[1]))
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

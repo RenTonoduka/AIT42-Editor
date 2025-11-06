@@ -29,6 +29,39 @@ export interface FileNode {
 }
 
 /**
+ * Diff line structure
+ */
+export interface DiffLine {
+  line_type: 'add' | 'delete' | 'context';
+  content: string;
+  old_line_num?: number;
+  new_line_num?: number;
+}
+
+/**
+ * Diff hunk structure
+ */
+export interface DiffHunk {
+  old_start: number;
+  old_lines: number;
+  new_start: number;
+  new_lines: number;
+  lines: DiffLine[];
+}
+
+/**
+ * File diff structure
+ */
+export interface FileDiff {
+  file_path: string;
+  old_path?: string;
+  change_type: 'modified' | 'added' | 'deleted' | 'renamed';
+  hunks: DiffHunk[];
+  additions: number;
+  deletions: number;
+}
+
+/**
  * Worktree API operations
  */
 export const worktreeApi = {
@@ -73,6 +106,37 @@ export const worktreeApi = {
       await invoke('delete_worktree', { worktreeId });
     } catch (error) {
       throw new Error(`Failed to delete worktree: ${error}`);
+    }
+  },
+
+  /**
+   * Get git diff for a specific file in a worktree
+   *
+   * @param worktreePath - Absolute path to worktree
+   * @param filePath - Relative path to file within worktree
+   * @returns File diff information
+   */
+  getFileDiff: async (worktreePath: string, filePath: string): Promise<FileDiff> => {
+    try {
+      const diff = await invoke<FileDiff>('get_file_diff', { worktreePath, filePath });
+      return diff;
+    } catch (error) {
+      throw new Error(`Failed to get file diff: ${error}`);
+    }
+  },
+
+  /**
+   * Get git diff for entire worktree
+   *
+   * @param worktreePath - Absolute path to worktree
+   * @returns Array of file diffs
+   */
+  getWorktreeDiff: async (worktreePath: string): Promise<FileDiff[]> => {
+    try {
+      const diffs = await invoke<FileDiff[]>('get_worktree_diff', { worktreePath });
+      return diffs;
+    } catch (error) {
+      throw new Error(`Failed to get worktree diff: ${error}`);
     }
   },
 };

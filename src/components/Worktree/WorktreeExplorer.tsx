@@ -1,9 +1,9 @@
 /**
- * Worktree Explorer Component
+ * Worktree Explorer Component (Phase 2 - Enhanced)
  *
- * Displays worktrees and their file trees in a 2-column layout
+ * Displays worktrees, file trees, and file preview in a 3-column layout
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useWorktreeStore } from '@/store/worktreeStore';
 import {
   Folder,
@@ -17,8 +17,15 @@ import {
   ChevronDown,
   Trash2,
   AlertCircle,
+  Eye,
+  GitCompare,
+  Grid,
 } from 'lucide-react';
 import type { FileNode } from '@/services/worktree';
+import { FileSearch } from './FileSearch';
+import { FilePreview } from './FilePreview';
+import { DiffViewer } from './DiffViewer';
+import { ComparisonMatrix } from './ComparisonMatrix';
 
 interface WorktreeExplorerProps {
   competitionId: string;
@@ -30,14 +37,52 @@ interface WorktreeExplorerProps {
 interface FileTreeItemProps {
   node: FileNode;
   level: number;
+  searchQuery: string;
 }
 
-const FileTreeItem: React.FC<FileTreeItemProps> = ({ node, level }) => {
+const FileTreeItem: React.FC<FileTreeItemProps> = ({ node, level, searchQuery }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const { selectFile, selectedFile } = useWorktreeStore();
+
+  // Filter logic: check if node or any child matches search
+  const matchesSearch = useMemo(() => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+
+    const nodeMatches = node.name.toLowerCase().includes(query);
+
+    // If directory, check children recursively
+    if (node.is_directory && node.children) {
+      const childMatches = (children: FileNode[]): boolean => {
+        return children.some(child => {
+          if (child.name.toLowerCase().includes(query)) return true;
+          if (child.is_directory && child.children) {
+            return childMatches(child.children);
+          }
+          return false;
+        });
+      };
+      return nodeMatches || childMatches(node.children);
+    }
+
+    return nodeMatches;
+  }, [node, searchQuery]);
+
+  // Auto-expand if search matches children
+  useEffect(() => {
+    if (searchQuery && node.is_directory && matchesSearch) {
+      setIsExpanded(true);
+    }
+  }, [searchQuery, node.is_directory, matchesSearch]);
+
+  if (!matchesSearch) return null;
 
   const toggleExpand = () => {
     if (node.is_directory) {
       setIsExpanded(!isExpanded);
+    } else {
+      // File clicked - load preview
+      selectFile(node.path);
     }
   };
 
@@ -54,13 +99,16 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({ node, level }) => {
     }
   };
 
+  const isSelected = !node.is_directory && selectedFile === node.path;
+
   return (
     <div>
       <div
         className={`
-          flex items-center px-2 py-1 hover:bg-gray-700 cursor-pointer
-          transition-colors duration-150
+          flex items-center px-2 py-1 cursor-pointer
+          transition-all duration-150
           ${gitStatusColor(node.git_status)}
+          ${isSelected ? 'bg-blue-500/20 border-l-2 border-blue-400' : 'hover:bg-gray-700'}
         `}
         style={{ paddingLeft: `${level * 16 + 8}px` }}
         onClick={toggleExpand}
@@ -102,7 +150,12 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({ node, level }) => {
       {node.is_directory && isExpanded && node.children && (
         <div>
           {node.children.map((child, idx) => (
-            <FileTreeItem key={`${child.path}-${idx}`} node={child} level={level + 1} />
+            <FileTreeItem
+              key={`${child.path}-${idx}`}
+              node={child}
+              level={level + 1}
+              searchQuery={searchQuery}
+            />
           ))}
         </div>
       )}
@@ -118,12 +171,16 @@ export const WorktreeExplorer: React.FC<WorktreeExplorerProps> = ({ competitionI
     worktrees,
     selectedWorktree,
     fileTree,
+    searchQuery,
     isLoading,
     error,
     fetchWorktrees,
     selectWorktree,
     deleteWorktree,
   } = useWorktreeStore();
+
+  // Tab state for right panel
+  const [activeTab, setActiveTab] = useState<'preview' | 'diff' | 'compare'>('preview');
 
   useEffect(() => {
     if (competitionId) {
@@ -139,11 +196,37 @@ export const WorktreeExplorer: React.FC<WorktreeExplorerProps> = ({ competitionI
     }
   };
 
+  // Get selected worktree path for DiffViewer
+  const selectedWorktreePath = useMemo(() => {
+    if (!selectedWorktree) return null;
+    const worktree = worktrees.find(w => w.id === selectedWorktree);
+    return worktree?.path || null;
+  }, [selectedWorktree, worktrees]);
+
+  // Count filtered files
+  const filteredFileCount = useMemo(() => {
+    if (!searchQuery) return fileTree.length;
+
+    const countMatches = (nodes: FileNode[]): number => {
+      return nodes.reduce((count, node) => {
+        if (node.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+          count++;
+        }
+        if (node.is_directory && node.children) {
+          count += countMatches(node.children);
+        }
+        return count;
+      }, 0);
+    };
+
+    return countMatches(fileTree);
+  }, [fileTree, searchQuery]);
+
   return (
     <div className="h-full flex bg-gray-900">
-      {/* Left Panel: Worktree List */}
-      <div className="w-1/3 border-r border-gray-700 overflow-y-auto">
-        <div className="sticky top-0 bg-gray-800 border-b border-gray-700 px-4 py-3">
+      {/* LEFT PANEL: Worktree List (1/4) */}
+      <div className="w-1/4 min-w-[250px] border-r border-gray-700 overflow-y-auto flex-shrink-0">
+        <div className="sticky top-0 bg-gray-800 border-b border-gray-700 px-4 py-3 z-10">
           <h3 className="text-sm font-semibold text-gray-300 flex items-center">
             <GitBranch className="w-4 h-4 mr-2 text-blue-400" />
             Worktrees ({worktrees.length})
@@ -256,51 +339,145 @@ export const WorktreeExplorer: React.FC<WorktreeExplorerProps> = ({ competitionI
         </div>
       </div>
 
-      {/* Right Panel: File Tree */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="sticky top-0 bg-gray-800 border-b border-gray-700 px-4 py-3">
-          <h3 className="text-sm font-semibold text-gray-300 flex items-center">
-            <FolderOpen className="w-4 h-4 mr-2 text-yellow-400" />
-            Files
-            {selectedWorktree && (
-              <span className="ml-2 text-xs text-gray-500">
-                ({fileTree.length} items)
-              </span>
-            )}
-          </h3>
+      {/* MIDDLE PANEL: File Tree (1/3) */}
+      <div className="w-1/3 min-w-[300px] border-r border-gray-700 flex flex-col flex-shrink-0">
+        <div className="flex-shrink-0 sticky top-0 bg-gray-800 border-b border-gray-700 z-10">
+          <div className="px-4 py-3">
+            <h3 className="text-sm font-semibold text-gray-300 flex items-center">
+              <FolderOpen className="w-4 h-4 mr-2 text-yellow-400" />
+              Files
+              {selectedWorktree && (
+                <span className="ml-2 text-xs text-gray-500">
+                  ({searchQuery ? filteredFileCount : fileTree.length} items)
+                </span>
+              )}
+            </h3>
+          </div>
+
+          {/* Search Bar */}
+          {selectedWorktree && <FileSearch />}
         </div>
 
-        {/* Loading State */}
-        {isLoading && selectedWorktree && (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="animate-spin text-gray-400" size={24} />
-          </div>
-        )}
+        <div className="flex-1 overflow-y-auto">
+          {/* Loading State */}
+          {isLoading && selectedWorktree && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="animate-spin text-gray-400" size={24} />
+            </div>
+          )}
 
-        {/* No Selection */}
-        {!selectedWorktree && (
-          <div className="px-4 py-8 text-center">
-            <Folder className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-            <p className="text-sm text-gray-400">Select a worktree to view files</p>
-          </div>
-        )}
+          {/* No Selection */}
+          {!selectedWorktree && (
+            <div className="px-4 py-8 text-center">
+              <Folder className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+              <p className="text-sm text-gray-400">Select a worktree to view files</p>
+            </div>
+          )}
 
-        {/* File Tree */}
-        {selectedWorktree && !isLoading && fileTree.length > 0 && (
-          <div className="py-2">
-            {fileTree.map((node, idx) => (
-              <FileTreeItem key={`${node.path}-${idx}`} node={node} level={0} />
-            ))}
-          </div>
-        )}
+          {/* File Tree */}
+          {selectedWorktree && !isLoading && fileTree.length > 0 && (
+            <div className="py-2">
+              {fileTree.map((node, idx) => (
+                <FileTreeItem
+                  key={`${node.path}-${idx}`}
+                  node={node}
+                  level={0}
+                  searchQuery={searchQuery}
+                />
+              ))}
+            </div>
+          )}
 
-        {/* Empty File Tree */}
-        {selectedWorktree && !isLoading && fileTree.length === 0 && (
-          <div className="px-4 py-8 text-center">
-            <FileText className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-            <p className="text-sm text-gray-400">No files found</p>
+          {/* Empty File Tree */}
+          {selectedWorktree && !isLoading && fileTree.length === 0 && (
+            <div className="px-4 py-8 text-center">
+              <FileText className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+              <p className="text-sm text-gray-400">No files found</p>
+            </div>
+          )}
+
+          {/* No Search Results */}
+          {selectedWorktree && !isLoading && fileTree.length > 0 && filteredFileCount === 0 && searchQuery && (
+            <div className="px-4 py-8 text-center">
+              <AlertCircle className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+              <p className="text-sm text-gray-400">No files match "{searchQuery}"</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* RIGHT PANEL: Tabbed View (remaining space) */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Tab Header */}
+        <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800">
+          <div className="flex items-center space-x-1 px-2 py-2">
+            <button
+              onClick={() => setActiveTab('preview')}
+              className={`
+                flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium
+                transition-all duration-200
+                ${
+                  activeTab === 'preview'
+                    ? 'bg-blue-500/20 text-blue-300 shadow-sm'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+                }
+              `}
+            >
+              <Eye className="w-4 h-4" />
+              <span>Preview</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('diff')}
+              className={`
+                flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium
+                transition-all duration-200
+                ${
+                  activeTab === 'diff'
+                    ? 'bg-blue-500/20 text-blue-300 shadow-sm'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+                }
+              `}
+            >
+              <GitCompare className="w-4 h-4" />
+              <span>Diff</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('compare')}
+              className={`
+                flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium
+                transition-all duration-200
+                ${
+                  activeTab === 'compare'
+                    ? 'bg-blue-500/20 text-blue-300 shadow-sm'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+                }
+              `}
+            >
+              <Grid className="w-4 h-4" />
+              <span>Compare</span>
+            </button>
           </div>
-        )}
+        </div>
+
+        {/* Tab Content */}
+        <div className="flex-1 min-h-0">
+          {activeTab === 'preview' ? (
+            <FilePreview />
+          ) : activeTab === 'diff' ? (
+            selectedWorktreePath ? (
+              <DiffViewer worktreePath={selectedWorktreePath} />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                <GitCompare className="w-16 h-16 mb-4 text-gray-600" />
+                <p className="text-sm">Select a worktree to view diff</p>
+              </div>
+            )
+          ) : (
+            <ComparisonMatrix competitionId={competitionId} />
+          )}
+        </div>
       </div>
     </div>
   );

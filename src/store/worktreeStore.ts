@@ -16,8 +16,16 @@ interface WorktreeStore {
   selectedWorktree: string | null;
   /** File tree for selected worktree */
   fileTree: FileNode[];
+  /** Currently selected file path */
+  selectedFile: string | null;
+  /** Content of selected file */
+  fileContent: string | null;
+  /** Search query for filtering files */
+  searchQuery: string;
   /** Loading state */
   isLoading: boolean;
+  /** Loading state for file content */
+  isLoadingFile: boolean;
   /** Error message */
   error: string | null;
 
@@ -28,6 +36,10 @@ interface WorktreeStore {
   selectWorktree: (id: string) => void;
   /** Load file tree for selected worktree */
   loadFileTree: (worktreePath: string) => Promise<void>;
+  /** Select a file and load its content */
+  selectFile: (filePath: string) => Promise<void>;
+  /** Set search query for filtering */
+  setSearchQuery: (query: string) => void;
   /** Delete a worktree by ID */
   deleteWorktree: (id: string) => Promise<void>;
   /** Reset store to initial state */
@@ -41,7 +53,11 @@ const initialState = {
   worktrees: [],
   selectedWorktree: null,
   fileTree: [],
+  selectedFile: null,
+  fileContent: null,
+  searchQuery: '',
   isLoading: false,
+  isLoadingFile: false,
   error: null,
 };
 
@@ -88,6 +104,28 @@ export const useWorktreeStore = create<WorktreeStore>((set, get) => ({
         isLoading: false,
       });
     }
+  },
+
+  selectFile: async (filePath: string) => {
+    set({ selectedFile: filePath, isLoadingFile: true, error: null });
+
+    try {
+      // Use Tauri fs API to read file
+      const { readTextFile } = await import('@tauri-apps/api/fs');
+      const content = await readTextFile(filePath);
+
+      set({ fileContent: content, isLoadingFile: false });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to load file content',
+        fileContent: null,
+        isLoadingFile: false,
+      });
+    }
+  },
+
+  setSearchQuery: (query: string) => {
+    set({ searchQuery: query });
   },
 
   deleteWorktree: async (id: string) => {

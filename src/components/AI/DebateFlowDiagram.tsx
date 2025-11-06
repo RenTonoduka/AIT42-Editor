@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { MessageSquare, Users, CheckCircle, ArrowRight } from 'lucide-react';
+import { MessageSquare, CheckCircle } from 'lucide-react';
 
 export interface DebateFlowDiagramProps {
   currentRound?: number;
@@ -9,7 +9,6 @@ export const DebateFlowDiagram: React.FC<DebateFlowDiagramProps> = ({ currentRou
   const [isVisible, setIsVisible] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // IntersectionObserver でビューポート内にある場合のみアニメーション
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => setIsVisible(entry.isIntersecting),
@@ -24,143 +23,296 @@ export const DebateFlowDiagram: React.FC<DebateFlowDiagramProps> = ({ currentRou
   }, []);
 
   const roles = [
-    { id: 'architect', name: 'Architect', color: 'from-blue-500 to-blue-600' },
-    { id: 'pragmatist', name: 'Pragmatist', color: 'from-green-500 to-green-600' },
-    { id: 'innovator', name: 'Innovator', color: 'from-purple-500 to-purple-600' },
+    { id: 'architect', name: 'Architect', color: '#3b82f6', label: 'A' },
+    { id: 'pragmatist', name: 'Pragmatist', color: '#10b981', label: 'P' },
+    { id: 'innovator', name: 'Innovator', color: '#a855f7', label: 'I' },
   ];
 
-  const rounds = [
-    { num: 1, name: '独立提案', desc: '各ロールが独自の視点を提示' },
-    { num: 2, name: '批判的分析', desc: '他の提案を評価・改善' },
-    { num: 3, name: 'コンセンサス', desc: '統合された最終提案' },
-  ];
+  // SVG dimensions
+  const width = 600;
+  const height = 500;
+  const nodeRadius = 35;
+  const layerSpacing = 160;
+
+  // Node positions for each layer (round)
+  const getNodePosition = (roundNum: number, roleIndex: number) => {
+    const y = roundNum * layerSpacing;
+    const totalNodes = roundNum === 3 ? 1 : 3;
+    const startX = width / 2 - ((totalNodes - 1) * 120) / 2;
+    const x = totalNodes === 1 ? width / 2 : startX + roleIndex * 120;
+    return { x, y };
+  };
+
+  // Generate edges between rounds
+  const generateEdges = () => {
+    const edges = [];
+
+    // Round 1 → Round 2 (3 → 3 = 9 edges)
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) {
+        const from = getNodePosition(1, i);
+        const to = getNodePosition(2, j);
+        edges.push({
+          id: `r1-${i}-r2-${j}`,
+          from,
+          to,
+          active: currentRound >= 2,
+          round: 2,
+        });
+      }
+    }
+
+    // Round 2 → Round 3 (3 → 1 = 3 edges)
+    for (let i = 0; i < 3; i++) {
+      const from = getNodePosition(2, i);
+      const to = getNodePosition(3, 0);
+      edges.push({
+        id: `r2-${i}-r3`,
+        from,
+        to,
+        active: currentRound >= 3,
+        round: 3,
+      });
+    }
+
+    return edges;
+  };
+
+  const edges = generateEdges();
+
+  // Generate curved path for edge
+  const getEdgePath = (from: { x: number; y: number }, to: { x: number; y: number }) => {
+    const midY = (from.y + to.y) / 2;
+    return `M ${from.x},${from.y} Q ${from.x},${midY} ${(from.x + to.x) / 2},${midY} T ${to.x},${to.y}`;
+  };
 
   return (
     <div
       ref={ref}
-      className="flex flex-col gap-6 p-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-200"
+      className="flex flex-col gap-4 p-6 bg-gradient-to-br from-slate-50 via-indigo-50 to-purple-50 rounded-lg border border-indigo-200"
     >
+      {/* Header */}
       <div className="flex items-center gap-2">
         <MessageSquare className="text-indigo-600" size={20} />
-        <h3 className="text-sm font-semibold text-gray-800">協議モードの仕組み</h3>
+        <h3 className="text-sm font-semibold text-gray-800">ニューラルネットワーク型協議モード</h3>
       </div>
 
-      {/* 3 Rounds Visualization */}
-      <div className="flex items-center justify-between gap-6">
-        {rounds.map((round, roundIdx) => (
-          <React.Fragment key={round.num}>
-            {/* Round Container */}
-            <div className="flex-1 flex flex-col items-center">
-              {/* Round Header */}
-              <div
-                className={`w-full mb-3 px-3 py-2 rounded-lg text-center transition-all ${
-                  currentRound === round.num
-                    ? 'bg-indigo-600 text-white shadow-lg scale-105'
-                    : 'bg-white/80 text-gray-700 border border-indigo-200'
-                }`}
-              >
-                <div className="text-xs font-semibold mb-1">Round {round.num}</div>
-                <div className="text-xs font-medium">{round.name}</div>
-              </div>
+      {/* Neural Network SVG */}
+      <div className="flex justify-center">
+        <svg
+          width={width}
+          height={height}
+          viewBox={`0 0 ${width} ${height}`}
+          className="drop-shadow-sm"
+        >
+          <defs>
+            {/* Gradient for active edges */}
+            <linearGradient id="activeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#818cf8" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#c084fc" stopOpacity="0.8" />
+            </linearGradient>
 
-              {/* 3 Roles Network */}
-              <div className="relative w-full h-32">
-                <svg className="absolute inset-0 w-full h-full" style={{ zIndex: 0 }}>
-                  {/* Connection lines for Round 2 and 3 (fully connected) */}
-                  {round.num >= 2 &&
-                    roles.map((role, i) =>
-                      roles.slice(i + 1).map((targetRole, j) => {
-                        const x1 = (i / 2) * 100 + 50;
-                        const y1 = 50;
-                        const x2 = ((i + j + 1) / 2) * 100 + 50;
-                        const y2 = 50;
-                        return (
-                          <line
-                            key={`${role.id}-${targetRole.id}`}
-                            x1={`${x1}%`}
-                            y1={`${y1}%`}
-                            x2={`${x2}%`}
-                            y2={`${y2}%`}
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeDasharray="4"
-                            className={`${
-                              currentRound === round.num
-                                ? 'text-indigo-400 opacity-100'
-                                : 'text-indigo-200 opacity-40'
-                            } transition-all`}
-                            style={{
-                              animation:
-                                isVisible && currentRound === round.num
-                                  ? 'dash 2s linear infinite'
-                                  : 'none',
-                            }}
-                          />
-                        );
-                      })
-                    )}
-                </svg>
+            {/* Arrow marker */}
+            <marker
+              id="arrowhead"
+              markerWidth="10"
+              markerHeight="10"
+              refX="9"
+              refY="3"
+              orient="auto"
+              markerUnits="strokeWidth"
+            >
+              <path d="M0,0 L0,6 L9,3 z" fill="#818cf8" />
+            </marker>
 
-                {/* Role Nodes */}
-                <div className="relative flex items-center justify-around h-full px-4" style={{ zIndex: 1 }}>
-                  {roles.map((role, idx) => (
-                    <div
-                      key={role.id}
-                      className={`flex flex-col items-center ${
-                        isVisible && currentRound === round.num ? 'animate-pulse' : ''
-                      }`}
-                      style={{ animationDelay: `${idx * 0.2}s` }}
-                    >
-                      <div
-                        className={`w-14 h-14 rounded-full bg-gradient-to-br ${role.color} text-white flex items-center justify-center shadow-lg font-bold text-sm ${
-                          currentRound === round.num ? 'ring-4 ring-indigo-300' : ''
-                        } transition-all`}
-                      >
-                        {role.name[0]}
-                      </div>
-                      <div className="text-xs text-gray-600 mt-1.5 font-medium">{role.name}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            {/* Glow filter for active nodes */}
+            <filter id="glow">
+              <feGaussianBlur stdDeviation="4" result="coloredBlur" />
+              <feMerge>
+                <feMergeNode in="coloredBlur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
 
-              {/* Round Description */}
-              <p className="text-xs text-gray-500 text-center mt-2">{round.desc}</p>
-            </div>
+          {/* Edges */}
+          {edges.map((edge) => (
+            <g key={edge.id}>
+              <path
+                d={getEdgePath(edge.from, edge.to)}
+                fill="none"
+                stroke={edge.active ? 'url(#activeGradient)' : '#e0e7ff'}
+                strokeWidth={edge.active ? '3' : '2'}
+                strokeOpacity={edge.active ? 1 : 0.4}
+                markerEnd={edge.active ? 'url(#arrowhead)' : undefined}
+                className="transition-all duration-500"
+                style={{
+                  strokeDasharray: edge.active && isVisible ? '8, 8' : 'none',
+                  animation:
+                    edge.active && isVisible && currentRound === edge.round
+                      ? 'dash 2s linear infinite'
+                      : 'none',
+                }}
+              />
+            </g>
+          ))}
 
-            {/* Arrow between rounds */}
-            {roundIdx < rounds.length - 1 && (
-              <div className="flex flex-col items-center justify-center">
-                <ArrowRight
-                  size={24}
-                  className={`${
-                    currentRound > round.num ? 'text-indigo-600' : 'text-indigo-300'
-                  } transition-colors`}
-                />
-              </div>
-            )}
-          </React.Fragment>
-        ))}
+          {/* Round 1 Nodes (Input Layer) */}
+          <g>
+            <text
+              x={width / 2}
+              y={getNodePosition(1, 0).y - 60}
+              textAnchor="middle"
+              className="text-xs font-semibold fill-gray-600"
+            >
+              Round 1: 独立提案 (Input Layer)
+            </text>
+            {roles.map((role, idx) => {
+              const pos = getNodePosition(1, idx);
+              const isActive = currentRound >= 1;
+              return (
+                <g key={`r1-${role.id}`}>
+                  <circle
+                    cx={pos.x}
+                    cy={pos.y}
+                    r={nodeRadius}
+                    fill={role.color}
+                    opacity={isActive ? 1 : 0.4}
+                    filter={isActive && currentRound === 1 ? 'url(#glow)' : undefined}
+                    className={`transition-all duration-500 ${
+                      isActive && currentRound === 1 ? 'animate-pulse' : ''
+                    }`}
+                    style={{ animationDelay: `${idx * 0.15}s` }}
+                  />
+                  <text
+                    x={pos.x}
+                    y={pos.y}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    className="text-xl font-bold fill-white pointer-events-none"
+                  >
+                    {role.label}
+                  </text>
+                  <text
+                    x={pos.x}
+                    y={pos.y + nodeRadius + 18}
+                    textAnchor="middle"
+                    className="text-xs font-medium fill-gray-700"
+                  >
+                    {role.name}
+                  </text>
+                </g>
+              );
+            })}
+          </g>
+
+          {/* Round 2 Nodes (Hidden Layer - Fully Connected) */}
+          <g>
+            <text
+              x={width / 2}
+              y={getNodePosition(2, 0).y - 60}
+              textAnchor="middle"
+              className="text-xs font-semibold fill-gray-600"
+            >
+              Round 2: 批判的分析 (Hidden Layer - 全結合)
+            </text>
+            {roles.map((role, idx) => {
+              const pos = getNodePosition(2, idx);
+              const isActive = currentRound >= 2;
+              return (
+                <g key={`r2-${role.id}`}>
+                  <circle
+                    cx={pos.x}
+                    cy={pos.y}
+                    r={nodeRadius}
+                    fill={role.color}
+                    opacity={isActive ? 1 : 0.4}
+                    filter={isActive && currentRound === 2 ? 'url(#glow)' : undefined}
+                    className={`transition-all duration-500 ${
+                      isActive && currentRound === 2 ? 'animate-pulse' : ''
+                    }`}
+                    style={{ animationDelay: `${idx * 0.15}s` }}
+                  />
+                  <text
+                    x={pos.x}
+                    y={pos.y}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    className="text-xl font-bold fill-white pointer-events-none"
+                  >
+                    {role.label}
+                  </text>
+                  <text
+                    x={pos.x}
+                    y={pos.y + nodeRadius + 18}
+                    textAnchor="middle"
+                    className="text-xs font-medium fill-gray-700"
+                  >
+                    {role.name}
+                  </text>
+                </g>
+              );
+            })}
+          </g>
+
+          {/* Round 3 Node (Output Layer) */}
+          <g>
+            <text
+              x={width / 2}
+              y={getNodePosition(3, 0).y - 60}
+              textAnchor="middle"
+              className="text-xs font-semibold fill-gray-600"
+            >
+              Round 3: コンセンサス形成 (Output Layer)
+            </text>
+            {(() => {
+              const pos = getNodePosition(3, 0);
+              const isActive = currentRound >= 3;
+              return (
+                <g>
+                  <circle
+                    cx={pos.x}
+                    cy={pos.y}
+                    r={nodeRadius + 5}
+                    fill="url(#activeGradient)"
+                    opacity={isActive ? 1 : 0.4}
+                    filter={isActive && currentRound === 3 ? 'url(#glow)' : undefined}
+                    className={`transition-all duration-500 ${
+                      isActive && currentRound === 3 ? 'animate-pulse' : ''
+                    }`}
+                  />
+                  <CheckCircle
+                    x={pos.x - 16}
+                    y={pos.y - 16}
+                    width={32}
+                    height={32}
+                    className="fill-white"
+                  />
+                  <text
+                    x={pos.x}
+                    y={pos.y + nodeRadius + 25}
+                    textAnchor="middle"
+                    className="text-sm font-bold fill-gray-800"
+                  >
+                    統合された最終提案
+                  </text>
+                </g>
+              );
+            })()}
+          </g>
+        </svg>
       </div>
 
-      {/* Final Output */}
-      <div className="flex items-center justify-center gap-4 pt-4 border-t border-indigo-200">
-        <ArrowRight size={20} className="text-indigo-400" />
-        <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-lg shadow-lg">
-          <CheckCircle size={20} />
-          <span className="text-sm font-semibold">統合された最終提案</span>
-        </div>
-      </div>
-
+      {/* Description */}
       <p className="text-xs text-gray-600 text-center">
-        3つの視点が3ラウンドで協議し、コンセンサスを形成
+        3つのロールが3層のネットワークで協議し、統合されたコンセンサスを形成
       </p>
 
       {/* Animation keyframes */}
       <style>{`
         @keyframes dash {
           to {
-            stroke-dashoffset: -20;
+            stroke-dashoffset: -16;
           }
         }
       `}</style>

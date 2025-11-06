@@ -4,10 +4,12 @@
 //! Uses Arc<Mutex<T>> for thread-safe access.
 
 use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
 use ait42_config::Config;
 use ait42_core::{Editor, EditorConfig, EditorState, buffer::BufferManager};
 use ait42_lsp::{LspConfig, LspManager};
 use crate::plugin::PluginManager;
+use crate::commands::ait42::{DebateStatus, RoundOutput};
 
 // Import TerminalExecutor from ait42-tui if available
 // Note: This will compile if ait42-tui is in dependencies
@@ -36,6 +38,9 @@ pub struct AppState {
 
     /// Working directory for git operations - uses tokio::sync::Mutex for async
     pub working_dir: Arc<tokio::sync::Mutex<std::path::PathBuf>>,
+
+    /// Debate status tracking - uses Arc<Mutex> for thread-safe access
+    pub debates: Arc<Mutex<HashMap<String, DebateStatus>>>,
 
     /// Terminal executor (optional feature) - uses tokio::sync::Mutex for async
     #[cfg(feature = "terminal")]
@@ -76,6 +81,7 @@ impl AppState {
             lsp_manager: Arc::new(lsp_manager),
             plugin_manager: Arc::new(Mutex::new(plugin_manager)),
             working_dir: Arc::new(tokio::sync::Mutex::new(working_dir.clone())),
+            debates: Arc::new(Mutex::new(HashMap::new())),
             #[cfg(feature = "terminal")]
             terminal: Arc::new(tokio::sync::Mutex::new(TerminalExecutor::new(working_dir))),
         })

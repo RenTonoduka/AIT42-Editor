@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, RefreshCw, Trophy, Clock, CheckCircle, AlertCircle } from 'lucide-react';
-import { listen } from '@tauri-apps/api/event';
+import { listen, emit } from '@tauri-apps/api/event';
 
 interface CompetitionMonitorPanelProps {
   isVisible: boolean;
@@ -44,37 +44,61 @@ export const CompetitionMonitorPanel: React.FC<CompetitionMonitorPanelProps> = (
     setInstances(initialInstances);
   }, [isVisible, instanceCount]);
 
-  // 出力リスナー
+  // 出力リスナー - ハンドシェイク対応版
   useEffect(() => {
-    if (!isVisible) return;
+    let unlisten: (() => void) | null = null;
 
-    const unlistenPromise = listen<{
-      instance: number;
-      output: string;
-      status?: 'completed' | 'error';
-      error?: string;
-    }>('competition-output', (event) => {
-      const { instance, output, status, error } = event.payload;
+    const setupListener = async () => {
+      try {
+        // STEP 1: リスナー登録（非同期待機）
+        console.log(`[Frontend] Registering listener for competition ${competitionId} at`, Date.now());
+        unlisten = await listen<{
+          instance: number;
+          output: string;
+          status?: 'completed' | 'error';
+          error?: string;
+        }>('competition-output', (event) => {
+          try {
+            const { instance, output, status, error } = event.payload;
 
-      setInstances((prev) =>
-        prev.map((inst) =>
-          inst.id === instance
-            ? {
-                ...inst,
-                output: inst.output + output,
-                status: status || inst.status,
-                error: error || inst.error,
-                endTime: status ? Date.now() : inst.endTime,
-              }
-            : inst
-        )
-      );
-    });
+            console.log(`[Frontend] Received competition-output event: instance=${instance}, output_len=${output.length}, status=${status} at`, Date.now());
+
+            setInstances((prev) =>
+              prev.map((inst) =>
+                inst.id === instance
+                  ? {
+                      ...inst,
+                      output: inst.output + output,
+                      status: status || inst.status,
+                      error: error || inst.error,
+                      endTime: status ? Date.now() : inst.endTime,
+                    }
+                  : inst
+              )
+            );
+          } catch (err) {
+            console.error('[Frontend] Error handling competition-output event:', err, event);
+          }
+        });
+
+        // STEP 2: リスナー登録完了 → バックエンドに通知
+        console.log(`[Frontend] Listener registered, emitting ready signal for competition ${competitionId} at`, Date.now());
+        await emit('competition-listener-ready', { competitionId });
+        console.log(`[Frontend] Ready signal sent for competition ${competitionId}`);
+      } catch (error) {
+        console.error('[Frontend] Failed to setup competition listener:', error);
+      }
+    };
+
+    setupListener();
 
     return () => {
-      unlistenPromise.then((unlisten) => unlisten());
+      if (unlisten) {
+        console.log(`[Frontend] Cleaning up listener for competition ${competitionId}`);
+        unlisten();
+      }
     };
-  }, [isVisible]);
+  }, [competitionId]); // Re-register when competition changes
 
   // 自動スクロール
   useEffect(() => {

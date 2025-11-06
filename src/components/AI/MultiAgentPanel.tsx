@@ -153,8 +153,44 @@ const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({ instances, competitio
         </div>
       </div>
 
-      {/* Agent Cards Grid */}
-      <div className="p-6 space-y-6">
+      {/* Tab Navigation */}
+      <div className="bg-gray-800 border-b border-gray-700 px-6 flex space-x-2">
+        <button
+          onClick={() => setActiveTab('output')}
+          className={`
+            px-4 py-2 text-sm font-medium transition-colors flex items-center space-x-2
+            ${
+              activeTab === 'output'
+                ? 'text-blue-400 border-b-2 border-blue-400'
+                : 'text-gray-400 hover:text-gray-300'
+            }
+          `}
+        >
+          <Terminal className="w-4 h-4" />
+          <span>Output</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('worktrees')}
+          className={`
+            px-4 py-2 text-sm font-medium transition-colors flex items-center space-x-2
+            ${
+              activeTab === 'worktrees'
+                ? 'text-blue-400 border-b-2 border-blue-400'
+                : 'text-gray-400 hover:text-gray-300'
+            }
+          `}
+        >
+          <Folder className="w-4 h-4" />
+          <span>Worktrees</span>
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      <div className="flex-1 overflow-y-auto">
+        {activeTab === 'output' && (
+          /* Agent Cards Grid */
+          <div className="p-6 space-y-6">
         {instances.map((instance) => (
           <div
             key={instance.id}
@@ -323,6 +359,26 @@ const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({ instances, competitio
             </div>
           </div>
         ))}
+          </div>
+        )}
+
+        {activeTab === 'worktrees' && competitionId && (
+          <WorktreeExplorer competitionId={competitionId} />
+        )}
+
+        {activeTab === 'worktrees' && !competitionId && (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <Folder className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-400 mb-2">
+                No Competition ID
+              </h3>
+              <p className="text-gray-500 text-sm">
+                Start a competition to view worktrees
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

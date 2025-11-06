@@ -484,13 +484,33 @@ async fn monitor_tmux_session(
                         let new_content = &log_contents[last_log_size..];
 
                         if !new_content.trim().is_empty() {
+                            // First event emission timing log
+                            if last_log_size == 0 {
+                                tracing::info!(
+                                    "🕐 First event emission for instance {} at {:?}",
+                                    instance_number,
+                                    std::time::SystemTime::now()
+                                );
+                            }
+
                             let payload = serde_json::json!({
                                 "instance": instance_number,
                                 "output": new_content,
                                 "status": "running"
                             });
 
-                            let _ = app.emit_all("competition-output", payload);
+                            // Log the exact payload being sent for debugging
+                            tracing::info!(
+                                "📤 Preparing to emit event 'competition-output' (incremental) with payload: instance={}, output_length={}, status=\"running\", preview=\"{}...\"",
+                                instance_number,
+                                new_content.len(),
+                                new_content.chars().take(50).collect::<String>().replace('\n', "\\n")
+                            );
+
+                            match app.emit_all("competition-output", payload.clone()) {
+                                Ok(_) => tracing::info!("✅ Sent {} bytes (incremental) for instance {}", new_content.len(), instance_number),
+                                Err(e) => tracing::error!("❌ Failed to emit incremental output for instance {}: {}", instance_number, e),
+                            }
                         }
 
                         last_log_size = log_size;
@@ -517,13 +537,19 @@ async fn monitor_tmux_session(
                                 let new_content = new_lines.join("\n");
 
                                 if !new_content.trim().is_empty() {
+                                    let output_with_newline = format!("{}\n", new_content);
+                                    let content_len = new_content.len();
+
                                     let payload = serde_json::json!({
                                         "instance": instance_number,
-                                        "output": new_content + "\n",
+                                        "output": output_with_newline,
                                         "status": "running"
                                     });
 
-                                    let _ = app.emit_all("competition-output", payload);
+                                    match app.emit_all("competition-output", payload) {
+                                        Ok(_) => tracing::debug!("📤 Sent {} bytes (tmux fallback) for instance {}", content_len, instance_number),
+                                        Err(e) => tracing::warn!("⚠️ Failed to emit tmux output: {}", e),
+                                    }
                                 }
 
                                 last_line_count = current_lines.len();
@@ -538,27 +564,50 @@ async fn monitor_tmux_session(
                 // Session no longer exists - completed or failed
                 tracing::info!("Tmux session {} has ended", session_id);
 
-                // Send final output from log file
-                if let Ok(final_output) = tokio::fs::read_to_string(&log_file_path).await {
-                    if final_output.len() > last_log_size {
-                        let final_content = &final_output[last_log_size..];
-                        if !final_content.trim().is_empty() {
+                // Send final output from log file (ALWAYS send full content on completion)
+                match tokio::fs::read_to_string(&log_file_path).await {
+                    Ok(final_output) => {
+                        if !final_output.trim().is_empty() {
                             let payload = serde_json::json!({
                                 "instance": instance_number,
-                                "output": final_content,
+                                "output": final_output,
+                                "status": "completed"
+                            });
+
+                            // Debug: Log payload details
+                            tracing::info!("📤 Emitting event 'competition-output': instance={}, output_len={}, status=completed",
+                                instance_number, final_output.len());
+
+                            match app.emit_all("competition-output", payload) {
+                                Ok(_) => tracing::info!("✅ Sent final output for instance {} ({} bytes)", instance_number, final_output.len()),
+                                Err(e) => tracing::error!("❌ Failed to emit final output for instance {}: {}", instance_number, e),
+                            }
+                        } else {
+                            tracing::warn!("⚠️ Log file for instance {} is empty", instance_number);
+
+                            // Send completion event even if log is empty
+                            let payload = serde_json::json!({
+                                "instance": instance_number,
+                                "output": "⚠️ No output captured",
                                 "status": "completed"
                             });
                             let _ = app.emit_all("competition-output", payload);
                         }
                     }
+                    Err(e) => {
+                        tracing::error!("❌ Failed to read log file for instance {}: {}", instance_number, e);
+
+                        // Send completion event even if file read failed
+                        let payload = serde_json::json!({
+                            "instance": instance_number,
+                            "output": format!("❌ Failed to read output: {}", e),
+                            "status": "error",
+                            "error": e.to_string()
+                        });
+                        let _ = app.emit_all("competition-output", payload);
+                    }
                 }
 
-                let payload = serde_json::json!({
-                    "instance": instance_number,
-                    "output": "",
-                    "status": "completed"
-                });
-                let _ = app.emit_all("competition-output", payload);
                 break;
             }
         }
@@ -695,13 +744,55 @@ pub async fn execute_claude_code_competition(
 
         tracing::info!("Launched Claude Code instance {} in session {}", i, session_id);
 
-        // Start monitoring task for this instance
+        // ハンドシェイク対応版: フロントエンドの準備完了を待つ
         let app = app_handle.clone();
         let monitor_session_id = session_id.clone();
         let monitor_instance_number = i;
         let monitor_log_path = output_log_path.clone();
+        let competition_id_for_handshake = competition_id.clone();
 
         tauri::async_runtime::spawn(async move {
+            // STEP 1: フロントエンドの準備完了を待機
+            let ready_signal_received = Arc::new(Mutex::new(false));
+            let ready_clone = Arc::clone(&ready_signal_received);
+            let competition_id_clone = competition_id_for_handshake.clone();
+
+            tracing::info!("🕐 Waiting for frontend ready signal for competition {} at {:?}",
+                competition_id_for_handshake, std::time::SystemTime::now());
+
+            // グローバルイベントリスナーを登録
+            let listener_handle = app.listen_global("competition-listener-ready", move |event| {
+                if let Some(payload) = event.payload() {
+                    if let Ok(data) = serde_json::from_str::<serde_json::Value>(payload) {
+                        if let Some(received_id) = data.get("competitionId").and_then(|v| v.as_str()) {
+                            if received_id == competition_id_clone {
+                                tracing::info!("✅ Frontend ready signal received for competition {}", competition_id_clone);
+                                *ready_clone.lock().unwrap() = true;
+                            }
+                        }
+                    }
+                }
+            });
+
+            // STEP 2: タイムアウト付き待機（最大5秒）
+            let timeout_duration = std::time::Duration::from_secs(5);
+            let start_time = std::time::Instant::now();
+
+            while !*ready_signal_received.lock().unwrap() {
+                if start_time.elapsed() > timeout_duration {
+                    tracing::warn!("⚠️ Frontend ready signal timeout for competition {}, proceeding anyway", competition_id_for_handshake);
+                    break;
+                }
+                tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+            }
+
+            // リスナークリーンアップ
+            app.unlisten(listener_handle);
+
+            // STEP 3: フロントエンド準備完了 → モニタリング開始
+            tracing::info!("🚀 Starting monitoring for instance {} at {:?}",
+                monitor_instance_number, std::time::SystemTime::now());
+
             monitor_tmux_session(app, monitor_session_id, monitor_instance_number, monitor_log_path).await;
         });
 

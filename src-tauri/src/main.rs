@@ -92,6 +92,8 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::list_worktrees,
             commands::get_worktree_files,
             commands::delete_worktree,
+            commands::get_file_diff,
+            commands::get_worktree_diff,
             // Terminal operations
             commands::execute_command,
             commands::get_terminal_output,

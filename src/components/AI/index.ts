@@ -10,5 +10,5 @@ export type { CompetitionDialogProps } from './CompetitionDialog';
 
 export { CompetitionMonitorPanel } from './CompetitionMonitorPanel';
 
-export { MultiAgentPanel } from './MultiAgentPanel';
+export { default as MultiAgentPanel } from './MultiAgentPanel';
 export type { MultiAgentPanelProps, ClaudeCodeInstance } from './MultiAgentPanel';
