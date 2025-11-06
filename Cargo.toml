@@ -11,6 +11,7 @@ members = [
     "crates/ait42-ait42",
     "crates/ait42-fs",
     "crates/ait42-config",
+    "crates/omega-theory",
 ]
 resolver = "2"
 
@@ -76,6 +77,7 @@ ait42-lsp = { path = "crates/ait42-lsp" }
 ait42-ait42 = { path = "crates/ait42-ait42" }
 ait42-fs = { path = "crates/ait42-fs" }
 ait42-config = { path = "crates/ait42-config" }
+omega-theory = { path = "crates/omega-theory" }
 
 # Dev dependencies
 [workspace.dev-dependencies]

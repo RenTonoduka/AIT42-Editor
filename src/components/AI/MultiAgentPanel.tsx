@@ -17,6 +17,7 @@ import {
   Folder,
 } from 'lucide-react';
 import WorktreeExplorer from '@/components/Worktree/WorktreeExplorer';
+import { listen, emit } from '@tauri-apps/api/event'; // 🔥 NEW: Tauri event system
 
 export interface ClaudeCodeInstance {
   id: string;
@@ -40,6 +41,12 @@ const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({ instances, competitio
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
   const [ensembleMode, setEnsembleMode] = useState(false);
   const [activeTab, setActiveTab] = useState<'output' | 'worktrees'>('output');
+  const [localInstances, setLocalInstances] = useState<ClaudeCodeInstance[]>(instances); // 🔥 NEW: Local state for instances with outputs
+
+  // 🔥 NEW: Sync local instances when prop changes
+  useEffect(() => {
+    setLocalInstances(instances);
+  }, [instances]);
 
   // Toggle log expansion for specific instance
   const toggleLog = (instanceId: string) => {
@@ -60,6 +67,64 @@ const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({ instances, competitio
       setEnsembleMode(false);
     }
   }, [instances.length]);
+
+  // 🔥 NEW: Handshake protocol - Listen for competition-output events
+  useEffect(() => {
+    if (!competitionId) return; // Only listen if we have a competition ID
+
+    let unlisten: (() => void) | null = null;
+
+    const setupListener = async () => {
+      try {
+        // STEP 1: Register listener
+        console.log(`[MultiAgentPanel] Registering listener for competition ${competitionId} at`, Date.now());
+        unlisten = await listen<{
+          instance: number;
+          output: string;
+          status?: 'completed' | 'failed';
+          error?: string;
+        }>('competition-output', (event) => {
+          try {
+            const { instance, output, status, error } = event.payload;
+            console.log(`[MultiAgentPanel] Received competition-output: instance=${instance}, output_len=${output.length}, status=${status}`);
+
+            setLocalInstances((prev) =>
+              prev.map((inst, idx) => {
+                // Match by instance number (1-indexed from backend, 0-indexed in array)
+                if (idx + 1 === instance) {
+                  return {
+                    ...inst,
+                    output: (inst.output || '') + output,
+                    status: status === 'completed' ? 'completed' : status === 'failed' ? 'failed' : inst.status,
+                    endTime: status ? Date.now() : inst.endTime,
+                  };
+                }
+                return inst;
+              })
+            );
+          } catch (err) {
+            console.error('[MultiAgentPanel] Error handling competition-output event:', err);
+          }
+        });
+
+        // STEP 2: Send ready signal to backend
+        console.log(`[MultiAgentPanel] Listener registered, emitting ready signal for competition ${competitionId}`);
+        await emit('competition-listener-ready', { competitionId });
+        console.log(`[MultiAgentPanel] Ready signal sent for competition ${competitionId}`);
+      } catch (error) {
+        console.error('[MultiAgentPanel] Failed to setup competition listener:', error);
+      }
+    };
+
+    setupListener();
+
+    return () => {
+      if (unlisten) {
+        console.log(`[MultiAgentPanel] Cleaning up listener for competition ${competitionId}`);
+        unlisten();
+      }
+    };
+  }, [competitionId]);
 
   // Status color mapping
   const getStatusColor = (status: string) => {
@@ -89,7 +154,7 @@ const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({ instances, competitio
   };
 
   // Empty state
-  if (instances.length === 0) {
+  if (localInstances.length === 0) {
     return (
       <div className="flex items-center justify-center h-full bg-gray-900">
         <div className="text-center">
@@ -120,10 +185,10 @@ const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({ instances, competitio
                 {ensembleMode ? (
                   <>
                     <Activity className="w-4 h-4 inline-block mr-1" />
-                    Ensemble Mode: {instances.length} agents collaborating
+                    Ensemble Mode: {localInstances.length} agents collaborating
                   </>
                 ) : (
-                  <>Active Tasks: {instances.length}</>
+                  <>Active Tasks: {localInstances.length}</>
                 )}
               </p>
             </div>
@@ -133,19 +198,19 @@ const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({ instances, competitio
           <div className="flex items-center space-x-6">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-400">
-                {instances.filter((i) => i.status === 'running').length}
+                {localInstances.filter((i) => i.status === 'running').length}
               </div>
               <div className="text-xs text-gray-400">Running</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-400">
-                {instances.filter((i) => i.status === 'completed').length}
+                {localInstances.filter((i) => i.status === 'completed').length}
               </div>
               <div className="text-xs text-gray-400">Completed</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-red-400">
-                {instances.filter((i) => i.status === 'failed').length}
+                {localInstances.filter((i) => i.status === 'failed').length}
               </div>
               <div className="text-xs text-gray-400">Failed</div>
             </div>
@@ -191,7 +256,7 @@ const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({ instances, competitio
         {activeTab === 'output' && (
           /* Agent Cards Grid */
           <div className="p-6 space-y-6">
-        {instances.map((instance) => (
+        {localInstances.map((instance) => (
           <div
             key={instance.id}
             className={`bg-gray-800 rounded-lg border-2 ${getStatusColor(

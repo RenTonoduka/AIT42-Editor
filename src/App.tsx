@@ -24,6 +24,7 @@ function App() {
   const [claudeInstances, setClaudeInstances] = useState<ClaudeCodeInstance[]>([]);
   const [debateId, setDebateId] = useState<string | null>(null);
   const [debateTask, setDebateTask] = useState<string>('');
+  const [activeCompetitionId, setActiveCompetitionId] = useState<string | null>(null); // 🔥 NEW: Store competition ID
 
   const { activeFile } = useEditorStore();
   const { showDiagnostics } = useSettingsStore();
@@ -43,6 +44,7 @@ function App() {
     }));
 
     setClaudeInstances(newInstances);
+    setActiveCompetitionId(competitionId); // 🔥 NEW: Store competition ID
     setShowCompetitionDialog(false);
     setViewMode('multi-agent');
   };
@@ -62,6 +64,7 @@ function App() {
     }));
 
     setClaudeInstances(newInstances);
+    setActiveCompetitionId(competitionId); // 🔥 NEW: Store competition ID
     setShowEnsembleDialog(false);
     setViewMode('multi-agent');
   };
@@ -194,7 +197,7 @@ function App() {
         {/* Multi-Agent View Mode */}
         {viewMode === 'multi-agent' && (
           <div className="flex-1 bg-gray-900">
-            <MultiAgentPanel instances={claudeInstances} />
+            <MultiAgentPanel instances={claudeInstances} competitionId={activeCompetitionId ||undefined} />
           </div>
         )}
 

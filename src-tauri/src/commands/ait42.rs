@@ -754,9 +754,10 @@ pub async fn execute_claude_code_competition(
 
         // Send Claude Code command to tmux session
         // Use --print flag for non-interactive mode to avoid Ink raw mode errors
+        // Use --permission-mode bypassPermissions to auto-approve changes and prevent interactive prompts
         // Note: Use echo | claude because it forces non-interactive mode in tmux
         let claude_cmd = format!(
-            "echo '{}' | claude --model {} --print",
+            "echo '{}' | claude --model {} --print --permission-mode bypassPermissions",
             request.task.replace("'", "'\\''"),
             request.model
         );
@@ -1242,8 +1243,9 @@ async fn execute_round(
             .output();
 
         // Send Claude Code command
+        // Use --permission-mode bypassPermissions to auto-approve changes and prevent interactive prompts
         let claude_cmd = format!(
-            "echo '{}' | claude --model {} code --print",
+            "echo '{}' | claude --model {} code --print --permission-mode bypassPermissions",
             prompt.replace("'", "'\\''"),
             request.model
         );
