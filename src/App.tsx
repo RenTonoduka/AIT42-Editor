@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, Settings, Activity, Users, Layout, Sparkles, Trophy, MessageSquare } from 'lucide-react';
+import { FileText, Settings, Users, Layout, Sparkles, Trophy, MessageSquare, Target } from 'lucide-react';
 import { Sidebar } from './components/Sidebar/Sidebar';
 import { EditorContainer } from '@/components/Editor';
 import { StatusBar } from '@/components/StatusBar';
@@ -9,11 +9,12 @@ import { CompetitionDialog } from '@/components/AI/CompetitionDialog';
 import { EnsembleDialog } from '@/components/AI/EnsembleDialog';
 import { DebateDialog } from '@/components/AI/DebateDialog';
 import DebateStatusPanel from '@/components/AI/DebateStatusPanel';
+import { OptimizerDemo } from '@/components/Optimizer';
 import { useEditorStore } from '@/store/editorStore';
 import { useSettingsStore } from '@/store/settingsStore';
 
 // View Mode Type
-type ViewMode = 'editor' | 'multi-agent' | 'debate';
+type ViewMode = 'editor' | 'multi-agent' | 'debate' | 'optimizer';
 
 function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('editor');
@@ -167,6 +168,17 @@ function App() {
               <MessageSquare className="w-4 h-4 inline-block mr-1" />
               Debate
             </button>
+            <button
+              onClick={() => setViewMode('optimizer')}
+              className={`px-3 py-1 rounded-md text-sm transition-colors ${
+                viewMode === 'optimizer'
+                  ? 'bg-green-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              <Target className="w-4 h-4 inline-block mr-1" />
+              Optimizer
+            </button>
           </div>
         </div>
 
@@ -209,6 +221,13 @@ function App() {
               task={debateTask}
               onClose={handleDebateClose}
             />
+          </div>
+        )}
+
+        {/* Optimizer View Mode */}
+        {viewMode === 'optimizer' && (
+          <div className="flex-1 bg-gray-900 overflow-auto">
+            <OptimizerDemo />
           </div>
         )}
       </div>
