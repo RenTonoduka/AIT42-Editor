@@ -657,6 +657,39 @@ pub async fn execute_claude_code_competition(
 
     let mut instances = Vec::new();
 
+    // ハンドシェイク準備: フロントエンドのリスナー登録を待つ仕組み
+    let ready_signal_received = Arc::new(Mutex::new(false));
+    let ready_clone = Arc::clone(&ready_signal_received);
+    let competition_id_for_listener = competition_id.clone();
+
+    tracing::info!("🕐 [HANDSHAKE] Registering global listener BEFORE creating worktrees for competition {} at {:?}",
+        competition_id, std::time::SystemTime::now());
+
+    // STEP 1: グローバルリスナーを先に登録（非同期タスクの外で）
+    let listener_handle = app_handle.listen_global("competition-listener-ready", move |event| {
+        tracing::info!("🔔 [HANDSHAKE] Received event on 'competition-listener-ready' at {:?}", std::time::SystemTime::now());
+        if let Some(payload) = event.payload() {
+            tracing::debug!("📦 [HANDSHAKE] Payload: {}", payload);
+            if let Ok(data) = serde_json::from_str::<serde_json::Value>(payload) {
+                if let Some(received_id) = data.get("competitionId").and_then(|v| v.as_str()) {
+                    tracing::info!("🔍 [HANDSHAKE] Checking received_id='{}' vs expected='{}'", received_id, competition_id_for_listener);
+                    if received_id == competition_id_for_listener {
+                        tracing::info!("✅ [HANDSHAKE] Frontend ready signal received for competition {}", competition_id_for_listener);
+                        *ready_clone.lock().unwrap() = true;
+                    } else {
+                        tracing::warn!("⚠️ [HANDSHAKE] Competition ID mismatch: received '{}', expected '{}'", received_id, competition_id_for_listener);
+                    }
+                } else {
+                    tracing::warn!("⚠️ [HANDSHAKE] No competitionId field in payload: {:?}", data);
+                }
+            } else {
+                tracing::error!("❌ [HANDSHAKE] Failed to parse payload as JSON: {}", payload);
+            }
+        } else {
+            tracing::error!("❌ [HANDSHAKE] Event payload is None");
+        }
+    });
+
     // Create worktrees and launch instances
     for i in 1..=request.instance_count {
         let instance_id = format!("{}-instance-{}", competition_id, i);
@@ -744,52 +777,33 @@ pub async fn execute_claude_code_competition(
 
         tracing::info!("Launched Claude Code instance {} in session {}", i, session_id);
 
-        // ハンドシェイク対応版: フロントエンドの準備完了を待つ
+        // モニタリングタスクを起動（ハンドシェイク待機済み前提）
         let app = app_handle.clone();
         let monitor_session_id = session_id.clone();
         let monitor_instance_number = i;
         let monitor_log_path = output_log_path.clone();
-        let competition_id_for_handshake = competition_id.clone();
+        let ready_signal_clone = Arc::clone(&ready_signal_received);
 
         tauri::async_runtime::spawn(async move {
-            // STEP 1: フロントエンドの準備完了を待機
-            let ready_signal_received = Arc::new(Mutex::new(false));
-            let ready_clone = Arc::clone(&ready_signal_received);
-            let competition_id_clone = competition_id_for_handshake.clone();
-
-            tracing::info!("🕐 Waiting for frontend ready signal for competition {} at {:?}",
-                competition_id_for_handshake, std::time::SystemTime::now());
-
-            // グローバルイベントリスナーを登録
-            let listener_handle = app.listen_global("competition-listener-ready", move |event| {
-                if let Some(payload) = event.payload() {
-                    if let Ok(data) = serde_json::from_str::<serde_json::Value>(payload) {
-                        if let Some(received_id) = data.get("competitionId").and_then(|v| v.as_str()) {
-                            if received_id == competition_id_clone {
-                                tracing::info!("✅ Frontend ready signal received for competition {}", competition_id_clone);
-                                *ready_clone.lock().unwrap() = true;
-                            }
-                        }
-                    }
-                }
-            });
-
-            // STEP 2: タイムアウト付き待機（最大5秒）
+            // STEP 2: フロントエンド準備完了を待機（最大5秒タイムアウト）
             let timeout_duration = std::time::Duration::from_secs(5);
             let start_time = std::time::Instant::now();
 
-            while !*ready_signal_received.lock().unwrap() {
+            tracing::info!("⏳ [HANDSHAKE] Instance {} waiting for frontend ready signal...", monitor_instance_number);
+
+            while !*ready_signal_clone.lock().unwrap() {
                 if start_time.elapsed() > timeout_duration {
-                    tracing::warn!("⚠️ Frontend ready signal timeout for competition {}, proceeding anyway", competition_id_for_handshake);
+                    tracing::warn!("⚠️ [HANDSHAKE] Frontend ready signal timeout for instance {}, proceeding anyway", monitor_instance_number);
                     break;
                 }
                 tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
             }
 
-            // リスナークリーンアップ
-            app.unlisten(listener_handle);
+            if *ready_signal_clone.lock().unwrap() {
+                tracing::info!("✅ [HANDSHAKE] Frontend ready confirmed for instance {}", monitor_instance_number);
+            }
 
-            // STEP 3: フロントエンド準備完了 → モニタリング開始
+            // STEP 3: モニタリング開始
             tracing::info!("🚀 Starting monitoring for instance {} at {:?}",
                 monitor_instance_number, std::time::SystemTime::now());
 
@@ -809,6 +823,17 @@ pub async fn execute_claude_code_competition(
             completed_at: None,
         });
     }
+
+    // STEP 4: リスナークリーンアップは最初のインスタンス完了時に行う
+    // （実際にはタイムアウト後に自動的にunlistenすべきだが、ここでは簡略化）
+    let app_for_cleanup = app_handle.clone();
+    let competition_id_for_cleanup = competition_id.clone();
+    tauri::async_runtime::spawn(async move {
+        // 10秒後にリスナーをクリーンアップ（ハンドシェイク期間終了）
+        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+        app_for_cleanup.unlisten(listener_handle);
+        tracing::info!("🧹 [HANDSHAKE] Cleaned up listener for competition {}", competition_id_for_cleanup);
+    });
 
     Ok(ClaudeCodeCompetitionResult {
         competition_id,
