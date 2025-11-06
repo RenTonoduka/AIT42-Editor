@@ -6,11 +6,13 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Sparkles, X, Settings as SettingsIcon, Code2, Cpu } from 'lucide-react';
+import { Sparkles, X, Settings as SettingsIcon, Code2, Cpu, Loader2 } from 'lucide-react';
 import { tauriApi, ClaudeCodeCompetitionRequest } from '@/services/tauri';
 import { ModeIndicator } from './ModeIndicator';
 import { CollaborativeFlowDiagram } from './CollaborativeFlowDiagram';
 import { ModeTooltip } from './ModeTooltip';
+import { useTaskOptimizer } from '@/hooks/useTaskOptimizer';
+import { ComplexityBadge } from '@/components/Optimizer/ComplexityBadge';
 
 export interface EnsembleDialogProps {
   /** Whether the dialog is visible */
@@ -57,6 +59,9 @@ export const EnsembleDialog: React.FC<EnsembleDialogProps> = ({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
 
+  // 🔥 NEW: Ω-theory optimizer integration
+  const { state: optimizerState, analyze, isAnalyzing } = useTaskOptimizer();
+
   // Reset state when dialog opens
   useEffect(() => {
     if (isOpen) {
@@ -69,6 +74,22 @@ export const EnsembleDialog: React.FC<EnsembleDialogProps> = ({
       setIsStarting(false);
     }
   }, [isOpen]);
+
+  // 🔥 NEW: Auto-update instance count when analysis completes
+  useEffect(() => {
+    if (optimizerState.status === 'calculated' && optimizerState.instances) {
+      setInstanceCount(optimizerState.instances.recommendedInstances);
+    }
+  }, [optimizerState]);
+
+  // 🔥 NEW: Handle Ω analysis
+  const handleAnalyze = async () => {
+    if (!task.trim()) {
+      alert('タスクを入力してください');
+      return;
+    }
+    await analyze(task.trim());
+  };
 
   const handleStart = async () => {
     if (!task.trim()) {
@@ -155,6 +176,46 @@ export const EnsembleDialog: React.FC<EnsembleDialogProps> = ({
               className="w-full px-4 py-3 bg-editor-bg text-text-primary placeholder-text-tertiary border border-editor-border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600/50 resize-none"
               rows={4}
             />
+          </div>
+
+          {/* 🔥 NEW: Ω Analysis Button and Results */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleAnalyze}
+              disabled={!task.trim() || isAnalyzing}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+              title="タスクの複雑度を分析して最適なインスタンス数を提案"
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>分析中...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles size={16} />
+                  <span>Ω分析</span>
+                </>
+              )}
+            </button>
+
+            {optimizerState.status === 'calculated' && optimizerState.optimization && (
+              <div className="flex items-center gap-3 flex-1">
+                <ComplexityBadge complexity={optimizerState.optimization.complexityClass} />
+                <div className="text-sm text-text-secondary">
+                  推奨: <span className="font-bold text-purple-600">{optimizerState.instances?.recommendedInstances}</span>インスタンス
+                </div>
+                <div className="text-xs text-text-tertiary italic">
+                  {optimizerState.optimization.reasoning.slice(0, 60)}...
+                </div>
+              </div>
+            )}
+
+            {optimizerState.status === 'error' && (
+              <div className="text-sm text-red-400">
+                エラー: {optimizerState.error}
+              </div>
+            )}
           </div>
 
           {/* Instance Count Slider */}
