@@ -1,0 +1,36 @@
+[package]
+name = "llm-estimator"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "LLM-based complexity estimation engine for AIT42 Editor using Anthropic Claude API"
+
+[dependencies]
+# Core async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# Anthropic SDK
+anthropic-sdk = "0.1"
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Internal dependencies
+omega-theory = { workspace = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
