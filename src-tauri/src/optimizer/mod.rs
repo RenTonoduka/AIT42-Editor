@@ -42,12 +42,14 @@
 //! | Quadratic | Ω(n²) | 5-10 | Nested loops, matrix ops |
 //! | Exponential | Ω(2^n) | 8-15 | Combinatorial, backtracking |
 
+pub mod instance_calculator;
 pub mod subtask_optimizer;
 
 #[cfg(test)]
 mod tests;
 
 // Re-export main types
+pub use instance_calculator::{InstanceCalculation, InstanceCalculator};
 pub use subtask_optimizer::{
     MemoryAdjustment, OptimizerError, OptimizationResult, SubtaskOptimizer,
 };
@@ -69,5 +71,7 @@ mod module_tests {
         let _: MemoryAdjustment;
         let _: ComplexityClass;
         let _: ComplexityEstimate;
+        let _: InstanceCalculator;
+        let _: InstanceCalculation;
     }
 }

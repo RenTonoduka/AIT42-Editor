@@ -11,6 +11,6 @@ pub mod optimizer;
 
 // Re-export commonly used types
 pub use optimizer::{
-    ComplexityClass, ComplexityEstimate, MemoryAdjustment, OptimizationResult, OptimizerError,
-    SubtaskOptimizer,
+    ComplexityClass, ComplexityEstimate, InstanceCalculation, InstanceCalculator, MemoryAdjustment,
+    OptimizationResult, OptimizerError, SubtaskOptimizer,
 };
