@@ -130,7 +130,7 @@ export const TaskAnalyzer: React.FC<TaskAnalyzerProps> = ({
             value={taskDescription}
             onChange={(e) => setTaskDescription(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Enter task description (e.g., 'Implement REST API for user management')"
+            placeholder="タスクの説明を入力（例: 'ユーザー管理用 REST API を実装'）"
             className="
               w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md
               text-gray-100 placeholder-gray-500
@@ -142,7 +142,7 @@ export const TaskAnalyzer: React.FC<TaskAnalyzerProps> = ({
             aria-describedby="task-description-hint"
           />
           <div id="task-description-hint" className="mt-1 text-xs text-gray-500">
-            Press <kbd className="px-1 py-0.5 bg-gray-700 rounded">⌘</kbd> + <kbd className="px-1 py-0.5 bg-gray-700 rounded">Enter</kbd> to analyze
+            <kbd className="px-1 py-0.5 bg-gray-700 rounded">⌘</kbd> + <kbd className="px-1 py-0.5 bg-gray-700 rounded">Enter</kbd> で分析
           </div>
         </div>
 
@@ -164,12 +164,12 @@ export const TaskAnalyzer: React.FC<TaskAnalyzerProps> = ({
           {isAnalyzing ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" />
-              Analyzing Task...
+              分析中...
             </>
           ) : (
             <>
               <Play className="w-5 h-5" />
-              Analyze Task
+              タスク分析
             </>
           )}
         </button>
@@ -181,12 +181,12 @@ export const TaskAnalyzer: React.FC<TaskAnalyzerProps> = ({
           {/* Success Header */}
           <div className="flex items-center gap-2 text-green-400">
             <CheckCircle className="w-5 h-5" />
-            <span className="font-semibold">Analysis Complete</span>
+            <span className="font-semibold">分析完了</span>
           </div>
 
           {/* Complexity Badge */}
           <div>
-            <div className="text-sm font-medium text-gray-400 mb-2">Detected Complexity</div>
+            <div className="text-sm font-medium text-gray-400 mb-2">検出された複雑度</div>
             <ComplexityBadge
               complexityClass={state.optimization.complexityClass}
               notation={state.complexityInfo.notation}
@@ -201,13 +201,13 @@ export const TaskAnalyzer: React.FC<TaskAnalyzerProps> = ({
             <div className="p-4 bg-gray-900 border border-gray-700 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
                 <Layers className="w-4 h-4 text-blue-400" />
-                <span className="text-xs font-semibold text-gray-400 uppercase">Subtasks</span>
+                <span className="text-xs font-semibold text-gray-400 uppercase">サブタスク</span>
               </div>
               <div className="text-3xl font-bold text-blue-400">
                 {state.optimization.recommendedSubtasks}
               </div>
               <div className="text-xs text-gray-500 mt-1">
-                {state.complexityInfo.subtaskRange} range
+                {state.complexityInfo.subtaskRange} 範囲
               </div>
             </div>
 
@@ -215,13 +215,13 @@ export const TaskAnalyzer: React.FC<TaskAnalyzerProps> = ({
             <div className="p-4 bg-gray-900 border border-gray-700 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
                 <Target className="w-4 h-4 text-purple-400" />
-                <span className="text-xs font-semibold text-gray-400 uppercase">Instances</span>
+                <span className="text-xs font-semibold text-gray-400 uppercase">インスタンス</span>
               </div>
               <div className="text-3xl font-bold text-purple-400">
                 {state.instances.recommendedInstances}
               </div>
               <div className="text-xs text-gray-500 mt-1">
-                {state.instances.subtasksPerInstance.toFixed(2)} per instance
+                {state.instances.subtasksPerInstance.toFixed(2)} / インスタンス
               </div>
             </div>
 
@@ -229,7 +229,7 @@ export const TaskAnalyzer: React.FC<TaskAnalyzerProps> = ({
             <div className="p-4 bg-gray-900 border border-gray-700 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
                 <TrendingUp className="w-4 h-4 text-green-400" />
-                <span className="text-xs font-semibold text-gray-400 uppercase">Confidence</span>
+                <span className="text-xs font-semibold text-gray-400 uppercase">信頼度</span>
               </div>
               <div className="text-3xl font-bold text-green-400">
                 {(state.optimization.confidence * 100).toFixed(0)}%
@@ -250,7 +250,7 @@ export const TaskAnalyzer: React.FC<TaskAnalyzerProps> = ({
 
           {/* Reasoning */}
           <div className="p-4 bg-gray-900 border border-gray-700 rounded-lg">
-            <div className="text-sm font-semibold text-gray-400 uppercase mb-2">Analysis Reasoning</div>
+            <div className="text-sm font-semibold text-gray-400 uppercase mb-2">分析の根拠</div>
             <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
               {state.optimization.reasoning}
             </p>

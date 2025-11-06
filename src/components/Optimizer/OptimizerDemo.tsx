@@ -39,45 +39,45 @@ interface SampleTaskItem {
 const SAMPLE_TASKS: SampleTaskItem[] = [
   {
     id: 'auth',
-    title: 'User Authentication',
-    description: 'Implement JWT-based user authentication system with login, logout, and token refresh',
+    title: 'ユーザー認証',
+    description: 'JWT ベースのユーザー認証システムをログイン、ログアウト、トークン更新機能付きで実装',
     icon: Lock,
-    expectedComplexity: 'Linear',
+    expectedComplexity: '線形',
   },
   {
     id: 'ecommerce',
-    title: 'E-commerce Checkout',
-    description: 'Build e-commerce checkout flow with cart management, payment integration (Stripe), and order processing',
+    title: 'EC チェックアウト',
+    description: 'カート管理、決済統合 (Stripe)、注文処理を含む EC チェックアウトフローを構築',
     icon: ShoppingCart,
-    expectedComplexity: 'Quadratic',
+    expectedComplexity: '二乗',
   },
   {
     id: 'api',
     title: 'REST API',
-    description: 'Create REST API for blog platform with CRUD operations, authentication, and pagination',
+    description: 'CRUD 操作、認証、ページネーション機能を持つブログプラットフォーム用 REST API を作成',
     icon: Code,
-    expectedComplexity: 'Linear',
+    expectedComplexity: '線形',
   },
   {
     id: 'database',
-    title: 'Database Migration',
-    description: 'Migrate MySQL database to PostgreSQL with 50+ tables, including data transformation and indexing',
+    title: 'データベース移行',
+    description: 'MySQL から PostgreSQL へ 50 以上のテーブルをデータ変換とインデックス作成を含めて移行',
     icon: Database,
-    expectedComplexity: 'Quadratic',
+    expectedComplexity: '二乗',
   },
   {
     id: 'landing',
-    title: 'Landing Page',
-    description: 'Build responsive landing page with hero section, features, testimonials, and contact form',
+    title: 'ランディングページ',
+    description: 'ヒーローセクション、機能、testimonials、お問い合わせフォームを含むレスポンシブランディングページを構築',
     icon: Globe,
-    expectedComplexity: 'Logarithmic',
+    expectedComplexity: '対数',
   },
   {
     id: 'microservices',
-    title: 'Microservices Architecture',
-    description: 'Design and implement microservices architecture with 5+ services, API gateway, service discovery, and message queue',
+    title: 'マイクロサービスアーキテクチャ',
+    description: '5 つ以上のサービス、API ゲートウェイ、サービス検出、メッセージキューを含むマイクロサービスアーキテクチャを設計・実装',
     icon: Zap,
-    expectedComplexity: 'Exponential',
+    expectedComplexity: '指数',
   },
 ];
 
@@ -178,8 +178,8 @@ ${lastResult.optimization.reasoning}`;
           <div className="flex items-center gap-3">
             <Sparkles className="w-8 h-8 text-blue-400" />
             <div>
-              <h1 className="text-3xl font-bold text-white">Ω-Theory Task Optimizer</h1>
-              <p className="text-gray-400">Intelligent subtask decomposition using complexity analysis</p>
+              <h1 className="text-3xl font-bold text-white">Ω 理論タスク最適化</h1>
+              <p className="text-gray-400">複雑度分析を用いたインテリジェントなサブタスク分解</p>
             </div>
           </div>
 
@@ -197,12 +197,12 @@ ${lastResult.optimization.reasoning}`;
                 {copied ? (
                   <>
                     <Check className="w-4 h-4 text-green-400" />
-                    Copied!
+                    コピー完了!
                   </>
                 ) : (
                   <>
                     <Copy className="w-4 h-4" />
-                    Copy
+                    コピー
                   </>
                 )}
               </button>
@@ -215,7 +215,7 @@ ${lastResult.optimization.reasoning}`;
                 "
               >
                 <Download className="w-4 h-4" />
-                Export JSON
+                JSON 出力
               </button>
             </div>
           )}
@@ -227,8 +227,8 @@ ${lastResult.optimization.reasoning}`;
         {/* Left Column: Sample Tasks */}
         <div>
           <div className="mb-4">
-            <h2 className="text-xl font-semibold text-white mb-2">Sample Tasks</h2>
-            <p className="text-sm text-gray-400">Click a sample task to analyze it</p>
+            <h2 className="text-xl font-semibold text-white mb-2">サンプルタスク</h2>
+            <p className="text-sm text-gray-400">サンプルタスクをクリックして分析</p>
           </div>
 
           <div className="space-y-3">
@@ -251,7 +251,7 @@ ${lastResult.optimization.reasoning}`;
                       <div className="font-semibold text-white mb-1">{task.title}</div>
                       <div className="text-sm text-gray-400 leading-relaxed">{task.description}</div>
                       <div className="text-xs text-gray-500 mt-2">
-                        Expected: <span className="text-blue-400">{task.expectedComplexity}</span>
+                        予想: <span className="text-blue-400">{task.expectedComplexity}</span>
                       </div>
                     </div>
                   </div>
@@ -264,8 +264,8 @@ ${lastResult.optimization.reasoning}`;
         {/* Right Column: Task Analyzer */}
         <div>
           <div className="mb-4">
-            <h2 className="text-xl font-semibold text-white mb-2">Analyze Task</h2>
-            <p className="text-sm text-gray-400">Enter a task description or select a sample</p>
+            <h2 className="text-xl font-semibold text-white mb-2">タスク分析</h2>
+            <p className="text-sm text-gray-400">タスクの説明を入力するか、サンプルを選択してください</p>
           </div>
 
           <TaskAnalyzer
