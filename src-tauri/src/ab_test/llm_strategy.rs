@@ -136,7 +136,7 @@ mod tests {
 
     fn create_test_strategy() -> LLMStrategy {
         // Create with dummy API key for testing
-        LLMStrategy::new("sk-ant-test-key".to_string()).await.unwrap()
+        LLMStrategy::new("sk-ant-test-key".to_string()).expect("Failed to create test strategy")
     }
 
     fn create_mock_estimate(
@@ -153,15 +153,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn
-    fn test_strategy_creation() {
+    async fn test_strategy_creation() {
         let strategy = create_test_strategy();
         assert_eq!(strategy.name(), "v1.6.0 LLM + Ω-Theory");
     }
 
     #[tokio::test]
-    async fn
-    fn test_strategy_from_env_missing_key() {
+    async fn test_strategy_from_env_missing_key() {
         // Remove env var if set
         std::env::remove_var("ANTHROPIC_API_KEY");
 
@@ -178,7 +176,7 @@ mod tests {
         strategy.insert_cached("Test task for LLM strategy", mock_estimate);
 
         // Run optimization (should hit cache)
-        let result = strategy.optimize_async("Test task for LLM strategy").await.await.unwrap();
+        let result = strategy.optimize_async("Test task for LLM strategy").await.unwrap();
 
         assert_eq!(result.strategy_name, "v1.6.0 LLM + Ω-Theory");
         assert_eq!(result.complexity_class, ComplexityClass::Linear);
@@ -187,8 +185,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn
-    fn test_constant_complexity() {
+    async fn test_constant_complexity() {
         let strategy = create_test_strategy();
 
         let mock_estimate = create_mock_estimate("Ω(1)", 1, 0.95);
@@ -201,8 +198,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn
-    fn test_logarithmic_complexity() {
+    async fn test_logarithmic_complexity() {
         let strategy = create_test_strategy();
 
         let mock_estimate = create_mock_estimate("Ω(log n)", 2, 0.85);
@@ -215,8 +211,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn
-    fn test_linear_complexity() {
+    async fn test_linear_complexity() {
         let strategy = create_test_strategy();
 
         let mock_estimate = create_mock_estimate("Ω(n)", 4, 0.90);
@@ -229,8 +224,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn
-    fn test_linearithmic_complexity() {
+    async fn test_linearithmic_complexity() {
         let strategy = create_test_strategy();
 
         let mock_estimate = create_mock_estimate("Ω(n log n)", 5, 0.87);
@@ -243,8 +237,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn
-    fn test_quadratic_complexity() {
+    async fn test_quadratic_complexity() {
         let strategy = create_test_strategy();
 
         let mock_estimate = create_mock_estimate("Ω(n²)", 8, 0.82);
@@ -257,8 +250,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn
-    fn test_exponential_complexity() {
+    async fn test_exponential_complexity() {
         let strategy = create_test_strategy();
 
         let mock_estimate = create_mock_estimate("Ω(2^n)", 12, 0.78);
@@ -271,8 +263,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn
-    fn test_omega_theory_adjustment() {
+    async fn test_omega_theory_adjustment() {
         let strategy = create_test_strategy();
 
         // Mock estimate with subtasks outside Ω bounds
@@ -289,8 +280,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn
-    fn test_reasoning_contains_llm_analysis() {
+    async fn test_reasoning_contains_llm_analysis() {
         let strategy = create_test_strategy();
 
         let mock_estimate = create_mock_estimate("Ω(n)", 4, 0.88);
@@ -304,8 +294,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn
-    fn test_high_confidence() {
+    async fn test_high_confidence() {
         let strategy = create_test_strategy();
 
         let mock_estimate = create_mock_estimate("Ω(n²)", 7, 0.95);
@@ -318,8 +307,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn
-    fn test_latency_reasonable() {
+    async fn test_latency_reasonable() {
         let strategy = create_test_strategy();
 
         let mock_estimate = create_mock_estimate("Ω(n)", 4, 0.85);
@@ -336,8 +324,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn
-    fn test_strategy_name_correct() {
+    async fn test_strategy_name_correct() {
         let strategy = create_test_strategy();
         let mock_estimate = create_mock_estimate("Ω(n)", 4, 0.85);
         strategy.insert_cached("Test", mock_estimate);

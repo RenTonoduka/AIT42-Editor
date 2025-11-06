@@ -1,58 +1,32 @@
-# Contributing to AIT42 Editor
+# Contributing to AIT42-Editor
 
-Thank you for your interest in contributing to AIT42 Editor!
-
-This document provides guidelines for contributing to the project.
-
----
+First off, thank you for considering contributing to AIT42-Editor! It's people like you that make AIT42-Editor such a great tool for the development community.
 
 ## Table of Contents
 
-1. [Code of Conduct](#code-of-conduct)
-2. [Getting Started](#getting-started)
-3. [Development Workflow](#development-workflow)
-4. [Coding Standards](#coding-standards)
-5. [Testing Guidelines](#testing-guidelines)
-6. [Pull Request Process](#pull-request-process)
-7. [Issue Guidelines](#issue-guidelines)
-8. [Documentation](#documentation)
-9. [Community](#community)
+- [Code of Conduct](#code-of-conduct)
+- [Getting Started](#getting-started)
+- [Development Environment Setup](#development-environment-setup)
+- [Project Structure](#project-structure)
+- [Development Workflow](#development-workflow)
+- [Coding Standards](#coding-standards)
+- [Testing Requirements](#testing-requirements)
+- [Pull Request Process](#pull-request-process)
+- [Issue Reporting Guidelines](#issue-reporting-guidelines)
+- [Community](#community)
 
 ---
 
 ## Code of Conduct
 
-### Our Pledge
+This project and everyone participating in it is governed by our commitment to creating a welcoming and inclusive environment. By participating, you are expected to uphold this code:
 
-We are committed to providing a welcoming and inclusive environment for all contributors, regardless of:
-- Experience level
-- Gender identity
-- Sexual orientation
-- Disability
-- Personal appearance
-- Race or ethnicity
-- Age
-- Religion
+- **Be respectful**: Treat everyone with respect. Disagreements are fine, but be constructive.
+- **Be inclusive**: Welcome newcomers and help them get started.
+- **Be collaborative**: Share knowledge and credit others for their contributions.
+- **Be patient**: Remember that everyone was a beginner once.
 
-### Our Standards
-
-**Positive Behavior**:
-- Using welcoming and inclusive language
-- Being respectful of differing viewpoints
-- Gracefully accepting constructive criticism
-- Focusing on what is best for the community
-- Showing empathy towards other community members
-
-**Unacceptable Behavior**:
-- Harassment or discriminatory language
-- Trolling, insulting, or derogatory comments
-- Personal or political attacks
-- Publishing others' private information without permission
-- Other conduct which could reasonably be considered inappropriate
-
-### Enforcement
-
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the project maintainers. All complaints will be reviewed and investigated promptly and fairly.
+If you experience or witness unacceptable behavior, please report it to support@ait42.dev.
 
 ---
 
@@ -60,135 +34,241 @@ Instances of abusive, harassing, or otherwise unacceptable behavior may be repor
 
 ### Prerequisites
 
-- **Rust 1.75+**: Install from [rustup.rs](https://rustup.rs)
-- **Git**: Version control
-- **macOS 11.0+**: Currently macOS-only (Linux/Windows support planned)
-- **Optional**:
-  - Tmux 2.0+ for agent development
-  - Language servers (rust-analyzer, etc.) for LSP features
+Before you begin, ensure you have the following installed:
 
-### Installation
+- **Node.js** 20.0 or higher
+- **Rust** 1.75 or higher (with `cargo` and `rustup`)
+- **Git** 2.40 or higher
+- **Tmux** 3.3 or higher (for testing debate mode)
+- **Claude Code CLI** (optional, for testing AI workflows)
+
+### Quick Setup
 
 ```bash
-# Clone repository
-git clone https://github.com/RenTonoduka/AIT42
+# Fork the repository on GitHub
+# Clone your fork
+git clone https://github.com/YOUR_USERNAME/AIT42-Editor
 cd AIT42-Editor
 
-# Run setup script
-./scripts/setup.sh
+# Add upstream remote
+git remote add upstream https://github.com/RenTonoduka/AIT42-Editor
 
-# Verify build
-cargo check
+# Install dependencies
+npm install
 
-# Run tests
+# Set up environment variables
+cp .env.example .env
+# Edit .env and add your ANTHROPIC_API_KEY
+
+# Run tests to verify setup
 cargo test
+npm test
 
-# Run editor
-cargo run
+# Start development server
+npm run tauri dev
 ```
 
-### Development Tools
+---
+
+## Development Environment Setup
+
+### Rust Development
 
 ```bash
-# Install recommended tools
-cargo install cargo-watch    # Auto-rebuild on changes
-cargo install cargo-tarpaulin # Code coverage
-cargo install cargo-flamegraph # Profiling
-cargo install cargo-audit    # Security audit
-cargo install cargo-nextest  # Faster test runner
+# Install Rust (if not already installed)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Install required components
+rustup component add rustfmt clippy
+
+# Verify installation
+rustc --version  # Should be 1.75 or higher
+cargo --version
+```
+
+### Node.js Development
+
+```bash
+# Install Node.js 20+ (using nvm)
+nvm install 20
+nvm use 20
+
+# Verify installation
+node --version  # Should be 20.0 or higher
+npm --version
 ```
 
 ### IDE Setup
 
-**VS Code** (Recommended):
-```bash
-# Install rust-analyzer extension
-code --install-extension rust-lang.rust-analyzer
+#### VS Code (Recommended)
 
-# Recommended extensions
-code --install-extension vadimcn.vscode-lldb  # Debugging
-code --install-extension tamasfe.even-better-toml
-code --install-extension serayuzgur.crates
-```
+Install the following extensions:
 
-Create `.vscode/settings.json`:
+- **rust-analyzer**: Rust language support
+- **Tauri**: Tauri development tools
+- **ESLint**: TypeScript/JavaScript linting
+- **Prettier**: Code formatting
+- **React Developer Tools**: React debugging
+
+Settings (`.vscode/settings.json`):
 ```json
 {
-  "rust-analyzer.cargo.features": "all",
-  "rust-analyzer.check.command": "clippy",
-  "rust-analyzer.check.allTargets": true,
+  "rust-analyzer.cargo.features": ["all"],
   "editor.formatOnSave": true,
-  "editor.rulers": [100],
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
   "[rust]": {
     "editor.defaultFormatter": "rust-lang.rust-analyzer"
   }
 }
 ```
 
+#### IntelliJ IDEA / CLion
+
+Install plugins:
+- **Rust**
+- **Tauri**
+- **ESLint**
+- **Prettier**
+
+---
+
+## Project Structure
+
+```
+AIT42-Editor/
+├── src/                           # React frontend (TypeScript)
+│   ├── components/
+│   │   ├── AI/                    # AI workflow components
+│   │   ├── Optimizer/             # v1.6.0 complexity analysis UI
+│   │   ├── Editor/                # Code editor components
+│   │   ├── Sidebar/               # File tree
+│   │   └── Settings/              # Settings panel
+│   ├── services/
+│   │   └── tauri.ts               # Tauri IPC wrappers
+│   ├── store/                     # Zustand state management
+│   └── App.tsx                    # Main application
+├── src-tauri/                     # Rust backend
+│   ├── src/
+│   │   ├── commands/              # Tauri commands (IPC)
+│   │   │   ├── ait42.rs           # AI agent orchestration
+│   │   │   ├── optimizer.rs       # v1.6.0 optimizer IPC
+│   │   │   ├── file.rs            # File operations
+│   │   │   ├── editor.rs          # Editor operations
+│   │   │   ├── git.rs             # Git operations
+│   │   │   └── lsp.rs             # LSP operations
+│   │   ├── optimizer/             # v1.6.0 optimizer logic
+│   │   │   ├── mod.rs
+│   │   │   ├── subtask.rs         # SubtaskOptimizer
+│   │   │   └── instance.rs        # InstanceCalculator
+│   │   ├── ab_test/               # v1.6.0 A/B testing
+│   │   ├── state.rs               # Application state
+│   │   └── main.rs                # Entry point
+│   └── Cargo.toml
+├── crates/                        # Rust workspace crates
+│   ├── ait42-core/                # Core editor logic
+│   ├── ait42-tui/                 # TUI components
+│   ├── ait42-lsp/                 # LSP client
+│   ├── ait42-fs/                  # File system operations
+│   ├── ait42-config/              # Configuration management
+│   ├── ait42-ait42/               # AI agent integration
+│   ├── omega-theory/              # v1.6.0 Ω-theory engine
+│   └── llm-estimator/             # v1.6.0 LLM estimation
+├── docs/                          # Documentation
+│   ├── design/phase1/             # Debate Mode design docs
+│   ├── OMEGA_THEORY_EXPLAINED.md  # Ω-theory deep dive
+│   ├── AB_TESTING_RESULTS.md      # A/B test analysis
+│   └── TROUBLESHOOTING.md         # Common issues
+├── tests/                         # E2E tests (Playwright)
+├── .github/                       # GitHub Actions CI/CD
+├── README.md                      # User documentation
+├── CHANGELOG.md                   # Version history
+├── CONTRIBUTING.md                # This file
+└── LICENSE                        # MIT License
+```
+
 ---
 
 ## Development Workflow
 
-### 1. Find or Create an Issue
+### 1. Pick an Issue
 
-Before starting work:
-- Check [existing issues](https://github.com/RenTonoduka/AIT42/issues)
-- Comment on the issue to indicate you're working on it
-- If no issue exists, create one describing the bug or feature
+- Browse [open issues](https://github.com/RenTonoduka/AIT42-Editor/issues)
+- Comment on the issue to claim it
+- Wait for maintainer approval before starting work
+- For new features, create an issue first to discuss the proposal
 
-### 2. Fork and Branch
+### 2. Create a Branch
 
 ```bash
-# Fork the repository on GitHub
-# Then clone your fork
-git clone https://github.com/YOUR_USERNAME/AIT42
-cd AIT42-Editor
+# Update your fork
+git checkout main
+git pull upstream main
 
-# Add upstream remote
-git remote add upstream https://github.com/RenTonoduka/AIT42
+# Create a feature branch
+git checkout -b feature/your-feature-name
 
-# Create feature branch
-git checkout -b feature/my-feature
-# or
-git checkout -b fix/my-bugfix
+# Or for bug fixes
+git checkout -b fix/bug-description
 ```
 
 ### 3. Make Changes
 
-- Write clean, well-documented code
-- Follow coding standards (see below)
-- Add tests for new functionality
-- Update documentation as needed
+Follow our [Coding Standards](#coding-standards) and write tests for your changes.
 
-### 4. Commit Changes
-
-Follow [Conventional Commits](https://www.conventionalcommits.org/):
+### 4. Test Your Changes
 
 ```bash
-git commit -m "feat(lsp): add support for Ruby language server"
-git commit -m "fix(buffer): handle emoji grapheme clusters correctly"
-git commit -m "docs: update installation instructions"
-git commit -m "test: add integration tests for agent executor"
+# Rust tests
+cargo test
+cargo clippy  # Linting
+cargo fmt     # Formatting
+
+# Frontend tests
+npm test
+npm run lint
+npm run format
+
+# E2E tests
+npm run test:e2e
+
+# Manual testing
+npm run tauri dev
+```
+
+### 5. Commit Your Changes
+
+We use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages:
+
+```bash
+# Format: <type>(<scope>): <subject>
+
+# Examples:
+git commit -m "feat(optimizer): add memory-based adjustment"
+git commit -m "fix(debate): resolve worktree cleanup race condition"
+git commit -m "docs(api): update optimize_task documentation"
+git commit -m "test(llm-estimator): add cache expiration tests"
+git commit -m "refactor(ui): extract ComplexityBadge component"
 ```
 
 **Commit Types**:
 - `feat`: New feature
 - `fix`: Bug fix
-- `docs`: Documentation only
-- `style`: Code style (formatting, missing semicolons, etc.)
-- `refactor`: Code refactoring
-- `perf`: Performance improvement
+- `docs`: Documentation changes
 - `test`: Adding or updating tests
+- `refactor`: Code refactoring (no functional changes)
+- `perf`: Performance improvements
+- `style`: Code style changes (formatting, etc.)
 - `chore`: Maintenance tasks (dependencies, build, etc.)
 
-### 5. Push and Create PR
+### 6. Push and Create PR
 
 ```bash
 # Push to your fork
-git push origin feature/my-feature
+git push origin feature/your-feature-name
 
-# Create Pull Request on GitHub
-# Fill out the PR template
+# Create PR on GitHub
+# Fill out the PR template completely
+# Link related issues
 ```
 
 ---
@@ -197,145 +277,161 @@ git push origin feature/my-feature
 
 ### Rust Style Guide
 
-Follow the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/):
+#### Formatting
 
-1. **Formatting**: Use `rustfmt` (automatically applied)
-   ```bash
-   cargo fmt
-   ```
+```bash
+# Format all Rust code before committing
+cargo fmt
+```
 
-2. **Linting**: Fix all `clippy` warnings
-   ```bash
-   cargo clippy -- -W clippy::all
-   ```
+#### Linting
 
-3. **Error Handling**: Never use `unwrap()` or `expect()` in production code
-   ```rust
-   // Bad
-   let file = fs::read_to_string(path).unwrap();
+```bash
+# Run Clippy with strict linting
+cargo clippy -- -D warnings
+```
 
-   // Good
-   let file = fs::read_to_string(path)
-       .map_err(|e| EditorError::FileReadError(path.clone(), e))?;
-   ```
+#### Naming Conventions
 
-4. **Naming Conventions**:
-   - Types: `PascalCase` (e.g., `EditorState`, `BufferId`)
-   - Functions/Variables: `snake_case` (e.g., `read_file`, `line_count`)
-   - Constants: `SCREAMING_SNAKE_CASE` (e.g., `MAX_BUFFER_SIZE`)
+- **Modules**: `snake_case` (e.g., `optimizer`, `ab_test`)
+- **Structs/Enums**: `PascalCase` (e.g., `SubtaskOptimizer`, `ComplexityClass`)
+- **Functions**: `snake_case` (e.g., `optimize_subtask_count`)
+- **Constants**: `SCREAMING_SNAKE_CASE` (e.g., `MAX_INSTANCES`)
 
-5. **Documentation**:
-   ```rust
-   /// Brief description of function
-   ///
-   /// More detailed explanation if needed.
-   ///
-   /// # Arguments
-   ///
-   /// * `path` - The file path to read
-   /// * `encoding` - The character encoding to use
-   ///
-   /// # Returns
-   ///
-   /// Returns the file content as a String
-   ///
-   /// # Errors
-   ///
-   /// Returns `EditorError::FileNotFound` if file doesn't exist
-   ///
-   /// # Examples
-   ///
-   /// ```no_run
-   /// use ait42_core::read_file;
-   /// let content = read_file("test.txt", "utf-8")?;
-   /// ```
-   pub fn read_file(path: &Path, encoding: &str) -> Result<String> {
-       // Implementation
-   }
-   ```
+#### Documentation
 
-6. **Module Organization**:
-   - One public module per file
-   - Use `mod.rs` only for re-exports
-   - Keep modules small and focused
+```rust
+/// Optimize subtask count for a given task description.
+///
+/// # Arguments
+/// * `task_description` - Task description to analyze
+/// * `current_subtasks` - Current number of subtasks (0 if none)
+///
+/// # Returns
+/// * `Ok(OptimizationResult)` - Optimization recommendation
+/// * `Err(OptimizerError)` - Error during optimization
+///
+/// # Example
+/// ```
+/// let result = optimizer.optimize_subtask_count("Implement REST API", 0).await?;
+/// assert_eq!(result.complexity_class, ComplexityClass::Linear);
+/// ```
+pub async fn optimize_subtask_count(
+    &self,
+    task_description: &str,
+    current_subtasks: usize,
+) -> Result<OptimizationResult, OptimizerError> {
+    // Implementation
+}
+```
 
-### Performance Guidelines
+#### Error Handling
 
-1. **Avoid allocations in hot paths**:
-   ```rust
-   // Bad: Allocates on every iteration
-   for line in buffer.lines() {
-       let owned = line.to_string();
-       process(owned);
-   }
+```rust
+// Use thiserror for custom error types
+use thiserror::Error;
 
-   // Good: Use Cow<str> or references
-   for line in buffer.lines() {
-       process(&line);
-   }
-   ```
+#[derive(Debug, Error)]
+pub enum OptimizerError {
+    #[error("LLM estimation failed: {0}")]
+    EstimationFailed(#[from] EstimationError),
 
-2. **Use appropriate data structures**:
-   - `Vec<T>` for sequential access
-   - `HashMap<K, V>` for key-value lookups
-   - `BTreeMap<K, V>` for sorted iteration
-   - `Rope` for text editing
+    #[error("Operation timed out after {0:?}")]
+    Timeout(Duration),
 
-3. **Profile before optimizing**:
-   ```bash
-   cargo flamegraph --bin ait42-editor
-   ```
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
+}
 
-### Security Guidelines
+// Propagate errors with ?
+let result = self.estimator.estimate_complexity(task).await?;
+```
 
-1. **Input validation**:
-   ```rust
-   pub fn set_cursor(&mut self, pos: usize) -> Result<()> {
-       if pos > self.buffer.len_chars() {
-           return Err(EditorError::InvalidCursorPosition(pos));
-       }
-       self.cursor = pos;
-       Ok(())
-   }
-   ```
+### TypeScript Style Guide
 
-2. **No unsafe code** without documentation:
-   ```rust
-   // Only allowed when absolutely necessary
-   // SAFETY: Caller must ensure buffer is valid UTF-8
-   unsafe {
-       // ... unsafe operations
-   }
-   ```
+#### Formatting
 
-3. **Sanitize outputs**:
-   ```rust
-   fn sanitize_output(text: &str) -> String {
-       text.chars()
-           .filter(|c| !c.is_control() || *c == '\n' || *c == '\t')
-           .collect()
-   }
-   ```
+```bash
+# Format TypeScript code
+npm run format
+```
+
+#### Linting
+
+```bash
+# Run ESLint
+npm run lint
+
+# Auto-fix issues
+npm run lint -- --fix
+```
+
+#### Naming Conventions
+
+- **Components**: `PascalCase` (e.g., `ComplexityBadge`, `TaskAnalyzer`)
+- **Functions/Variables**: `camelCase` (e.g., `optimizeTask`, `instanceCount`)
+- **Constants**: `SCREAMING_SNAKE_CASE` (e.g., `MAX_CONFIDENCE`)
+- **Interfaces**: `PascalCase` with `I` prefix (e.g., `IOptimizerProps`)
+
+#### React Components
+
+```typescript
+// Functional components with TypeScript
+interface ComplexityBadgeProps {
+  complexity: string;
+  subtaskRange: string;
+  className?: string;
+}
+
+export const ComplexityBadge: React.FC<ComplexityBadgeProps> = ({
+  complexity,
+  subtaskRange,
+  className = '',
+}) => {
+  // Implementation
+  return (
+    <div className={`badge ${className}`}>
+      <span>{complexity}</span>
+      <span>{subtaskRange}</span>
+    </div>
+  );
+};
+```
+
+#### Tauri IPC
+
+```typescript
+// Type-safe Tauri IPC calls
+interface OptimizeTaskRequest {
+  taskDescription: string;
+  currentSubtasks: number;
+}
+
+interface OptimizeTaskResponse {
+  complexityClass: string;
+  recommendedSubtasks: number;
+  confidence: number;
+  reasoning: string;
+}
+
+export async function optimizeTask(
+  taskDescription: string,
+  currentSubtasks: number
+): Promise<OptimizeTaskResponse> {
+  return invoke<OptimizeTaskResponse>('optimize_task', {
+    taskDescription,
+    currentSubtasks,
+  });
+}
+```
 
 ---
 
-## Testing Guidelines
+## Testing Requirements
 
-### Test Coverage Requirements
-
-| Component | Target Coverage | Current |
-|-----------|----------------|---------|
-| ait42-core | 90%+ | 89% |
-| ait42-lsp | 80%+ | 82% |
-| ait42-ait42 | 85%+ | 87% |
-| ait42-tui | 70%+ | 68% |
-| **Overall** | **85%+** | **83%** |
-
-### Writing Tests
+### Rust Tests
 
 #### Unit Tests
-
-Place tests in the same file:
 
 ```rust
 #[cfg(test)]
@@ -343,228 +439,207 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_buffer_insert() {
-        // Arrange
-        let mut buffer = Buffer::new();
-
-        // Act
-        buffer.insert(0, "Hello").unwrap();
-
-        // Assert
-        assert_eq!(buffer.to_string(), "Hello");
-        assert!(buffer.is_dirty());
+    fn test_complexity_class_parsing() {
+        assert_eq!(
+            parse_complexity_class("Linear").unwrap(),
+            ComplexityClass::Linear
+        );
     }
 
-    #[test]
-    #[should_panic(expected = "out of bounds")]
-    fn test_buffer_insert_out_of_bounds() {
-        let mut buffer = Buffer::new();
-        buffer.insert(100, "test").unwrap();
+    #[tokio::test]
+    async fn test_optimize_subtask_count() {
+        let optimizer = SubtaskOptimizer::from_env().unwrap();
+        let result = optimizer
+            .optimize_subtask_count("Implement REST API", 0)
+            .await
+            .unwrap();
+
+        assert_eq!(result.complexity_class, ComplexityClass::Linear);
+        assert!(result.recommended_subtasks >= 3 && result.recommended_subtasks <= 5);
     }
 }
 ```
 
 #### Integration Tests
 
-Place in `tests/` directory:
-
 ```rust
 // tests/integration_tests.rs
-use ait42_core::*;
-
 #[tokio::test]
-async fn test_full_editing_workflow() {
-    let mut state = EditorState::new();
-    let buffer = Buffer::from_string("test".to_string(), None);
-    let id = state.open_buffer(buffer);
+async fn test_end_to_end_optimization() {
+    let optimizer = SubtaskOptimizer::from_env().unwrap();
+    let calculator = InstanceCalculator::new();
 
-    // Make edit
-    let cmd = Box::new(InsertCommand::new(id, 0, "// Comment\n"));
-    state.execute_command(cmd).await.unwrap();
+    let result = optimizer
+        .optimize_subtask_count("Build e-commerce platform", 0)
+        .await
+        .unwrap();
 
-    // Verify
-    assert_eq!(state.buffer(id).unwrap().to_string(), "// Comment\ntest");
+    let instances = calculator.calculate_instances(
+        result.complexity_class,
+        result.recommended_subtasks,
+    );
+
+    assert!(instances.recommended_instances <= 10);
 }
 ```
 
-#### Property-Based Tests
+### TypeScript Tests (Jest)
 
-Use `proptest`:
+```typescript
+// src/components/Optimizer/ComplexityBadge.test.tsx
+import { render, screen } from '@testing-library/react';
+import { ComplexityBadge } from './ComplexityBadge';
 
-```rust
-use proptest::prelude::*;
+describe('ComplexityBadge', () => {
+  it('renders complexity class correctly', () => {
+    render(<ComplexityBadge complexity="Linear" subtaskRange="3-5" />);
+    expect(screen.getByText('Linear')).toBeInTheDocument();
+    expect(screen.getByText('3-5')).toBeInTheDocument();
+  });
 
-proptest! {
-    #[test]
-    fn test_insert_delete_roundtrip(text in "\\PC*") {
-        let mut buffer = Buffer::new();
-        buffer.insert(0, &text).unwrap();
-        assert_eq!(buffer.to_string(), text);
-
-        let len = buffer.len_chars();
-        buffer.delete(0..len).unwrap();
-        assert_eq!(buffer.len_chars(), 0);
-    }
-}
+  it('applies correct color for Linear complexity', () => {
+    const { container } = render(
+      <ComplexityBadge complexity="Linear" subtaskRange="3-5" />
+    );
+    expect(container.firstChild).toHaveClass('bg-green-100');
+  });
+});
 ```
 
-### Running Tests
+### E2E Tests (Playwright)
 
-```bash
-# All tests
-cargo test
+```typescript
+// tests/e2e/optimizer.spec.ts
+import { test, expect } from '@playwright/test';
 
-# Specific crate
-cargo test --package ait42-core
+test('task optimization workflow', async ({ page }) => {
+  await page.goto('http://localhost:1420/optimizer');
 
-# Specific test
-cargo test test_buffer_insert
+  // Enter task description
+  await page.fill('textarea[name="taskDescription"]', 'Implement REST API');
 
-# With output
-cargo test -- --nocapture
+  // Click analyze button
+  await page.click('button:has-text("Analyze Task")');
 
-# Coverage
-cargo tarpaulin --out Html --output-dir coverage
+  // Wait for results
+  await page.waitForSelector('.complexity-badge');
 
-# Watch mode
-cargo watch -x test
-
-# Faster test runner
-cargo nextest run
+  // Verify results
+  const complexity = await page.textContent('.complexity-badge');
+  expect(complexity).toContain('Linear');
+});
 ```
 
-### Test Checklist
+### Test Coverage Requirements
 
-Before submitting PR:
-- [ ] All tests pass: `cargo test`
-- [ ] No clippy warnings: `cargo clippy`
-- [ ] Code formatted: `cargo fmt`
-- [ ] Coverage maintained or improved
-- [ ] New features have tests
-- [ ] Edge cases covered
+- **Minimum Coverage**: 80% for new code
+- **Critical Paths**: 100% coverage for:
+  - Optimizer logic (SubtaskOptimizer, InstanceCalculator)
+  - LLM estimation (ComplexityEstimator, AnthropicClient)
+  - Tauri IPC commands
+- **Run Coverage**:
+  ```bash
+  cargo tarpaulin --out Html  # Rust coverage
+  npm run test:coverage        # TypeScript coverage
+  ```
 
 ---
 
 ## Pull Request Process
 
-### PR Title
+### Before Submitting
 
-Follow Conventional Commits format:
+1. **Rebase on Main**
+   ```bash
+   git fetch upstream
+   git rebase upstream/main
+   ```
 
-```
-feat(lsp): add Ruby language server support
-fix(buffer): handle emoji grapheme clusters correctly
-docs: update installation instructions
-```
+2. **Run All Tests**
+   ```bash
+   cargo test
+   npm test
+   npm run test:e2e
+   ```
 
-### PR Description Template
+3. **Check Code Quality**
+   ```bash
+   cargo clippy -- -D warnings
+   cargo fmt --check
+   npm run lint
+   npm run format
+   ```
+
+4. **Update Documentation**
+   - Update README.md if user-facing features changed
+   - Update API_REFERENCE.md for new Tauri commands
+   - Add JSDoc/RustDoc comments for new functions
+
+### PR Template
 
 ```markdown
 ## Description
+Brief description of what this PR does.
 
-Brief description of changes made.
-
-## Motivation and Context
-
-Why is this change required? What problem does it solve?
-Fixes #(issue)
+## Related Issue
+Closes #123
 
 ## Type of Change
-
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to change)
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Breaking change
 - [ ] Documentation update
 
-## How Has This Been Tested?
-
-Describe the tests you ran to verify your changes:
-- [ ] Unit tests
-- [ ] Integration tests
-- [ ] Manual testing
-
-Test Configuration:
-* macOS version:
-* Rust version:
-* Terminal: (iTerm2, Terminal.app, Alacritty)
-
-## Screenshots (if applicable)
-
-<!-- Add screenshots here -->
+## Testing
+Describe tests added/updated.
 
 ## Checklist
-
-- [ ] My code follows the code style of this project
-- [ ] I have performed a self-review of my own code
-- [ ] I have commented my code, particularly in hard-to-understand areas
-- [ ] I have made corresponding changes to the documentation
-- [ ] My changes generate no new warnings
-- [ ] I have added tests that prove my fix is effective or that my feature works
-- [ ] New and existing unit tests pass locally with my changes
-- [ ] Any dependent changes have been merged and published
-
-## Additional Notes
-
-<!-- Any additional information -->
+- [ ] Code follows project style guidelines
+- [ ] Tests added/updated and passing
+- [ ] Documentation updated
+- [ ] Commit messages follow Conventional Commits
+- [ ] No merge conflicts with main
 ```
 
 ### Review Process
 
-1. **Automated Checks**: CI runs automatically
-   - Tests must pass
-   - Clippy must pass
-   - Formatting must be correct
-
-2. **Code Review**: Maintainer reviews code
-   - Focus on correctness, readability, performance
-   - May request changes
-
-3. **Approval**: Once approved, PR can be merged
-
-4. **Merge**: Maintainer merges PR (usually squash merge)
-
-### Review Checklist
-
-Reviewers will check:
-- [ ] Code quality and style
-- [ ] Test coverage
-- [ ] Documentation updates
-- [ ] No breaking changes (or properly documented)
-- [ ] Performance implications
-- [ ] Security considerations
+1. **Automated Checks**: CI/CD will run tests and linting
+2. **Code Review**: At least 1 maintainer approval required
+3. **Feedback**: Address review comments promptly
+4. **Approval**: Maintainer will merge once approved
 
 ---
 
-## Issue Guidelines
+## Issue Reporting Guidelines
 
-### Reporting Bugs
+### Bug Reports
 
 Use the bug report template:
 
 ```markdown
 **Describe the bug**
-A clear and concise description of what the bug is.
+A clear description of what the bug is.
 
 **To Reproduce**
-Steps to reproduce the behavior:
-1. Open file '...'
-2. Press '....'
+Steps to reproduce:
+1. Go to '...'
+2. Click on '...'
 3. See error
 
 **Expected behavior**
-A clear and concise description of what you expected to happen.
+What you expected to happen.
 
 **Screenshots**
-If applicable, add screenshots to help explain your problem.
+If applicable, add screenshots.
 
-**Environment:**
- - macOS version: [e.g. 14.2]
- - Terminal: [e.g. iTerm2]
- - AIT42 Editor version: [e.g. 1.0.0]
- - Rust version: [e.g. 1.75.0]
+**Environment**
+- OS: [e.g., macOS 14.0]
+- AIT42-Editor version: [e.g., 1.6.0]
+- Node.js version: [e.g., 20.10.0]
+- Rust version: [e.g., 1.75.0]
 
 **Additional context**
-Add any other context about the problem here.
+Any other relevant information.
 ```
 
 ### Feature Requests
@@ -572,90 +647,17 @@ Add any other context about the problem here.
 Use the feature request template:
 
 ```markdown
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+**Is your feature request related to a problem?**
+A clear description of the problem.
 
 **Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+A clear description of what you want to happen.
 
 **Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+Other solutions you've thought about.
 
 **Additional context**
-Add any other context or screenshots about the feature request here.
-```
-
----
-
-## Documentation
-
-### What to Document
-
-- **Public APIs**: All public functions, structs, enums need rustdoc
-- **User-facing features**: Update USER_GUIDE.md
-- **Architecture changes**: Update DEVELOPER_GUIDE.md or ARCHITECTURE.md
-- **Configuration options**: Update config examples
-- **Breaking changes**: Update CHANGELOG.md
-
-### Documentation Style
-
-```rust
-/// Brief one-line description
-///
-/// More detailed explanation. Use Markdown formatting:
-/// - **Bold** for emphasis
-/// - `code` for inline code
-/// - ```rust for code blocks
-///
-/// # Arguments
-///
-/// * `buffer_id` - ID of the buffer to operate on
-/// * `position` - Byte position where to insert
-/// * `text` - Text to insert
-///
-/// # Returns
-///
-/// Returns `Ok(())` on success, or an error if:
-/// - Buffer not found
-/// - Position out of bounds
-///
-/// # Examples
-///
-/// ```no_run
-/// # use ait42_core::*;
-/// # fn example() -> Result<()> {
-/// let mut state = EditorState::new();
-/// state.insert_text(buffer_id, 0, "Hello")?;
-/// # Ok(())
-/// # }
-/// ```
-///
-/// # Panics
-///
-/// This function does not panic.
-///
-/// # Safety
-///
-/// (Only for unsafe functions)
-/// Caller must ensure...
-pub fn insert_text(
-    &mut self,
-    buffer_id: BufferId,
-    position: usize,
-    text: &str,
-) -> Result<()> {
-    // Implementation
-}
-```
-
-### Generating Documentation
-
-```bash
-# Generate and open docs
-cargo doc --no-deps --open
-
-# Generate with private items (for internal development)
-cargo doc --no-deps --document-private-items --open
+Mockups, examples, or other context.
 ```
 
 ---
@@ -666,36 +668,28 @@ cargo doc --no-deps --document-private-items --open
 
 - **GitHub Issues**: Bug reports, feature requests
 - **GitHub Discussions**: Questions, ideas, general discussion
-- **Pull Requests**: Code contributions
+- **Email**: support@ait42.dev (for private matters)
 
 ### Getting Help
 
-- Check [USER_GUIDE.md](USER_GUIDE.md) for usage questions
-- Check [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for development questions
-- Search existing [issues](https://github.com/RenTonoduka/AIT42/issues)
-- Ask in [GitHub Discussions](https://github.com/RenTonoduka/AIT42/discussions)
+- **Documentation**: Start with [README.md](README.md) and [USER_GUIDE.md](USER_GUIDE.md)
+- **Troubleshooting**: Check [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+- **API Reference**: See [API_REFERENCE.md](API_REFERENCE.md)
+- **Architecture**: Read [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ### Recognition
 
 Contributors will be:
-- Listed in CONTRIBUTORS.md
+- Listed in CHANGELOG.md for each release
 - Mentioned in release notes
-- Acknowledged in commit history
-
-Thank you for contributing to AIT42 Editor!
+- Added to GitHub contributors page
 
 ---
 
-## License
+## Thank You!
 
-By contributing to AIT42 Editor, you agree that your contributions will be licensed under the MIT License.
+Thank you for taking the time to contribute to AIT42-Editor. Every contribution, no matter how small, is valuable and appreciated. Together, we're building a better tool for the development community!
 
 ---
 
-## Questions?
-
-If you have questions not covered here:
-- Open a [GitHub Discussion](https://github.com/RenTonoduka/AIT42/discussions)
-- Tag maintainers in an issue
-
-**Happy Contributing! 🎉**
+**Questions?** Open a [GitHub Discussion](https://github.com/RenTonoduka/AIT42-Editor/discussions) or email support@ait42.dev.
