@@ -869,10 +869,14 @@ pub async fn execute_claude_code_competition(
     );
 
     let working_dir = state.working_dir.lock().await;
-    let base_path = working_dir.clone();
+    // Navigate to project root (parent of src-tauri)
+    let base_path = working_dir
+        .parent()
+        .unwrap_or(&working_dir)
+        .to_path_buf();
     drop(working_dir); // Release lock
 
-    // Create competition directory
+    // Create competition directory in project root
     let competition_dir = format!("{}/.worktrees/competition-{}", base_path.display(), &competition_id[..8]);
     std::fs::create_dir_all(&competition_dir).map_err(|e| e.to_string())?;
 

@@ -113,7 +113,15 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::calculate_instances,
             commands::get_complexity_info,
             // A/B Testing operations (v1.6.0)
-            commands::run_ab_test
+            commands::run_ab_test,
+            // Session History operations (v1.6.0)
+            commands::create_session,
+            commands::update_session,
+            commands::get_session,
+            commands::get_all_sessions,
+            commands::delete_session,
+            commands::add_chat_message,
+            commands::update_instance_status
         ]
     }
 
@@ -205,7 +213,15 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::calculate_instances,
             commands::get_complexity_info,
             // A/B Testing operations (v1.6.0)
-            commands::run_ab_test
+            commands::run_ab_test,
+            // Session History operations (v1.6.0)
+            commands::create_session,
+            commands::update_session,
+            commands::get_session,
+            commands::get_all_sessions,
+            commands::delete_session,
+            commands::add_chat_message,
+            commands::update_instance_status
         ]
     }
 }
