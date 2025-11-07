@@ -311,27 +311,25 @@ const MetricsTab: React.FC<{ session: WorktreeSession }> = ({ session }) => {
 };
 
 /**
- * Chat Tab (Placeholder for Phase 4)
+ * Chat Tab - Interactive chat with Claude Code instances
  */
 const ChatTab: React.FC<{ session: WorktreeSession }> = ({ session }) => {
-  return (
-    <div className="p-6">
-      <div className="text-center text-gray-500">
-        <MessageSquare className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-        <p className="text-lg font-medium mb-2">Interactive Chat (Phase 4)</p>
-        <p className="text-sm">
-          Chat history: {session.chatHistory.length} messages
-        </p>
-        <p className="text-sm mt-4">
-          Phase 4 will implement:
-        </p>
-        <ul className="text-sm mt-4 space-y-2 text-left max-w-md mx-auto">
-          <li>• Message history display</li>
-          <li>• Send commands to tmux sessions</li>
-          <li>• Real-time output streaming</li>
-          <li>• Instance-specific chat threads</li>
-        </ul>
+  // Lazy import to avoid circular dependencies
+  const [ChatPanel, setChatPanel] = React.useState<React.ComponentType<any> | null>(null);
+
+  React.useEffect(() => {
+    import('./ChatPanel').then((mod) => {
+      setChatPanel(() => mod.ChatPanel);
+    });
+  }, []);
+
+  if (!ChatPanel) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader className="w-8 h-8 text-blue-500 animate-spin" />
       </div>
-    </div>
-  );
+    );
+  }
+
+  return <ChatPanel session={session} />;
 };

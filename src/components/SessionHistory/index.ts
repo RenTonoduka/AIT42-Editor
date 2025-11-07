@@ -9,3 +9,4 @@ export { KanbanColumn } from './KanbanColumn';
 export { SessionCard } from './SessionCard';
 export { SessionFilters } from './SessionFilters';
 export { SessionDetailView } from './SessionDetailView';
+export { ChatPanel } from './ChatPanel';
