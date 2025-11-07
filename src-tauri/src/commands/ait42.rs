@@ -977,9 +977,23 @@ pub async fn execute_claude_code_competition(
         // Use --print flag for non-interactive mode to avoid Ink raw mode errors
         // Use --permission-mode bypassPermissions to auto-approve changes and prevent interactive prompts
         // Note: Use echo | claude because it forces non-interactive mode in tmux
+        // Build Claude Code command with explicit instructions
+        let enhanced_task = format!(
+            "{}
+
+あなたはこのタスクを完遂する開発者です。以下の手順で実行してください：
+1. タスクの要件を分析
+2. 必要なファイルやコードを特定
+3. 具体的な実装を提案・実行
+4. テストと検証
+
+質問はせず、直接実装してください。",
+            request.task
+        );
+
         let claude_cmd = format!(
-            "echo '{}' | claude --model {} --print --permission-mode bypassPermissions",
-            request.task.replace("'", "'\\''"),
+            "printf '%s' '{}' | claude --model {} --print --permission-mode bypassPermissions",
+            enhanced_task.replace("'", "'\\''"),
             request.model
         );
 
@@ -1463,10 +1477,10 @@ async fn execute_round(
             .arg(format!("cat >> {}", output_log_path))
             .output();
 
-        // Send Claude Code command
+        // Send Claude Code command using printf for multiline support
         // Use --permission-mode bypassPermissions to auto-approve changes and prevent interactive prompts
         let claude_cmd = format!(
-            "echo '{}' | claude --model {} code --print --permission-mode bypassPermissions",
+            "printf '%s' '{}' | claude --model {} code --print --permission-mode bypassPermissions",
             prompt.replace("'", "'\\''"),
             request.model
         );
