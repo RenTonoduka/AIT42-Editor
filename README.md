@@ -8,6 +8,113 @@ A modern desktop code editor with integrated AI multi-agent workflows powered by
 [![Node Version](https://img.shields.io/badge/node-20%2B-green.svg)](https://nodejs.org)
 [![Version](https://img.shields.io/badge/version-1.6.0-blue)](https://github.com/RenTonoduka/AIT42-Editor/releases/tag/v1.6.0)
 
+## 日本語ガイド（Japanese Guide）
+
+### セッション履歴管理システム（Session History System）
+
+**v1.6.0の新機能**: すべてのCompetition/Ensemble/Debateセッションを永続化し、Kanban Board UIで視覚的に管理できるようになりました。
+
+#### 主な機能
+
+1. **永続的セッション保存**
+   - すべてのWorktreeセッションを `.ait42/sessions.json` に自動保存
+   - セッションが消えることはもうありません
+
+2. **Kanban Board UI**
+   - **4つのカラム**: Running / Paused / Completed / Failed
+   - **ドラッグ&ドロップ**: セッションカードをドラッグしてステータスを変更
+   - **リアルタイム更新**: 実行中のセッションを自動追跡
+
+3. **詳細ビューモーダル**
+   - **Overview**: サマリーカード（インスタンス数、実行時間、変更ファイル数）
+   - **Worktrees**: Worktreeエクスプローラーとの統合
+   - **Metrics**: メトリクス表示（今後実装予定）
+   - **Chat**: 実行中のClaude Codeインスタンスと対話
+
+4. **対話型チャット**
+   - tmux経由でClaude Codeインスタンスにコマンドを送信
+   - リアルタイムで出力を取得
+   - チャット履歴を永続化
+
+#### 使い方
+
+**ステップ1: セッションの作成**
+```
+1. ヘッダーの「🏆 Competition」「✨ Ensemble」「💬 Debate」ボタンをクリック
+2. タスクを入力してセッションを開始
+3. セッションが自動的にSession Historyに保存されます
+```
+
+**ステップ2: セッション一覧の表示**
+```
+1. サイドバーの「📊 Session History」をクリック
+2. Kanban Boardですべてのセッションを確認
+3. フィルター、検索、ソートで目的のセッションを探す
+```
+
+**ステップ3: セッションの詳細表示**
+```
+1. セッションカードをクリック
+2. モーダルで詳細情報を確認:
+   - Overview: 概要とインスタンス一覧
+   - Worktrees: Worktreeファイル構造
+   - Chat: インスタンスと対話
+```
+
+**ステップ4: インスタンスとチャット**
+```
+1. Chatタブを選択
+2. インスタンスを選択
+3. コマンドを入力（例: "npm test"）
+4. Enterで送信、Shift+Enterで改行
+5. 実行結果がリアルタイムで表示されます
+```
+
+**ステップ5: ステータス管理**
+```
+1. セッションカードをドラッグ
+2. 目的のカラム（Running/Paused/Completed/Failed）にドロップ
+3. ステータスが自動更新されます
+```
+
+#### フィルタリング
+
+- **タイプ**: Competition / Ensemble / Debate
+- **ステータス**: Running / Paused / Completed / Failed
+- **検索**: タスク名やエージェント名で検索
+- **ソート**: 更新日時 / 作成日時 / 実行時間 / ファイル変更数
+
+#### 便利な機能
+
+- **リフレッシュボタン**: 最新の状態に更新
+- **カラーコーディング**:
+  - 青（Running）、黄（Paused）、緑（Completed）、赤（Failed）
+- **ホバー効果**: カードにカーソルを合わせると影が表示
+- **アニメーション**: ドラッグ中は半透明、ドロップゾーンはハイライト
+
+#### トラブルシューティング
+
+**セッションが表示されない場合**
+```bash
+# .ait42/sessions.json が存在するか確認
+ls -la .ait42/sessions.json
+
+# Refreshボタンをクリック
+# ブラウザコンソールでエラーを確認
+```
+
+**チャットが動作しない場合**
+```bash
+# Tmuxセッションが実行中か確認
+tmux ls
+
+# インスタンスのステータスを確認（Chatタブで）
+```
+
+詳細なドキュメント: [docs/SESSION_HISTORY.md](docs/SESSION_HISTORY.md)
+
+---
+
 ## What's New in v1.6.0
 
 **AIT42-Editor v1.6.0** introduces **mathematical rigor** to AI task planning with **Ω-theory complexity analysis** and **LLM-powered estimation**:

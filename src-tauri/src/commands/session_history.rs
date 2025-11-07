@@ -207,8 +207,9 @@ pub async fn add_chat_message(
     if let Some(session) = sessions.iter_mut().find(|s| s.id == session_id) {
         session.chat_history.push(message);
         session.updated_at = chrono::Utc::now().to_rfc3339();
+        let result = session.clone();
         save_sessions(&state, &sessions)?;
-        Ok(session.clone())
+        Ok(result)
     } else {
         Err(format!("Session {} not found", session_id))
     }
@@ -239,8 +240,9 @@ pub async fn update_instance_status(
         {
             instance.status = new_status;
             session.updated_at = chrono::Utc::now().to_rfc3339();
+            let result = session.clone();
             save_sessions(&state, &sessions)?;
-            Ok(session.clone())
+            Ok(result)
         } else {
             Err(format!(
                 "Instance {} not found in session {}",

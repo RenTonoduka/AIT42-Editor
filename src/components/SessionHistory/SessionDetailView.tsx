@@ -282,7 +282,7 @@ const OverviewTab: React.FC<{ session: WorktreeSession }> = ({ session }) => {
 const WorktreesTab: React.FC<{ session: WorktreeSession }> = ({ session }) => {
   return (
     <div className="h-full">
-      <WorktreeExplorer />
+      <WorktreeExplorer competitionId={session.id} />
     </div>
   );
 };
@@ -290,7 +290,7 @@ const WorktreesTab: React.FC<{ session: WorktreeSession }> = ({ session }) => {
 /**
  * Metrics Tab
  */
-const MetricsTab: React.FC<{ session: WorktreeSession }> = ({ session }) => {
+const MetricsTab: React.FC<{ session: WorktreeSession }> = () => {
   return (
     <div className="p-6">
       <div className="text-center text-gray-500">

@@ -7,7 +7,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useSessionHistoryStore } from '@/store/sessionHistoryStore';
 import { tauriApi } from '@/services/tauri';
-import type { WorktreeSession, ChatMessage, WorktreeInstance } from '@/types/worktree';
+import type { WorktreeSession, ChatMessage } from '@/types/worktree';
 import { Send, Terminal, User, Bot, AlertCircle, Loader } from 'lucide-react';
 
 interface ChatPanelProps {

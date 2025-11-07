@@ -11,7 +11,6 @@ import type {
   ChatMessage,
   SessionFilters,
   SessionSortOptions,
-  SessionStatus,
 } from '@/types/worktree';
 
 /**
