@@ -1142,4 +1142,103 @@ export const tauriApi = {
       throw new Error(`Failed to cancel debate: ${error}`);
     }
   },
+
+  // ===== Session History Commands (v1.6.0) =====
+
+  /**
+   * Create a new worktree session
+   */
+  async createSession(session: import('@/types/worktree').WorktreeSession): Promise<import('@/types/worktree').WorktreeSession> {
+    try {
+      const result = await invoke<import('@/types/worktree').WorktreeSession>('create_session', { session });
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to create session: ${error}`);
+    }
+  },
+
+  /**
+   * Update an existing session
+   */
+  async updateSession(session: import('@/types/worktree').WorktreeSession): Promise<import('@/types/worktree').WorktreeSession> {
+    try {
+      const result = await invoke<import('@/types/worktree').WorktreeSession>('update_session', { session });
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to update session: ${error}`);
+    }
+  },
+
+  /**
+   * Get a specific session by ID
+   */
+  async getSession(sessionId: string): Promise<import('@/types/worktree').WorktreeSession> {
+    try {
+      const result = await invoke<import('@/types/worktree').WorktreeSession>('get_session', { sessionId });
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to get session: ${error}`);
+    }
+  },
+
+  /**
+   * Get all sessions
+   */
+  async getAllSessions(): Promise<import('@/types/worktree').WorktreeSession[]> {
+    try {
+      const result = await invoke<import('@/types/worktree').WorktreeSession[]>('get_all_sessions');
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to get all sessions: ${error}`);
+    }
+  },
+
+  /**
+   * Delete a session
+   */
+  async deleteSession(sessionId: string): Promise<void> {
+    try {
+      await invoke('delete_session', { sessionId });
+    } catch (error) {
+      throw new Error(`Failed to delete session: ${error}`);
+    }
+  },
+
+  /**
+   * Add a chat message to a session
+   */
+  async addChatMessage(
+    sessionId: string,
+    message: import('@/types/worktree').ChatMessage
+  ): Promise<import('@/types/worktree').WorktreeSession> {
+    try {
+      const result = await invoke<import('@/types/worktree').WorktreeSession>('add_chat_message', {
+        sessionId,
+        message,
+      });
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to add chat message: ${error}`);
+    }
+  },
+
+  /**
+   * Update instance status within a session
+   */
+  async updateInstanceStatus(
+    sessionId: string,
+    instanceId: number,
+    newStatus: string
+  ): Promise<import('@/types/worktree').WorktreeSession> {
+    try {
+      const result = await invoke<import('@/types/worktree').WorktreeSession>('update_instance_status', {
+        sessionId,
+        instanceId,
+        newStatus,
+      });
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to update instance status: ${error}`);
+    }
+  },
 };
