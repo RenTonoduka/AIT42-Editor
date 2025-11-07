@@ -242,6 +242,13 @@ function App() {
             <OptimizerDemo />
           </div>
         )}
+
+        {/* Session History View Mode */}
+        {viewMode === 'session-history' && (
+          <div className="flex-1 bg-gray-900 overflow-hidden">
+            <SessionHistory />
+          </div>
+        )}
       </div>
 
       {/* Settings Modal */}
