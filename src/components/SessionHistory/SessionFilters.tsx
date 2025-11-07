@@ -47,7 +47,7 @@ export const SessionFilters: React.FC = () => {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
         <input
           type="text"
-          placeholder="Search sessions by task or agent name..."
+          placeholder="タスクまたはエージェント名で検索..."
           value={filters.searchQuery || ''}
           onChange={handleSearchChange}
           className="
@@ -63,54 +63,69 @@ export const SessionFilters: React.FC = () => {
         {/* Type Filters */}
         <div className="flex items-center gap-2">
           <SlidersHorizontal className="w-4 h-4 text-gray-500" />
-          <span className="text-sm font-medium text-gray-700">Type:</span>
+          <span className="text-sm font-medium text-gray-700">種類:</span>
 
-          {(['competition', 'ensemble', 'debate'] as SessionType[]).map((type) => (
-            <button
-              key={type}
-              onClick={() => handleTypeToggle(type)}
-              className={`
-                px-3 py-1 rounded-full text-xs font-medium
-                border transition-colors
-                ${
-                  filters.type?.includes(type)
-                    ? 'bg-blue-500 text-white border-blue-500'
-                    : 'bg-white text-gray-700 border-gray-300 hover:border-blue-300'
-                }
-              `}
-            >
-              {type}
-            </button>
-          ))}
+          {(['competition', 'ensemble', 'debate'] as SessionType[]).map((type) => {
+            const typeLabels = {
+              competition: '競争',
+              ensemble: 'アンサンブル',
+              debate: 'ディベート',
+            };
+            return (
+              <button
+                key={type}
+                onClick={() => handleTypeToggle(type)}
+                className={`
+                  px-3 py-1 rounded-full text-xs font-medium
+                  border transition-colors
+                  ${
+                    filters.type?.includes(type)
+                      ? 'bg-blue-500 text-white border-blue-500'
+                      : 'bg-white text-gray-700 border-gray-300 hover:border-blue-300'
+                  }
+                `}
+              >
+                {typeLabels[type]}
+              </button>
+            );
+          })}
         </div>
 
         {/* Status Filters */}
         <div className="flex items-center gap-2 border-l pl-4">
-          <span className="text-sm font-medium text-gray-700">Status:</span>
+          <span className="text-sm font-medium text-gray-700">状態:</span>
 
-          {(['running', 'paused', 'completed', 'failed'] as SessionStatus[]).map((status) => (
-            <button
-              key={status}
-              onClick={() => handleStatusToggle(status)}
-              className={`
-                px-3 py-1 rounded-full text-xs font-medium
-                border transition-colors
-                ${
-                  filters.status?.includes(status)
-                    ? 'bg-blue-500 text-white border-blue-500'
-                    : 'bg-white text-gray-700 border-gray-300 hover:border-blue-300'
-                }
-              `}
-            >
-              {status}
-            </button>
-          ))}
+          {(['running', 'paused', 'completed', 'failed'] as SessionStatus[]).map((status) => {
+            const statusLabels = {
+              running: '実行中',
+              paused: '一時停止',
+              completed: '完了',
+              failed: '失敗',
+            };
+            return (
+              <button
+                key={status}
+                onClick={() => handleStatusToggle(status)}
+                className={`
+                  px-3 py-1 rounded-full text-xs font-medium
+                  border transition-colors
+                  ${
+                    filters.status?.includes(status)
+                      ? 'bg-blue-500 text-white border-blue-500'
+                      : 'bg-white text-gray-700 border-gray-300 hover:border-blue-300'
+                  }
+                `}
+              >
+                {statusLabels[status]}
+              </button>
+            );
+          })}
         </div>
 
         {/* Sort Options */}
         <div className="flex items-center gap-2 border-l pl-4 ml-auto">
           <ArrowUpDown className="w-4 h-4 text-gray-500" />
-          <span className="text-sm font-medium text-gray-700">Sort:</span>
+          <span className="text-sm font-medium text-gray-700">並び替え:</span>
 
           <select
             value={sortOptions.field}
@@ -125,10 +140,10 @@ export const SessionFilters: React.FC = () => {
               focus:ring-2 focus:ring-blue-500 focus:border-blue-500
             "
           >
-            <option value="updatedAt">Updated Time</option>
-            <option value="createdAt">Created Time</option>
-            <option value="duration">Duration</option>
-            <option value="filesChanged">Files Changed</option>
+            <option value="updatedAt">更新日時</option>
+            <option value="createdAt">作成日時</option>
+            <option value="duration">実行時間</option>
+            <option value="filesChanged">変更ファイル数</option>
           </select>
 
           <button
