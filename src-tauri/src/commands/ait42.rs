@@ -869,17 +869,14 @@ pub async fn execute_claude_code_competition(
     );
 
     let working_dir = state.working_dir.lock().await;
-    let project_root = working_dir
-        .parent()
-        .unwrap_or(&working_dir)
-        .to_path_buf();
+    let project_root = working_dir.clone();
     drop(working_dir); // Release lock
 
-    // Use home directory for worktrees to avoid read-only file system issues in macOS app bundles
-    let home_dir = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
-    let ait42_worktrees = home_dir.join(".ait42").join(".worktrees");
+    // Create worktrees in the project directory (not in home directory)
+    // This keeps worktrees with their respective projects
+    let ait42_worktrees = project_root.join(".ait42").join(".worktrees");
 
-    // Create competition directory in home directory
+    // Create competition directory in project's .ait42 directory
     let competition_dir = format!("{}/competition-{}", ait42_worktrees.display(), &competition_id[..8]);
     std::fs::create_dir_all(&competition_dir).map_err(|e| e.to_string())?;
 
@@ -1134,8 +1131,13 @@ pub async fn cancel_competition(
 
     // Cleanup worktrees if requested
     if cleanup_worktrees {
-        let home_dir = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
-        let ait42_worktrees = home_dir.join(".ait42").join(".worktrees");
+        // Get project root for worktree cleanup
+        let working_dir = state.working_dir.lock().await;
+        let project_root = working_dir.clone();
+        drop(working_dir);
+
+        // Use project directory for worktrees (not home directory)
+        let ait42_worktrees = project_root.join(".ait42").join(".worktrees");
         let competition_dir = format!("{}/competition-{}", ait42_worktrees.display(), &competition_id[..8]);
 
         // Remove all worktrees
@@ -1267,11 +1269,11 @@ pub async fn execute_debate(
     let project_root = working_dir.clone();
     drop(working_dir);
 
-    // Use home directory for worktrees to avoid read-only file system issues
-    let home_dir = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
-    let ait42_worktrees = home_dir.join(".ait42").join(".worktrees");
+    // Create worktrees in the project directory (not in home directory)
+    // This keeps worktrees with their respective projects
+    let ait42_worktrees = project_root.join(".ait42").join(".worktrees");
 
-    // Create debate directory
+    // Create debate directory in project's .ait42 directory
     let debate_dir = format!("{}/debate-{}", ait42_worktrees.display(), &debate_id[..8]);
     std::fs::create_dir_all(&debate_dir).map_err(|e| e.to_string())?;
 
@@ -1651,8 +1653,13 @@ pub async fn cancel_debate(
 
     // Cleanup worktrees if requested
     if cleanup_worktrees {
-        let home_dir = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
-        let ait42_worktrees = home_dir.join(".ait42").join(".worktrees");
+        // Get project root for worktree cleanup
+        let working_dir = state.working_dir.lock().await;
+        let project_root = working_dir.clone();
+        drop(working_dir);
+
+        // Use project directory for worktrees (not home directory)
+        let ait42_worktrees = project_root.join(".ait42").join(".worktrees");
         let debate_dir = format!("{}/debate-{}", ait42_worktrees.display(), &debate_id[..8]);
 
         // Remove worktree
