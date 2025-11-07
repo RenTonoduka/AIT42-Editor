@@ -1772,9 +1772,9 @@ REASONING: [なぜこの複雑度クラスと分解数が適切か、詳細な�
         request.task
     );
 
-    // Send Claude Code command
+    // Send Claude Code command using printf for multiline support
     let claude_cmd = format!(
-        "echo '{}' | claude --model {} --print",
+        "printf '%s' '{}' | claude --model {} --print --permission-mode bypassPermissions",
         analysis_prompt.replace("'", "'\\''"),
         request.model
     );
