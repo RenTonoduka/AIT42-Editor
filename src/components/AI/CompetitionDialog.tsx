@@ -12,7 +12,6 @@ import { ModeIndicator } from './ModeIndicator';
 import { CompetitiveFlowDiagram } from './CompetitiveFlowDiagram';
 import { ModeTooltip } from './ModeTooltip';
 import { useTaskOptimizer } from '@/hooks/useTaskOptimizer';
-import { ComplexityBadge } from '@/components/Optimizer/ComplexityBadge';
 
 export interface CompetitionDialogProps {
   /** Whether the dialog is visible */
@@ -59,7 +58,7 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
 
-  // 🔥 NEW: Ω-theory optimizer integration
+  // 🔥 Ω-theory optimizer integration (automatic analysis)
   const { state: optimizerState, analyze, isAnalyzing } = useTaskOptimizer();
 
   // Reset state when dialog opens
@@ -75,21 +74,25 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
     }
   }, [isOpen]);
 
-  // 🔥 NEW: Auto-update instance count when analysis completes
+  // 🔥 Auto-update instance count when analysis completes
   useEffect(() => {
     if (optimizerState.status === 'calculated' && optimizerState.instances) {
       setInstanceCount(optimizerState.instances.recommendedInstances);
     }
   }, [optimizerState]);
 
-  // 🔥 NEW: Handle Ω analysis
-  const handleAnalyze = async () => {
-    if (!task.trim()) {
-      alert('タスクを入力してください');
+  // 🔥 Auto-analyze task when user finishes typing (debounced)
+  useEffect(() => {
+    if (!task.trim() || task.trim().length < 10) {
       return;
     }
-    await analyze(task.trim());
-  };
+
+    const debounceTimer = setTimeout(() => {
+      analyze(task.trim());
+    }, 1500); // 1.5秒後に自動分析
+
+    return () => clearTimeout(debounceTimer);
+  }, [task, analyze]);
 
   const handleStart = async () => {
     if (!task.trim()) {
@@ -179,45 +182,40 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
             />
           </div>
 
-          {/* 🔥 NEW: Ω Analysis Button and Results */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleAnalyze}
-              disabled={!task.trim() || isAnalyzing}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-              title="タスクの複雑度を分析して最適なインスタンス数を提案"
-            >
-              {isAnalyzing ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  <span>分析中...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles size={16} />
-                  <span>Ω分析</span>
-                </>
-              )}
-            </button>
+          {/* 🔥 Automatic Ω Analysis Feedback */}
+          {isAnalyzing && (
+            <div className="flex items-center gap-3 px-4 py-3 bg-purple-900/20 border border-purple-700/30 rounded-lg">
+              <Loader2 size={16} className="animate-spin text-purple-400" />
+              <span className="text-sm text-purple-300">
+                Claude Codeがタスクを分析中...
+              </span>
+            </div>
+          )}
 
-            {optimizerState.status === 'calculated' && optimizerState.optimization && (
-              <div className="flex items-center gap-3 flex-1">
-                <ComplexityBadge complexityClass={optimizerState.optimization.complexityClass} />
-                <div className="text-sm text-text-secondary">
-                  推奨: <span className="font-bold text-accent-primary">{optimizerState.instances?.recommendedInstances}</span>インスタンス
-                </div>
-                <div className="text-xs text-text-tertiary italic">
-                  {optimizerState.optimization.reasoning.slice(0, 60)}...
-                </div>
+          {optimizerState.status === 'calculated' && optimizerState.optimization && (
+            <div className="px-4 py-3 bg-green-900/20 border border-green-700/30 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles size={16} className="text-green-400" />
+                <span className="text-sm font-semibold text-green-300">
+                  分析完了: {optimizerState.optimization.complexityClass} 複雑度
+                </span>
               </div>
-            )}
+              <div className="text-xs text-green-400/80">
+                推奨インスタンス数: <span className="font-bold">{optimizerState.instances?.recommendedInstances}</span> |{' '}
+                {optimizerState.optimization.reasoning.slice(0, 80)}...
+              </div>
+            </div>
+          )}
 
-            {optimizerState.status === 'error' && (
-              <div className="text-sm text-red-400">
-                エラー: {optimizerState.error}
+          {optimizerState.status === 'error' && (
+            <div className="px-4 py-3 bg-red-900/20 border border-red-700/30 rounded-lg">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-red-300">
+                  分析エラー: {optimizerState.error}
+                </span>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Instance Count Slider */}
           <div>
