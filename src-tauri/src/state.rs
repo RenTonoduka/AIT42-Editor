@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use ait42_config::Config;
 use ait42_core::{Editor, EditorConfig, EditorState, buffer::BufferManager};
 use ait42_lsp::{LspConfig, LspManager};
+use ait42_ait42::{AgentRegistry, AgentExecutor, Coordinator, config::AIT42Config};
 use crate::plugin::PluginManager;
 use crate::commands::ait42::{DebateStatus, RoundOutput};
 
@@ -45,6 +46,15 @@ pub struct AppState {
     /// Terminal executor (optional feature) - uses tokio::sync::Mutex for async
     #[cfg(feature = "terminal")]
     pub terminal: Arc<tokio::sync::Mutex<TerminalExecutor>>,
+
+    /// AIT42 agent registry for discovering and managing agents
+    pub agent_registry: Arc<Mutex<Option<AgentRegistry>>>,
+
+    /// AIT42 agent executor for running agents
+    pub agent_executor: Arc<tokio::sync::Mutex<Option<AgentExecutor>>>,
+
+    /// AIT42 coordinator for intelligent agent selection
+    pub coordinator: Arc<tokio::sync::Mutex<Option<Coordinator>>>,
 }
 
 impl AppState {
@@ -73,6 +83,11 @@ impl AppState {
         plugin_manager.initialize()
             .unwrap_or_else(|e| eprintln!("Failed to initialize plugin manager: {}", e));
 
+        // Initialize AIT42 agent system (lazy initialization - will be initialized on first use)
+        let agent_registry = Arc::new(Mutex::new(None));
+        let agent_executor = Arc::new(tokio::sync::Mutex::new(None));
+        let coordinator = Arc::new(tokio::sync::Mutex::new(None));
+
         Ok(Self {
             editor: Arc::new(Mutex::new(editor)),
             editor_state: Arc::new(Mutex::new(editor_state)),
@@ -84,6 +99,9 @@ impl AppState {
             debates: Arc::new(Mutex::new(HashMap::new())),
             #[cfg(feature = "terminal")]
             terminal: Arc::new(tokio::sync::Mutex::new(TerminalExecutor::new(working_dir))),
+            agent_registry,
+            agent_executor,
+            coordinator,
         })
     }
 

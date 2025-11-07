@@ -91,6 +91,8 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::execute_debate,
             commands::get_debate_status,
             commands::cancel_debate,
+            // AIT42 Meta-Analysis (Claude Code self-analysis)
+            commands::analyze_task_with_claude_code,
             // Worktree visualization operations
             commands::list_worktrees,
             commands::get_worktree_files,
@@ -192,6 +194,8 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::execute_debate,
             commands::get_debate_status,
             commands::cancel_debate,
+            // AIT42 Meta-Analysis (Claude Code self-analysis)
+            commands::analyze_task_with_claude_code,
             // Worktree visualization operations
             commands::list_worktrees,
             commands::get_worktree_files,

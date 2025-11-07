@@ -9,6 +9,8 @@ use tauri::{Manager, State};
 use std::process::Command;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use ait42_ait42::{AgentRegistry, AgentExecutor, Coordinator, config::AIT42Config, ExecutionMode};
+use tracing::{info, warn, error};
 
 use crate::state::AppState;
 
@@ -101,45 +103,120 @@ pub struct ClaudeCodeInstanceResult {
     pub completed_at: Option<String>,
 }
 
+/// Initialize AIT42 agent registry if not already initialized
+async fn ensure_registry_initialized(state: &State<'_, AppState>) -> Result<(), String> {
+    let mut registry_guard = state.agent_registry.lock()
+        .map_err(|e| format!("Failed to lock agent registry: {}", e))?;
+
+    if registry_guard.is_some() {
+        return Ok(());
+    }
+
+    // Initialize registry
+    let config = match AIT42Config::load() {
+        Ok(config) => config,
+        Err(e) => {
+            warn!("Failed to load AIT42 config: {}. Using default.", e);
+            // Try to detect AIT42 root from common locations
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+            let ait42_root = std::path::PathBuf::from(&home)
+                .join("Programming/AI/02_Workspace/05_Client/03_Sun/AIT42");
+            AIT42Config::new(ait42_root)
+        }
+    };
+
+    let registry = AgentRegistry::load_from_directory(&config.agents_dir())
+        .map_err(|e| format!("Failed to load agent registry: {}", e))?;
+
+    *registry_guard = Some(registry);
+    Ok(())
+}
+
+/// Get registry (must be initialized first)
+fn get_registry<'a>(state: &'a State<'a, AppState>) -> Result<std::sync::MutexGuard<'a, Option<AgentRegistry>>, String> {
+    // Note: This is a synchronous function, but we need async initialization
+    // For now, we'll initialize synchronously if needed
+    let mut registry_guard = state.agent_registry.lock()
+        .map_err(|e| format!("Failed to lock agent registry: {}", e))?;
+
+    if registry_guard.is_none() {
+        // Try to initialize synchronously
+        let config = match AIT42Config::load() {
+            Ok(config) => config,
+            Err(e) => {
+                warn!("Failed to load AIT42 config: {}. Using default.", e);
+                let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+                let ait42_root = std::path::PathBuf::from(&home)
+                    .join("Programming/AI/02_Workspace/05_Client/03_Sun/AIT42");
+                AIT42Config::new(ait42_root)
+            }
+        };
+
+        let registry = AgentRegistry::load_from_directory(&config.agents_dir())
+            .map_err(|e| format!("Failed to load agent registry: {}", e))?;
+        *registry_guard = Some(registry);
+    }
+
+    Ok(registry_guard)
+}
+
+/// Initialize AIT42 coordinator if not already initialized
+async fn ensure_coordinator_initialized(state: &State<'_, AppState>) -> Result<(), String> {
+    let mut coordinator_guard = state.coordinator.lock().await;
+
+    if coordinator_guard.is_some() {
+        return Ok(());
+    }
+
+    // Initialize coordinator
+    let config = match AIT42Config::load() {
+        Ok(config) => config,
+        Err(e) => {
+            warn!("Failed to load AIT42 config: {}. Using default.", e);
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+            let ait42_root = std::path::PathBuf::from(&home)
+                .join("Programming/AI/02_Workspace/05_Client/03_Sun/AIT42");
+            AIT42Config::new(ait42_root)
+        }
+    };
+
+    let coordinator = Coordinator::new(config)
+        .map_err(|e| format!("Failed to initialize coordinator: {}", e))?;
+
+    *coordinator_guard = Some(coordinator);
+    Ok(())
+}
+
+/// Get coordinator (must be initialized first)
+async fn get_coordinator<'a>(state: &'a State<'a, AppState>) -> Result<tokio::sync::MutexGuard<'a, Option<Coordinator>>, String> {
+    ensure_coordinator_initialized(state).await?;
+    Ok(state.coordinator.lock().await)
+}
+
 /**
  * List all available agents
  */
 #[tauri::command]
-pub async fn list_agents(_state: State<'_, AppState>) -> Result<Vec<AgentInfo>, String> {
-    // TODO: Integrate with ait42-ait42::registry
-    // For now, return a sample list of core agents
-    Ok(vec![
-        AgentInfo {
-            name: "code-reviewer".to_string(),
-            description: "Automated code review specialist".to_string(),
-            category: "quality".to_string(),
-            tools: vec!["Read".to_string(), "Grep".to_string(), "Glob".to_string()],
-        },
-        AgentInfo {
-            name: "test-generator".to_string(),
-            description: "Automated test generation specialist".to_string(),
-            category: "testing".to_string(),
-            tools: vec!["Read".to_string(), "Write".to_string(), "Edit".to_string(), "Bash".to_string()],
-        },
-        AgentInfo {
-            name: "refactor-specialist".to_string(),
-            description: "Code refactoring and technical debt reduction specialist".to_string(),
-            category: "quality".to_string(),
-            tools: vec!["Read".to_string(), "Write".to_string(), "Edit".to_string(), "Grep".to_string()],
-        },
-        AgentInfo {
-            name: "security-scanner".to_string(),
-            description: "Security scanning and vulnerability management specialist".to_string(),
-            category: "security".to_string(),
-            tools: vec!["Read".to_string(), "Grep".to_string(), "Glob".to_string(), "Bash".to_string()],
-        },
-        AgentInfo {
-            name: "bug-fixer".to_string(),
-            description: "Automated bug fixing specialist".to_string(),
-            category: "quality".to_string(),
-            tools: vec!["Read".to_string(), "Write".to_string(), "Edit".to_string(), "Bash".to_string()],
-        },
-    ])
+pub async fn list_agents(state: State<'_, AppState>) -> Result<Vec<AgentInfo>, String> {
+    ensure_registry_initialized(&state).await?;
+    let registry_guard = get_registry(&state)?;
+    let registry = registry_guard.as_ref()
+        .ok_or_else(|| "Agent registry not initialized".to_string())?;
+
+    let agents = registry.list();
+    let mut agent_infos = Vec::new();
+
+    for agent in agents {
+        agent_infos.push(AgentInfo {
+            name: agent.name.clone(),
+            description: agent.description.clone(),
+            category: format!("{:?}", agent.category),
+            tools: agent.tools.clone(),
+        });
+    }
+
+    info!("Listed {} agents", agent_infos.len());
+    Ok(agent_infos)
 }
 
 /**
@@ -147,26 +224,23 @@ pub async fn list_agents(_state: State<'_, AppState>) -> Result<Vec<AgentInfo>, 
  */
 #[tauri::command]
 pub async fn get_agent_info(
-    _state: State<'_, AppState>,
+    state: State<'_, AppState>,
     agent_name: String,
 ) -> Result<AgentInfo, String> {
-    // TODO: Integrate with ait42-ait42::registry
-    // For now, return sample data
-    match agent_name.as_str() {
-        "code-reviewer" => Ok(AgentInfo {
-            name: "code-reviewer".to_string(),
-            description: "Automated code review specialist. Proactively reviews code for security, quality, best practices, and generates quality scores (0-100).".to_string(),
-            category: "quality".to_string(),
-            tools: vec!["Read".to_string(), "Grep".to_string(), "Glob".to_string()],
-        }),
-        "test-generator" => Ok(AgentInfo {
-            name: "test-generator".to_string(),
-            description: "Automated test generation specialist. Invoked for unit tests, integration tests, E2E tests, and test fixture creation.".to_string(),
-            category: "testing".to_string(),
-            tools: vec!["Read".to_string(), "Write".to_string(), "Edit".to_string(), "Bash".to_string()],
-        }),
-        _ => Err(format!("Agent not found: {}", agent_name)),
-    }
+    ensure_registry_initialized(&state).await?;
+    let registry_guard = get_registry(&state)?;
+    let registry = registry_guard.as_ref()
+        .ok_or_else(|| "Agent registry not initialized".to_string())?;
+
+    let agent = registry.get(&agent_name)
+        .ok_or_else(|| format!("Agent not found: {}", agent_name))?;
+
+    Ok(AgentInfo {
+        name: agent.name.clone(),
+        description: agent.description.clone(),
+        category: format!("{:?}", agent.category),
+        tools: agent.tools.clone(),
+    })
 }
 
 /**
@@ -174,20 +248,74 @@ pub async fn get_agent_info(
  */
 #[tauri::command]
 pub async fn execute_agent(
-    _state: State<'_, AppState>,
+    state: State<'_, AppState>,
     request: AgentExecutionRequest,
 ) -> Result<AgentExecutionResponse, String> {
-    // TODO: Integrate with ait42-ait42::executor
-    // For now, return a mock response
+    // Verify agent exists
+    {
+        ensure_registry_initialized(&state).await?;
+        let registry_guard = get_registry(&state)?;
+        let registry = registry_guard.as_ref()
+            .ok_or_else(|| "Agent registry not initialized".to_string())?;
+        if registry.get(&request.agent_name).is_none() {
+            return Err(format!("Agent not found: {}", request.agent_name));
+        }
+    }
+
     let execution_id = uuid::Uuid::new_v4().to_string();
 
-    Ok(AgentExecutionResponse {
-        execution_id,
-        agent_name: request.agent_name,
-        status: "started".to_string(),
-        output: Some("Agent execution started...".to_string()),
-        error: None,
-    })
+    info!("Executing agent: {} with task: {}", request.agent_name, request.task);
+
+    // Build task with context if provided
+    let task = if let Some(ref context) = request.context {
+        format!("{}\n\nContext:\n{}", request.task, context)
+    } else {
+        request.task.clone()
+    };
+
+    // Create coordinator and executor for this execution
+    let config = match AIT42Config::load() {
+        Ok(config) => config,
+        Err(e) => {
+            warn!("Failed to load AIT42 config: {}. Using default.", e);
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+            let ait42_root = std::path::PathBuf::from(&home)
+                .join("Programming/AI/02_Workspace/05_Client/03_Sun/AIT42");
+            AIT42Config::new(ait42_root)
+        }
+    };
+
+    let coordinator = Coordinator::new(config)
+        .map_err(|e| format!("Failed to initialize coordinator: {}", e))?;
+    let mut executor = AgentExecutor::new(coordinator);
+    let mode = ExecutionMode::Single(request.agent_name.clone());
+
+    match executor.execute(mode, &task).await {
+        Ok(results) => {
+            if results.is_empty() {
+                return Err("No execution results returned".to_string());
+            }
+
+            let result = &results[0];
+            Ok(AgentExecutionResponse {
+                execution_id,
+                agent_name: result.agent_name.clone(),
+                status: format!("{:?}", result.status),
+                output: Some(result.output.clone()),
+                error: None,
+            })
+        }
+        Err(e) => {
+            error!("Agent execution failed: {}", e);
+            Ok(AgentExecutionResponse {
+                execution_id,
+                agent_name: request.agent_name,
+                status: "failed".to_string(),
+                output: None,
+                error: Some(e.to_string()),
+            })
+        }
+    }
 }
 
 /**
@@ -195,27 +323,71 @@ pub async fn execute_agent(
  */
 #[tauri::command]
 pub async fn execute_parallel(
-    _state: State<'_, AppState>,
+    state: State<'_, AppState>,
     request: ParallelExecutionRequest,
 ) -> Result<Vec<AgentExecutionResponse>, String> {
-    // TODO: Integrate with ait42-ait42::executor for parallel execution
-    // For now, return mock responses
-    let responses: Vec<AgentExecutionResponse> = request
-        .agents
-        .iter()
-        .map(|agent_name| {
-            let execution_id = uuid::Uuid::new_v4().to_string();
-            AgentExecutionResponse {
-                execution_id,
-                agent_name: agent_name.clone(),
-                status: "started".to_string(),
-                output: Some(format!("Parallel execution started for {}", agent_name)),
-                error: None,
+    // Verify all agents exist
+    {
+        ensure_registry_initialized(&state).await?;
+        let registry_guard = get_registry(&state)?;
+        let registry = registry_guard.as_ref()
+            .ok_or_else(|| "Agent registry not initialized".to_string())?;
+        for agent_name in &request.agents {
+            if registry.get(agent_name).is_none() {
+                return Err(format!("Agent not found: {}", agent_name));
             }
-        })
-        .collect();
+        }
+    }
 
-    Ok(responses)
+    info!("Executing {} agents in parallel", request.agents.len());
+
+    // Build task with context if provided
+    let task = if let Some(ref context) = request.context {
+        format!("{}\n\nContext:\n{}", request.task, context)
+    } else {
+        request.task.clone()
+    };
+
+    // Create coordinator and executor for this execution
+    let config = match AIT42Config::load() {
+        Ok(config) => config,
+        Err(e) => {
+            warn!("Failed to load AIT42 config: {}. Using default.", e);
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+            let ait42_root = std::path::PathBuf::from(&home)
+                .join("Programming/AI/02_Workspace/05_Client/03_Sun/AIT42");
+            AIT42Config::new(ait42_root)
+        }
+    };
+
+    let coordinator = Coordinator::new(config)
+        .map_err(|e| format!("Failed to initialize coordinator: {}", e))?;
+    let mut executor = AgentExecutor::new(coordinator);
+    let mode = ExecutionMode::Parallel(request.agents.clone());
+
+    match executor.execute(mode, &task).await {
+        Ok(results) => {
+            let responses: Vec<AgentExecutionResponse> = results
+                .into_iter()
+                .map(|result| {
+                    let execution_id = uuid::Uuid::new_v4().to_string();
+                    AgentExecutionResponse {
+                        execution_id,
+                        agent_name: result.agent_name.clone(),
+                        status: format!("{:?}", result.status),
+                        output: Some(result.output.clone()),
+                        error: None,
+                    }
+                })
+                .collect();
+
+            Ok(responses)
+        }
+        Err(e) => {
+            error!("Parallel execution failed: {}", e);
+            Err(format!("Parallel execution failed: {}", e))
+        }
+    }
 }
 
 /**
@@ -463,6 +635,47 @@ async fn monitor_tmux_session(
     let mut last_line_count = 0;
     let mut last_log_size = 0;
 
+    // Helper function to strip ANSI codes using regex-like approach
+    // Remove ANSI escape sequences: \x1b[...m, \x1b[?..., etc.
+    let strip_ansi = |text: &str| -> String {
+        let mut result = String::with_capacity(text.len());
+        let mut chars = text.chars().peekable();
+        
+        while let Some(ch) = chars.next() {
+            if ch == '\x1b' {
+                // Skip ANSI escape sequence
+                if let Some(&'[') = chars.peek() {
+                    chars.next(); // consume '['
+                    // Skip until we find a letter (end of escape sequence)
+                    while let Some(&next_ch) = chars.peek() {
+                        if next_ch.is_alphabetic() || next_ch == 'm' {
+                            chars.next();
+                            break;
+                        }
+                        chars.next();
+                    }
+                } else if let Some(&'%') = chars.peek() {
+                    chars.next(); // consume '%'
+                } else if let Some(&'(') = chars.peek() {
+                    chars.next(); // consume '('
+                } else if let Some(&')') = chars.peek() {
+                    chars.next(); // consume ')'
+                } else if let Some(&'#') = chars.peek() {
+                    chars.next(); // consume '#'
+                } else if let Some(&'\\') = chars.peek() {
+                    chars.next(); // consume '\'
+                } else {
+                    // Not an ANSI sequence, keep the character
+                    result.push(ch);
+                }
+            } else {
+                result.push(ch);
+            }
+        }
+        
+        result
+    };
+
     loop {
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
@@ -484,6 +697,9 @@ async fn monitor_tmux_session(
                         let new_content = &log_contents[last_log_size..];
 
                         if !new_content.trim().is_empty() {
+                            // Strip ANSI codes before sending
+                            let cleaned_content = strip_ansi(new_content);
+
                             // First event emission timing log
                             if last_log_size == 0 {
                                 tracing::info!(
@@ -495,7 +711,7 @@ async fn monitor_tmux_session(
 
                             let payload = serde_json::json!({
                                 "instance": instance_number,
-                                "output": new_content,
+                                "output": cleaned_content,
                                 "status": "running"
                             });
 
@@ -503,12 +719,12 @@ async fn monitor_tmux_session(
                             tracing::info!(
                                 "📤 Preparing to emit event 'competition-output' (incremental) with payload: instance={}, output_length={}, status=\"running\", preview=\"{}...\"",
                                 instance_number,
-                                new_content.len(),
-                                new_content.chars().take(50).collect::<String>().replace('\n', "\\n")
+                                cleaned_content.len(),
+                                cleaned_content.chars().take(50).collect::<String>().replace('\n', "\\n")
                             );
 
                             match app.emit_all("competition-output", payload.clone()) {
-                                Ok(_) => tracing::info!("✅ Sent {} bytes (incremental) for instance {}", new_content.len(), instance_number),
+                                Ok(_) => tracing::info!("✅ Sent {} bytes (incremental) for instance {}", cleaned_content.len(), instance_number),
                                 Err(e) => tracing::error!("❌ Failed to emit incremental output for instance {}: {}", instance_number, e),
                             }
                         }
@@ -537,8 +753,10 @@ async fn monitor_tmux_session(
                                 let new_content = new_lines.join("\n");
 
                                 if !new_content.trim().is_empty() {
-                                    let output_with_newline = format!("{}\n", new_content);
-                                    let content_len = new_content.len();
+                                    // Strip ANSI codes before sending
+                                    let cleaned_content = strip_ansi(&new_content);
+                                    let output_with_newline = format!("{}\n", cleaned_content);
+                                    let content_len = cleaned_content.len();
 
                                     let payload = serde_json::json!({
                                         "instance": instance_number,
@@ -568,18 +786,21 @@ async fn monitor_tmux_session(
                 match tokio::fs::read_to_string(&log_file_path).await {
                     Ok(final_output) => {
                         if !final_output.trim().is_empty() {
+                            // Strip ANSI codes before sending
+                            let cleaned_output = strip_ansi(&final_output);
+                            
                             let payload = serde_json::json!({
                                 "instance": instance_number,
-                                "output": final_output,
+                                "output": cleaned_output,
                                 "status": "completed"
                             });
 
                             // Debug: Log payload details
                             tracing::info!("📤 Emitting event 'competition-output': instance={}, output_len={}, status=completed",
-                                instance_number, final_output.len());
+                                instance_number, cleaned_output.len());
 
                             match app.emit_all("competition-output", payload) {
-                                Ok(_) => tracing::info!("✅ Sent final output for instance {} ({} bytes)", instance_number, final_output.len()),
+                                Ok(_) => tracing::info!("✅ Sent final output for instance {} ({} bytes)", instance_number, cleaned_output.len()),
                                 Err(e) => tracing::error!("❌ Failed to emit final output for instance {}: {}", instance_number, e),
                             }
                         } else {
@@ -1424,4 +1645,374 @@ pub async fn cancel_debate(
     }
 
     Ok(())
+}
+
+//
+// ============================================================
+// Claude Code Meta-Analysis (Ω-theory Self-Analysis)
+// ============================================================
+//
+
+/// Task analysis request for Claude Code
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaudeCodeAnalysisRequest {
+    pub task: String,
+    pub model: String,  // "sonnet", "haiku", "opus"
+    pub timeout_seconds: u64,  // Default: 120s
+}
+
+/// Task analysis response from Claude Code
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaudeCodeAnalysisResponse {
+    pub analysis_id: String,
+    pub complexity_class: String,  // "Logarithmic", "Linear", "Quadratic", "Exponential"
+    pub recommended_subtasks: usize,
+    pub recommended_instances: usize,
+    pub confidence: f64,  // 0.0-1.0
+    pub reasoning: String,
+    pub raw_output: String,
+    pub status: String,  // "completed", "failed", "timeout"
+}
+
+/// Analyze task using Claude Code itself (meta-analysis)
+///
+/// Instead of using Claude API directly, this launches Claude Code CLI
+/// to analyze the task and provide decomposition recommendations.
+#[tauri::command]
+pub async fn analyze_task_with_claude_code(
+    state: State<'_, AppState>,
+    request: ClaudeCodeAnalysisRequest,
+) -> Result<ClaudeCodeAnalysisResponse, String> {
+    // Validation
+    if request.task.trim().is_empty() {
+        return Err("Task cannot be empty".to_string());
+    }
+
+    let valid_models = ["sonnet", "haiku", "opus"];
+    if !valid_models.contains(&request.model.as_str()) {
+        return Err(format!("Invalid model. Must be one of: {:?}", valid_models));
+    }
+
+    let analysis_id = uuid::Uuid::new_v4().to_string();
+
+    tracing::info!(
+        "Starting Claude Code meta-analysis: {} for task: {}",
+        analysis_id,
+        request.task.chars().take(50).collect::<String>()
+    );
+
+    let working_dir = state.working_dir.lock().await;
+    let base_path = working_dir.clone();
+    drop(working_dir);
+
+    // Create analysis directory
+    let analysis_dir = format!("{}/.worktrees/analysis-{}", base_path.display(), &analysis_id[..8]);
+    std::fs::create_dir_all(&analysis_dir).map_err(|e| e.to_string())?;
+
+    // Create tmux session
+    let session_id = format!("claude-analysis-{}", &analysis_id[..8]);
+    let output_log_path = format!("{}/.claude-analysis.log", analysis_dir);
+
+    let tmux_output = Command::new("tmux")
+        .arg("new-session")
+        .arg("-d")
+        .arg("-s")
+        .arg(&session_id)
+        .arg("-c")
+        .arg(&base_path)
+        .output()
+        .map_err(|e| format!("Failed to create tmux session: {}", e))?;
+
+    if !tmux_output.status.success() {
+        let error = String::from_utf8_lossy(&tmux_output.stderr);
+        return Err(format!("Failed to create tmux session: {}", error));
+    }
+
+    // Enable pipe-pane to capture output
+    let _ = Command::new("tmux")
+        .arg("pipe-pane")
+        .arg("-t")
+        .arg(&session_id)
+        .arg("-o")
+        .arg(format!("cat >> {}", output_log_path))
+        .output();
+
+    // Build analysis prompt
+    let analysis_prompt = format!(
+        r#"あなたはタスク分析の専門家です。以下のタスクを分析し、以下の形式で回答してください：
+
+タスク: {}
+
+以下の形式で回答してください：
+COMPLEXITY_CLASS: [Logarithmic/Linear/Quadratic/Exponential]
+SUBTASKS: [推奨サブタスク数（数値のみ）]
+INSTANCES: [推奨並列実行インスタンス数（数値のみ）]
+CONFIDENCE: [信頼度 0.0-1.0]
+REASONING: [なぜこの複雑度クラスと分解数が適切か、詳細な理由を説明]
+
+複雑度クラスの定義:
+- Logarithmic (Ω(log n)): 単純なタスク（例: ランディングページ作成、単純なCRUD）
+- Linear (Ω(n)): 標準的なタスク（例: REST API実装、認証システム）
+- Quadratic (Ω(n²)): 複雑なタスク（例: ECサイト、データベース移行）
+- Exponential (Ω(2ⁿ)): 非常に複雑なタスク（例: マイクロサービスアーキテクチャ）
+
+サブタスク数の推奨範囲:
+- Logarithmic: 2-3
+- Linear: 3-5
+- Quadratic: 5-8
+- Exponential: 8-15
+
+インスタンス数の推奨:
+- Logarithmic: 2-3
+- Linear: 2-5
+- Quadratic: 3-8
+- Exponential: 5-10"#,
+        request.task
+    );
+
+    // Send Claude Code command
+    let claude_cmd = format!(
+        "echo '{}' | claude --model {} --print",
+        analysis_prompt.replace("'", "'\\''"),
+        request.model
+    );
+
+    let send_output = Command::new("tmux")
+        .arg("send-keys")
+        .arg("-t")
+        .arg(&session_id)
+        .arg(format!("{} && exit", claude_cmd))
+        .arg("C-m")
+        .output()
+        .map_err(|e| format!("Failed to send command: {}", e))?;
+
+    if !send_output.status.success() {
+        let error = String::from_utf8_lossy(&send_output.stderr);
+        return Err(format!("Failed to send command: {}", error));
+    }
+
+    tracing::info!("Claude Code analysis started in session {}", session_id);
+
+    // Wait for completion with timeout
+    let timeout = tokio::time::Duration::from_secs(request.timeout_seconds);
+    let start_time = tokio::time::Instant::now();
+
+    loop {
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+        // Check if session still exists
+        let check_output = Command::new("tmux")
+            .arg("has-session")
+            .arg("-t")
+            .arg(&session_id)
+            .output();
+
+        match check_output {
+            Ok(output) if output.status.success() => {
+                // Session still running
+                if start_time.elapsed() > timeout {
+                    // Timeout - kill session
+                    let _ = Command::new("tmux")
+                        .arg("kill-session")
+                        .arg("-t")
+                        .arg(&session_id)
+                        .output();
+
+                    return Err("Analysis timed out".to_string());
+                }
+            }
+            _ => {
+                // Session completed
+                break;
+            }
+        }
+    }
+
+    // Read output
+    let raw_output = tokio::fs::read_to_string(&output_log_path)
+        .await
+        .unwrap_or_else(|_| String::from("No output captured"));
+
+    tracing::info!("Claude Code analysis completed, parsing output...");
+
+    // Parse output
+    let response = parse_analysis_output(&raw_output, &analysis_id)?;
+
+    // Cleanup
+    let _ = std::fs::remove_dir_all(&analysis_dir);
+
+    tracing::info!(
+        "Analysis complete: {} ({} subtasks, {} instances, confidence: {:.2})",
+        response.complexity_class,
+        response.recommended_subtasks,
+        response.recommended_instances,
+        response.confidence
+    );
+
+    Ok(response)
+}
+
+/// Parse Claude Code analysis output
+fn parse_analysis_output(output: &str, analysis_id: &str) -> Result<ClaudeCodeAnalysisResponse, String> {
+    let mut complexity_class = String::new();
+    let mut subtasks = 0;
+    let mut instances = 0;
+    let mut confidence = 0.0;
+    let mut reasoning = String::new();
+
+    // Parse structured output
+    for line in output.lines() {
+        let line = line.trim();
+
+        if line.starts_with("COMPLEXITY_CLASS:") {
+            complexity_class = line
+                .strip_prefix("COMPLEXITY_CLASS:")
+                .unwrap_or("")
+                .trim()
+                .to_string();
+        } else if line.starts_with("SUBTASKS:") {
+            if let Ok(val) = line
+                .strip_prefix("SUBTASKS:")
+                .unwrap_or("0")
+                .trim()
+                .parse::<usize>()
+            {
+                subtasks = val;
+            }
+        } else if line.starts_with("INSTANCES:") {
+            if let Ok(val) = line
+                .strip_prefix("INSTANCES:")
+                .unwrap_or("0")
+                .trim()
+                .parse::<usize>()
+            {
+                instances = val;
+            }
+        } else if line.starts_with("CONFIDENCE:") {
+            if let Ok(val) = line
+                .strip_prefix("CONFIDENCE:")
+                .unwrap_or("0.0")
+                .trim()
+                .parse::<f64>()
+            {
+                confidence = val;
+            }
+        } else if line.starts_with("REASONING:") {
+            reasoning = line
+                .strip_prefix("REASONING:")
+                .unwrap_or("")
+                .trim()
+                .to_string();
+
+            // Collect multi-line reasoning
+            let reasoning_start = output.find("REASONING:").unwrap_or(0);
+            reasoning = output[reasoning_start..]
+                .strip_prefix("REASONING:")
+                .unwrap_or("")
+                .trim()
+                .to_string();
+        }
+    }
+
+    // Validation
+    let valid_classes = ["Logarithmic", "Linear", "Quadratic", "Exponential"];
+    if !valid_classes.contains(&complexity_class.as_str()) {
+        // Fallback: try to infer from output
+        complexity_class = infer_complexity_class(output);
+    }
+
+    if subtasks == 0 {
+        subtasks = infer_subtasks(output, &complexity_class);
+    }
+
+    if instances == 0 {
+        instances = calculate_instances_from_complexity(&complexity_class, subtasks);
+    }
+
+    if confidence == 0.0 {
+        confidence = 0.7; // Default confidence
+    }
+
+    if reasoning.is_empty() {
+        reasoning = extract_reasoning(output);
+    }
+
+    Ok(ClaudeCodeAnalysisResponse {
+        analysis_id: analysis_id.to_string(),
+        complexity_class,
+        recommended_subtasks: subtasks,
+        recommended_instances: instances,
+        confidence,
+        reasoning,
+        raw_output: output.to_string(),
+        status: "completed".to_string(),
+    })
+}
+
+/// Infer complexity class from unstructured output
+fn infer_complexity_class(output: &str) -> String {
+    let lower = output.to_lowercase();
+
+    if lower.contains("exponential") || lower.contains("指数") {
+        "Exponential".to_string()
+    } else if lower.contains("quadratic") || lower.contains("二乗") || lower.contains("o(n²)") {
+        "Quadratic".to_string()
+    } else if lower.contains("linear") || lower.contains("線形") || lower.contains("o(n)") {
+        "Linear".to_string()
+    } else if lower.contains("logarithmic") || lower.contains("対数") || lower.contains("o(log") {
+        "Logarithmic".to_string()
+    } else {
+        "Linear".to_string() // Default
+    }
+}
+
+/// Infer subtasks from output
+fn infer_subtasks(output: &str, complexity_class: &str) -> usize {
+    // Try to find numbers in output
+    let numbers: Vec<usize> = output
+        .split_whitespace()
+        .filter_map(|word| word.parse::<usize>().ok())
+        .filter(|&n| n >= 2 && n <= 20)
+        .collect();
+
+    if let Some(&first) = numbers.first() {
+        first
+    } else {
+        // Fallback based on complexity class
+        match complexity_class {
+            "Logarithmic" => 3,
+            "Linear" => 4,
+            "Quadratic" => 6,
+            "Exponential" => 10,
+            _ => 4,
+        }
+    }
+}
+
+/// Calculate instances from complexity class and subtasks
+fn calculate_instances_from_complexity(complexity_class: &str, subtasks: usize) -> usize {
+    match complexity_class {
+        "Logarithmic" => std::cmp::max(2, std::cmp::min(3, subtasks)),
+        "Linear" => std::cmp::max(2, std::cmp::min(5, subtasks / 3)),
+        "Quadratic" => std::cmp::max(3, std::cmp::min(8, subtasks / 2)),
+        "Exponential" => std::cmp::max(5, std::cmp::min(10, subtasks)),
+        _ => 3,
+    }
+}
+
+/// Extract reasoning from unstructured output
+fn extract_reasoning(output: &str) -> String {
+    // Take first meaningful paragraph
+    let lines: Vec<&str> = output
+        .lines()
+        .filter(|line| !line.trim().is_empty() && line.len() > 20)
+        .collect();
+
+    if lines.is_empty() {
+        "Claude Code分析による推奨".to_string()
+    } else {
+        lines.join(" ").chars().take(200).collect()
+    }
 }

@@ -5,7 +5,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { FileText, Plus, Minus, AlertCircle, Loader2, ChevronRight, ChevronDown } from 'lucide-react';
-import { worktreeApi, type FileDiff, type DiffHunk, type DiffLine } from '@/services/worktree';
+import { worktreeApi, type FileDiff, type DiffLine } from '@/services/worktree';
 
 interface DiffViewerProps {
   worktreePath: string;

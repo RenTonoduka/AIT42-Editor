@@ -7,7 +7,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useWorktreeStore } from '@/store/worktreeStore';
 import {
   CheckCircle,
-  XCircle,
   AlertCircle,
   Loader2,
   GitBranch,
@@ -35,7 +34,7 @@ interface WorktreeDiffData {
 /**
  * Comparison Matrix Component
  */
-export const ComparisonMatrix: React.FC<ComparisonMatrixProps> = ({ competitionId }) => {
+export const ComparisonMatrix: React.FC<ComparisonMatrixProps> = ({ competitionId: _competitionId }) => {
   const { worktrees } = useWorktreeStore();
   const [selectedWorktreeIds, setSelectedWorktreeIds] = useState<string[]>([]);
   const [diffData, setDiffData] = useState<Map<string, WorktreeDiffData>>(new Map());

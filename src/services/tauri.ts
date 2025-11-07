@@ -206,6 +206,29 @@ export interface ClaudeCodeCompetitionRequest {
 }
 
 /**
+ * Claude Code Analysis Request (Meta-Analysis)
+ */
+export interface ClaudeCodeAnalysisRequest {
+  task: string;
+  model: string;  // "sonnet", "haiku", "opus"
+  timeoutSeconds: number;  // default: 120
+}
+
+/**
+ * Claude Code Analysis Response
+ */
+export interface ClaudeCodeAnalysisResponse {
+  analysisId: string;
+  complexityClass: string;  // "Logarithmic", "Linear", "Quadratic", "Exponential"
+  recommendedSubtasks: number;
+  recommendedInstances: number;
+  confidence: number;  // 0.0-1.0
+  reasoning: string;
+  rawOutput: string;
+  status: string;  // "completed", "failed", "timeout"
+}
+
+/**
  * Claude Code Competition Result
  */
 export interface ClaudeCodeCompetitionResult {
@@ -1011,6 +1034,29 @@ export const tauriApi = {
       return result;
     } catch (error) {
       throw new Error(`Failed to execute Claude Code competition: ${error}`);
+    }
+  },
+
+  /**
+   * Analyze task using Claude Code itself (meta-analysis)
+   *
+   * Launches Claude Code CLI to analyze the task and provide
+   * complexity classification and decomposition recommendations.
+   *
+   * @param request - Analysis request parameters
+   * @returns Analysis response with complexity class, subtask count, and reasoning
+   */
+  async analyzeTaskWithClaudeCode(
+    request: ClaudeCodeAnalysisRequest
+  ): Promise<ClaudeCodeAnalysisResponse> {
+    try {
+      const result = await invoke<ClaudeCodeAnalysisResponse>(
+        'analyze_task_with_claude_code',
+        { request }
+      );
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to analyze task with Claude Code: ${error}`);
     }
   },
 

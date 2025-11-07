@@ -202,7 +202,7 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
 
             {optimizerState.status === 'calculated' && optimizerState.optimization && (
               <div className="flex items-center gap-3 flex-1">
-                <ComplexityBadge complexity={optimizerState.optimization.complexityClass} />
+                <ComplexityBadge complexityClass={optimizerState.optimization.complexityClass} />
                 <div className="text-sm text-text-secondary">
                   推奨: <span className="font-bold text-accent-primary">{optimizerState.instances?.recommendedInstances}</span>インスタンス
                 </div>

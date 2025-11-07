@@ -201,7 +201,7 @@ export const EnsembleDialog: React.FC<EnsembleDialogProps> = ({
 
             {optimizerState.status === 'calculated' && optimizerState.optimization && (
               <div className="flex items-center gap-3 flex-1">
-                <ComplexityBadge complexity={optimizerState.optimization.complexityClass} />
+                <ComplexityBadge complexityClass={optimizerState.optimization.complexityClass} />
                 <div className="text-sm text-text-secondary">
                   推奨: <span className="font-bold text-purple-600">{optimizerState.instances?.recommendedInstances}</span>インスタンス
                 </div>

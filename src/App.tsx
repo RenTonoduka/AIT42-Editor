@@ -11,7 +11,6 @@ import { DebateDialog } from '@/components/AI/DebateDialog';
 import DebateStatusPanel from '@/components/AI/DebateStatusPanel';
 import { OptimizerDemo } from '@/components/Optimizer';
 import { useEditorStore } from '@/store/editorStore';
-import { useSettingsStore } from '@/store/settingsStore';
 
 // View Mode Type
 type ViewMode = 'editor' | 'multi-agent' | 'debate' | 'optimizer';
@@ -27,8 +26,9 @@ function App() {
   const [debateTask, setDebateTask] = useState<string>('');
   const [activeCompetitionId, setActiveCompetitionId] = useState<string | null>(null); // 🔥 NEW: Store competition ID
 
-  const { activeFile } = useEditorStore();
-  const { showDiagnostics } = useSettingsStore();
+  // Get active file from editor store
+  const getActiveTab = useEditorStore((state) => state.getActiveTab);
+  const activeFile = getActiveTab();
 
   // Handle competition start (競争モード)
   const handleCompetitionStart = (competitionId: string, instanceCount: number, task: string) => {
@@ -234,7 +234,7 @@ function App() {
 
       {/* Settings Modal */}
       {showSettings && (
-        <SettingsPanel onClose={() => setShowSettings(false)} />
+        <SettingsPanel />
       )}
 
       {/* Competition Dialog (競争モード) */}

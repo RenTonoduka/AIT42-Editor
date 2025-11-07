@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, X, Settings as SettingsIcon, Code2, Cpu, Users } from 'lucide-react';
+import { MessageSquare, X, Settings as SettingsIcon, Code2, Users } from 'lucide-react';
 import { tauriApi, DebateRequest, RoleDefinition } from '@/services/tauri';
 import { DebateFlowDiagram } from './DebateFlowDiagram';
 

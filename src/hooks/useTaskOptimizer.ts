@@ -2,21 +2,14 @@
  * useTaskOptimizer Hook - State management for task optimization workflow
  *
  * Manages async calls to Tauri backend for Ω-theory complexity analysis,
- * subtask optimization, and instance calculation.
+ * using Claude Code CLI for meta-analysis (self-analysis).
  *
  * @module hooks/useTaskOptimizer
- * @version 1.6.0
+ * @version 1.6.0-omega
  */
 
 import { useState, useCallback } from 'react';
-import {
-  optimizeTask,
-  calculateInstances,
-  getComplexityInfo,
-  type OptimizeTaskResponse,
-  type CalculateInstancesResponse,
-  type ComplexityInfo,
-} from '@/services/optimizer';
+import { tauriApi, type ClaudeCodeAnalysisRequest } from '@/services/tauri';
 import type { OptimizerState } from '@/types/optimizer';
 
 // ============================================================================
@@ -107,25 +100,15 @@ export function useTaskOptimizer(): UseTaskOptimizerReturn {
   const [state, setState] = useState<OptimizerState>(initialState);
 
   /**
-   * Analyze task description (full workflow)
+   * Analyze task description using Claude Code (meta-analysis)
    */
-  const analyze = useCallback(async (description: string, currentSubtasks: number = 0) => {
+  const analyze = useCallback(async (description: string, _currentSubtasks: number = 0) => {
     // Validation
     if (!description || description.trim().length === 0) {
       setState({
         ...initialState,
         status: 'error',
         error: 'Task description cannot be empty',
-        taskDescription: description,
-      });
-      return;
-    }
-
-    if (currentSubtasks < 0) {
-      setState({
-        ...initialState,
-        status: 'error',
-        error: 'Current subtasks must be non-negative',
         taskDescription: description,
       });
       return;
@@ -139,39 +122,45 @@ export function useTaskOptimizer(): UseTaskOptimizerReturn {
     });
 
     try {
-      // Step 1: Optimize subtask count (LLM analysis)
-      let optimization: OptimizeTaskResponse;
-      try {
-        optimization = await optimizeTask(description, currentSubtasks);
-      } catch (error: any) {
-        throw new Error(formatOptimizeError(error));
-      }
+      // Execute Claude Code meta-analysis
+      const request: ClaudeCodeAnalysisRequest = {
+        task: description.trim(),
+        model: 'sonnet',  // Use Sonnet 4.5 for analysis
+        timeoutSeconds: 120,
+      };
 
-      // Step 2: Calculate instance count
-      let instances: CalculateInstancesResponse;
-      try {
-        instances = await calculateInstances(
-          optimization.complexityClass,
-          optimization.recommendedSubtasks
-        );
-      } catch (error: any) {
-        throw new Error(`Failed to calculate instances: ${error.message || error}`);
-      }
+      const response = await tauriApi.analyzeTaskWithClaudeCode(request);
 
-      // Step 3: Get complexity info
-      let complexityInfo: ComplexityInfo;
-      try {
-        complexityInfo = await getComplexityInfo(optimization.complexityClass);
-      } catch (error: any) {
-        throw new Error(`Failed to get complexity info: ${error.message || error}`);
-      }
+      // Map complexity class to notation
+      const notationMap: Record<string, string> = {
+        'Logarithmic': 'Ω(log n)',
+        'Linear': 'Ω(n)',
+        'Quadratic': 'Ω(n²)',
+        'Exponential': 'Ω(2ⁿ)',
+      };
 
-      // Success - update state
+      // Success - update state with Claude Code analysis results
       setState({
         status: 'calculated',
-        optimization,
-        instances,
-        complexityInfo,
+        optimization: {
+          complexityClass: response.complexityClass,
+          recommendedSubtasks: response.recommendedSubtasks,
+          confidence: response.confidence,
+          reasoning: response.reasoning,
+        },
+        instances: {
+          recommendedInstances: response.recommendedInstances,
+          subtasksPerInstance: response.recommendedSubtasks / response.recommendedInstances,
+          resourceConstrained: false,
+          reasoning: `Claude Code分析に基づく推奨：${response.recommendedInstances}インスタンス`,
+        },
+        complexityInfo: {
+          className: response.complexityClass,
+          notation: notationMap[response.complexityClass] || 'Ω(n)',
+          subtaskRange: getSubtaskRange(response.complexityClass),
+          description: `${response.complexityClass}複雑度のタスク`,
+          examples: [],
+        },
         error: null,
         taskDescription: description,
       });
@@ -182,7 +171,7 @@ export function useTaskOptimizer(): UseTaskOptimizerReturn {
         optimization: null,
         instances: null,
         complexityInfo: null,
-        error: error.message || 'Unknown error occurred',
+        error: error.message || 'Claude Code分析に失敗しました',
         taskDescription: description,
       });
     }
@@ -217,33 +206,21 @@ export function useTaskOptimizer(): UseTaskOptimizerReturn {
 // ============================================================================
 
 /**
- * Format optimize_task error into user-friendly message
+ * Get subtask range for complexity class
  */
-function formatOptimizeError(error: any): string {
-  const errorStr = error.message || error.toString() || 'Unknown error';
-
-  // API key missing
-  if (errorStr.includes('ANTHROPIC_API_KEY') || errorStr.includes('API key')) {
-    return 'ANTHROPIC_API_KEY environment variable is not set. Please configure it in your system or .env file.';
+function getSubtaskRange(complexityClass: string): string {
+  switch (complexityClass) {
+    case 'Logarithmic':
+      return '2-3';
+    case 'Linear':
+      return '3-5';
+    case 'Quadratic':
+      return '5-8';
+    case 'Exponential':
+      return '8-15';
+    default:
+      return '3-5';
   }
-
-  // Network timeout
-  if (errorStr.includes('timeout') || errorStr.includes('network')) {
-    return 'Network timeout - please check your internet connection and try again.';
-  }
-
-  // Invalid response
-  if (errorStr.includes('Invalid') || errorStr.includes('parse')) {
-    return 'Received invalid response from backend. Please try again or contact support.';
-  }
-
-  // Rate limit
-  if (errorStr.includes('rate limit') || errorStr.includes('429')) {
-    return 'API rate limit exceeded. Please wait a moment and try again.';
-  }
-
-  // Generic error
-  return `Analysis failed: ${errorStr}`;
 }
 
 /**

@@ -85,7 +85,7 @@ const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({ instances, competitio
           error?: string;
         }>('competition-output', (event) => {
           try {
-            const { instance, output, status, error } = event.payload;
+            const { instance, output, status } = event.payload;
             console.log(`[MultiAgentPanel] Received competition-output: instance=${instance}, output_len=${output.length}, status=${status}`);
 
             setLocalInstances((prev) =>
