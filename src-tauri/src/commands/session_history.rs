@@ -60,26 +60,22 @@ pub struct WorktreeSession {
 }
 
 /// Get path to sessions storage file
-fn get_sessions_file_path(state: &AppState) -> PathBuf {
-    let working_dir = state.working_dir.blocking_lock();
-    let project_root = working_dir
-        .parent()
-        .unwrap_or(&working_dir)
-        .to_path_buf();
-    project_root.join(".ait42").join("sessions.json")
+/// Uses user's home directory to avoid read-only file system errors in macOS app bundles
+fn get_sessions_file_path(_state: &AppState) -> PathBuf {
+    // Use home directory instead of working directory to avoid read-only issues
+    let home_dir = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
+    home_dir.join(".ait42").join("sessions.json")
 }
 
-/// Ensure .ait42 directory exists
-fn ensure_storage_dir(state: &AppState) -> Result<(), String> {
-    let working_dir = state.working_dir.blocking_lock();
-    let project_root = working_dir
-        .parent()
-        .unwrap_or(&working_dir)
-        .to_path_buf();
-    let ait42_dir = project_root.join(".ait42");
+/// Ensure .ait42 directory exists in user's home directory
+fn ensure_storage_dir(_state: &AppState) -> Result<(), String> {
+    let home_dir = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
+    let ait42_dir = home_dir.join(".ait42");
 
     if !ait42_dir.exists() {
-        fs::create_dir_all(&ait42_dir).map_err(|e| e.to_string())?;
+        fs::create_dir_all(&ait42_dir).map_err(|e| {
+            format!("Failed to create .ait42 directory at {:?}: {}", ait42_dir, e)
+        })?;
     }
 
     Ok(())

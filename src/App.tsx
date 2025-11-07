@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, Settings, Users, Layout, Sparkles, Trophy, MessageSquare, Target } from 'lucide-react';
+import { FileText, Settings, Users, Layout, Sparkles, Trophy, MessageSquare, Target, History } from 'lucide-react';
 import { Sidebar } from './components/Sidebar/Sidebar';
 import { EditorContainer } from '@/components/Editor';
 import { StatusBar } from '@/components/StatusBar';
@@ -10,10 +10,11 @@ import { EnsembleDialog } from '@/components/AI/EnsembleDialog';
 import { DebateDialog } from '@/components/AI/DebateDialog';
 import DebateStatusPanel from '@/components/AI/DebateStatusPanel';
 import { OptimizerDemo } from '@/components/Optimizer';
+import { SessionHistory } from '@/components/SessionHistory';
 import { useEditorStore } from '@/store/editorStore';
 
 // View Mode Type
-type ViewMode = 'editor' | 'multi-agent' | 'debate' | 'optimizer';
+type ViewMode = 'editor' | 'multi-agent' | 'debate' | 'optimizer' | 'session-history';
 
 function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('editor');
@@ -178,6 +179,17 @@ function App() {
             >
               <Target className="w-4 h-4 inline-block mr-1" />
               Optimizer
+            </button>
+            <button
+              onClick={() => setViewMode('session-history')}
+              className={`px-3 py-1 rounded-md text-sm transition-colors ${
+                viewMode === 'session-history'
+                  ? 'bg-orange-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              <History className="w-4 h-4 inline-block mr-1" />
+              履歴
             </button>
           </div>
         </div>
