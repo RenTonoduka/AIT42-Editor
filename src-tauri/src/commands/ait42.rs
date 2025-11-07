@@ -869,15 +869,18 @@ pub async fn execute_claude_code_competition(
     );
 
     let working_dir = state.working_dir.lock().await;
-    // Navigate to project root (parent of src-tauri)
-    let base_path = working_dir
+    let project_root = working_dir
         .parent()
         .unwrap_or(&working_dir)
         .to_path_buf();
     drop(working_dir); // Release lock
 
-    // Create competition directory in project root
-    let competition_dir = format!("{}/.worktrees/competition-{}", base_path.display(), &competition_id[..8]);
+    // Use home directory for worktrees to avoid read-only file system issues in macOS app bundles
+    let home_dir = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
+    let ait42_worktrees = home_dir.join(".ait42").join(".worktrees");
+
+    // Create competition directory in home directory
+    let competition_dir = format!("{}/competition-{}", ait42_worktrees.display(), &competition_id[..8]);
     std::fs::create_dir_all(&competition_dir).map_err(|e| e.to_string())?;
 
     let mut instances = Vec::new();
@@ -930,7 +933,7 @@ pub async fn execute_claude_code_competition(
             .arg("-b")
             .arg(&branch_name)
             .arg(&worktree_path)
-            .current_dir(&base_path);
+            .current_dir(&project_root);
 
         let output = cmd.output().map_err(|e| {
             format!("Failed to create worktree {}: {}", i, e)
@@ -1131,9 +1134,9 @@ pub async fn cancel_competition(
 
     // Cleanup worktrees if requested
     if cleanup_worktrees {
-        let working_dir = state.working_dir.lock().await;
-        let competition_dir = format!("{}/.worktrees/competition-{}", working_dir.display(), &competition_id[..8]);
-        drop(working_dir);
+        let home_dir = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
+        let ait42_worktrees = home_dir.join(".ait42").join(".worktrees");
+        let competition_dir = format!("{}/competition-{}", ait42_worktrees.display(), &competition_id[..8]);
 
         // Remove all worktrees
         if let Ok(entries) = std::fs::read_dir(&competition_dir) {
@@ -1261,11 +1264,15 @@ pub async fn execute_debate(
     );
 
     let working_dir = state.working_dir.lock().await;
-    let base_path = working_dir.clone();
+    let project_root = working_dir.clone();
     drop(working_dir);
 
+    // Use home directory for worktrees to avoid read-only file system issues
+    let home_dir = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
+    let ait42_worktrees = home_dir.join(".ait42").join(".worktrees");
+
     // Create debate directory
-    let debate_dir = format!("{}/.worktrees/debate-{}", base_path.display(), &debate_id[..8]);
+    let debate_dir = format!("{}/debate-{}", ait42_worktrees.display(), &debate_id[..8]);
     std::fs::create_dir_all(&debate_dir).map_err(|e| e.to_string())?;
 
     // Create context directory for shared files
@@ -1284,7 +1291,7 @@ pub async fn execute_debate(
         .arg("-b")
         .arg(&branch_name)
         .arg(&worktree_path)
-        .current_dir(&base_path);
+        .current_dir(&project_root);
 
     let output = cmd.output().map_err(|e| {
         format!("Failed to create worktree: {}", e)
@@ -1644,9 +1651,9 @@ pub async fn cancel_debate(
 
     // Cleanup worktrees if requested
     if cleanup_worktrees {
-        let working_dir = state.working_dir.lock().await;
-        let debate_dir = format!("{}/.worktrees/debate-{}", working_dir.display(), &debate_id[..8]);
-        drop(working_dir);
+        let home_dir = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
+        let ait42_worktrees = home_dir.join(".ait42").join(".worktrees");
+        let debate_dir = format!("{}/debate-{}", ait42_worktrees.display(), &debate_id[..8]);
 
         // Remove worktree
         let worktree_path = format!("{}/debate-workspace", debate_dir);
