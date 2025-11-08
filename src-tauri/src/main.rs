@@ -238,7 +238,13 @@ fn main() {
     info!("Starting AIT42 Editor GUI");
 
     // Initialize application state
-    let working_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    // Use home directory as default working directory to avoid read-only file system issues
+    // in macOS app bundles where current_dir() points to the app bundle
+    let working_dir = dirs::home_dir()
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
+
+    info!("Working directory set to: {}", working_dir.display());
+
     let app_state = AppState::new(working_dir).expect("Failed to initialize application state");
 
     // Initialize optimizer state (lazy initialization on first use)

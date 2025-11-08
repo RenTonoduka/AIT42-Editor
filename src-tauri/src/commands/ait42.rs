@@ -872,13 +872,23 @@ pub async fn execute_claude_code_competition(
     let project_root = working_dir.clone();
     drop(working_dir); // Release lock
 
+    tracing::info!("📁 Project root for competition: {}", project_root.display());
+
     // Create worktrees in the project directory (not in home directory)
     // This keeps worktrees with their respective projects
     let ait42_worktrees = project_root.join(".ait42").join(".worktrees");
 
+    tracing::info!("📁 Worktrees directory: {}", ait42_worktrees.display());
+
     // Create competition directory in project's .ait42 directory
     let competition_dir = format!("{}/competition-{}", ait42_worktrees.display(), &competition_id[..8]);
-    std::fs::create_dir_all(&competition_dir).map_err(|e| e.to_string())?;
+
+    tracing::info!("📁 Creating competition directory: {}", competition_dir);
+    std::fs::create_dir_all(&competition_dir).map_err(|e| {
+        let err_msg = format!("Failed to create competition directory at {}: {}", competition_dir, e);
+        tracing::error!("{}", err_msg);
+        err_msg
+    })?;
 
     let mut instances = Vec::new();
 
