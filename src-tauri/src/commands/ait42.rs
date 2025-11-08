@@ -1005,9 +1005,15 @@ pub async fn execute_claude_code_competition(
             request.task
         );
 
+        // Escape newlines and quotes for proper shell handling
+        let escaped_task = enhanced_task
+            .replace('\\', "\\\\")      // Escape backslashes first
+            .replace('\n', "\\n")       // Escape newlines
+            .replace('\'', "'\\''");    // Escape single quotes
+
         let claude_cmd = format!(
-            "printf '%s' '{}' | claude --model {} --print --permission-mode bypassPermissions",
-            enhanced_task.replace("'", "'\\''"),
+            "echo -e '{}' | claude --model {} --print --permission-mode bypassPermissions",
+            escaped_task,
             request.model
         );
 
@@ -1500,11 +1506,16 @@ async fn execute_round(
             .arg(format!("cat >> {}", output_log_path))
             .output();
 
-        // Send Claude Code command using printf for multiline support
+        // Send Claude Code command using echo -e for proper multiline handling
         // Use --permission-mode bypassPermissions to auto-approve changes and prevent interactive prompts
+        let escaped_prompt = prompt
+            .replace('\\', "\\\\")      // Escape backslashes first
+            .replace('\n', "\\n")       // Escape newlines
+            .replace('\'', "'\\''");    // Escape single quotes
+
         let claude_cmd = format!(
-            "printf '%s' '{}' | claude --model {} code --print --permission-mode bypassPermissions",
-            prompt.replace("'", "'\\''"),
+            "echo -e '{}' | claude --model {} code --print --permission-mode bypassPermissions",
+            escaped_prompt,
             request.model
         );
 
@@ -1814,10 +1825,15 @@ REASONING: [なぜこの複雑度クラスと分解数が適切か、詳細な�
         request.task
     );
 
-    // Send Claude Code command using printf for multiline support
+    // Send Claude Code command using echo -e for proper multiline handling
+    let escaped_prompt = analysis_prompt
+        .replace('\\', "\\\\")      // Escape backslashes first
+        .replace('\n', "\\n")       // Escape newlines
+        .replace('\'', "'\\''");    // Escape single quotes
+
     let claude_cmd = format!(
-        "printf '%s' '{}' | claude --model {} --print --permission-mode bypassPermissions",
-        analysis_prompt.replace("'", "'\\''"),
+        "echo -e '{}' | claude --model {} --print --permission-mode bypassPermissions",
+        escaped_prompt,
         request.model
     );
 
