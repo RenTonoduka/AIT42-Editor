@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, Settings, Users, Layout, Sparkles, Trophy, MessageSquare, Target, History, FolderOpen } from 'lucide-react';
+import { FileText, Settings, Users, Layout, Sparkles, Trophy, MessageSquare, History, FolderOpen } from 'lucide-react';
 import { Sidebar } from './components/Sidebar/Sidebar';
 import { EditorContainer } from '@/components/Editor';
 import { StatusBar } from '@/components/StatusBar';
@@ -9,13 +9,12 @@ import { CompetitionDialog } from '@/components/AI/CompetitionDialog';
 import { EnsembleDialog } from '@/components/AI/EnsembleDialog';
 import { DebateDialog } from '@/components/AI/DebateDialog';
 import DebateStatusPanel from '@/components/AI/DebateStatusPanel';
-import { OptimizerDemo } from '@/components/Optimizer';
 import { SessionHistory } from '@/components/SessionHistory';
 import { useEditorStore } from '@/store/editorStore';
 import { tauriApi } from '@/services/tauri';
 
 // View Mode Type
-type ViewMode = 'editor' | 'multi-agent' | 'debate' | 'optimizer' | 'session-history';
+type ViewMode = 'editor' | 'multi-agent' | 'debate' | 'session-history';
 
 function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('editor');
@@ -265,17 +264,6 @@ function App() {
               Debate
             </button>
             <button
-              onClick={() => setViewMode('optimizer')}
-              className={`px-3 py-1 rounded-md text-sm transition-colors ${
-                viewMode === 'optimizer'
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
-            >
-              <Target className="w-4 h-4 inline-block mr-1" />
-              Optimizer
-            </button>
-            <button
               onClick={() => setViewMode('session-history')}
               className={`px-3 py-1 rounded-md text-sm transition-colors ${
                 viewMode === 'session-history'
@@ -335,13 +323,6 @@ function App() {
               task={debateTask}
               onClose={handleDebateClose}
             />
-          </div>
-        )}
-
-        {/* Optimizer View Mode */}
-        {viewMode === 'optimizer' && (
-          <div className="flex-1 bg-gray-900 overflow-auto">
-            <OptimizerDemo />
           </div>
         )}
 
