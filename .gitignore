@@ -62,3 +62,4 @@ lerna-debug.log*
 # AIT42 Worktrees
 ait42-worktrees/
 src-tauri/.worktrees/
+.ait42/

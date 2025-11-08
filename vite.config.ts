@@ -15,7 +15,7 @@ export default defineConfig({
     strictPort: true,
     watch: {
       // Ignore Git worktrees to prevent hot reload during Competition execution
-      ignored: ['**/src-tauri/.worktrees/**'],
+      ignored: ['**/src-tauri/.worktrees/**', '**/.ait42/**'],
     },
   },
 
