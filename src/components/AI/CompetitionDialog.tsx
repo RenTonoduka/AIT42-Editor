@@ -100,6 +100,22 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
       return;
     }
 
+    // Check if workspace is a Git repository
+    try {
+      const workspace = await tauriApi.getWorkspace();
+      if (!workspace.is_git_repo) {
+        alert(
+          `現在のワークスペースはGitリポジトリではありません。\n\n` +
+          `ワークスペース: ${workspace.path}\n\n` +
+          `右上の「フォルダを開く」ボタンからGitリポジトリを選択してください。`
+        );
+        return;
+      }
+    } catch (error) {
+      alert(`ワークスペースの確認に失敗しました:\n${error}`);
+      return;
+    }
+
     setIsStarting(true);
     try {
       const request: ClaudeCodeCompetitionRequest = {
