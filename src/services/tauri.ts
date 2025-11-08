@@ -1241,4 +1241,38 @@ export const tauriApi = {
       throw new Error(`Failed to update instance status: ${error}`);
     }
   },
+
+  // ===== Workspace Commands =====
+
+  /**
+   * Select a workspace folder (must be a Git repository)
+   */
+  async selectWorkspace(): Promise<WorkspaceInfo> {
+    try {
+      const result = await invoke<WorkspaceInfo>('select_workspace');
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to select workspace: ${error}`);
+    }
+  },
+
+  /**
+   * Get current workspace information
+   */
+  async getWorkspace(): Promise<WorkspaceInfo> {
+    try {
+      const result = await invoke<WorkspaceInfo>('get_workspace');
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to get workspace: ${error}`);
+    }
+  },
 };
+
+/**
+ * Workspace information
+ */
+export interface WorkspaceInfo {
+  path: string;
+  is_git_repo: boolean;
+}

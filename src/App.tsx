@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { FileText, Settings, Users, Layout, Sparkles, Trophy, MessageSquare, Target, History } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { FileText, Settings, Users, Layout, Sparkles, Trophy, MessageSquare, Target, History, FolderOpen } from 'lucide-react';
 import { Sidebar } from './components/Sidebar/Sidebar';
 import { EditorContainer } from '@/components/Editor';
 import { StatusBar } from '@/components/StatusBar';
@@ -12,6 +12,7 @@ import DebateStatusPanel from '@/components/AI/DebateStatusPanel';
 import { OptimizerDemo } from '@/components/Optimizer';
 import { SessionHistory } from '@/components/SessionHistory';
 import { useEditorStore } from '@/store/editorStore';
+import { tauriApi } from '@/services/tauri';
 
 // View Mode Type
 type ViewMode = 'editor' | 'multi-agent' | 'debate' | 'optimizer' | 'session-history';
@@ -26,10 +27,49 @@ function App() {
   const [debateId, setDebateId] = useState<string | null>(null);
   const [debateTask, setDebateTask] = useState<string>('');
   const [activeCompetitionId, setActiveCompetitionId] = useState<string | null>(null); // 🔥 NEW: Store competition ID
+  const [workspacePath, setWorkspacePath] = useState<string>('');
+  const [isGitRepo, setIsGitRepo] = useState<boolean>(false);
 
   // Get active file from editor store
   const getActiveTab = useEditorStore((state) => state.getActiveTab);
   const activeFile = getActiveTab();
+
+  // Check workspace on mount
+  useEffect(() => {
+    const checkWorkspace = async () => {
+      try {
+        const workspace = await tauriApi.getWorkspace();
+        setWorkspacePath(workspace.path);
+        setIsGitRepo(workspace.is_git_repo);
+
+        // If not a git repo, prompt user to select workspace
+        if (!workspace.is_git_repo) {
+          const confirmSelect = window.confirm(
+            '現在のフォルダはGitリポジトリではありません。\nプロジェクトフォルダを選択しますか？'
+          );
+          if (confirmSelect) {
+            handleSelectWorkspace();
+          }
+        }
+      } catch (error) {
+        console.error('Failed to check workspace:', error);
+      }
+    };
+
+    checkWorkspace();
+  }, []);
+
+  // Handle workspace selection
+  const handleSelectWorkspace = async () => {
+    try {
+      const workspace = await tauriApi.selectWorkspace();
+      setWorkspacePath(workspace.path);
+      setIsGitRepo(workspace.is_git_repo);
+      alert(`ワークスペースを設定しました:\n${workspace.path}`);
+    } catch (error) {
+      alert(`ワークスペースの選択に失敗しました:\n${error}`);
+    }
+  };
 
   // Handle competition start (競争モード)
   const handleCompetitionStart = (competitionId: string, instanceCount: number, task: string) => {
@@ -94,6 +134,13 @@ function App() {
           <span className="text-sm font-semibold">AIT42-Editor</span>
           {activeFile && (
             <span className="text-xs text-gray-400">{activeFile.name}</span>
+          )}
+          {/* Workspace indicator */}
+          {isGitRepo && workspacePath && (
+            <div className="flex items-center space-x-2 text-xs text-gray-400">
+              <FolderOpen className="w-3 h-3" />
+              <span>{workspacePath.split('/').pop()}</span>
+            </div>
           )}
         </div>
 
@@ -195,6 +242,13 @@ function App() {
         </div>
 
         <div className="flex items-center space-x-2">
+          <button
+            onClick={handleSelectWorkspace}
+            className="p-2 rounded hover:bg-gray-700"
+            title="プロジェクトフォルダを開く"
+          >
+            <FolderOpen className="w-4 h-4" />
+          </button>
           <button
             onClick={() => setShowSettings(!showSettings)}
             className={`p-2 rounded hover:bg-gray-700 ${

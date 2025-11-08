@@ -121,7 +121,10 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::get_all_sessions,
             commands::delete_session,
             commands::add_chat_message,
-            commands::update_instance_status
+            commands::update_instance_status,
+            // Workspace operations
+            commands::select_workspace,
+            commands::get_workspace
         ]
     }
 
@@ -221,7 +224,10 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::get_all_sessions,
             commands::delete_session,
             commands::add_chat_message,
-            commands::update_instance_status
+            commands::update_instance_status,
+            // Workspace operations
+            commands::select_workspace,
+            commands::get_workspace
         ]
     }
 }
@@ -238,10 +244,22 @@ fn main() {
     info!("Starting AIT42 Editor GUI");
 
     // Initialize application state
-    // Use home directory as default working directory to avoid read-only file system issues
-    // in macOS app bundles where current_dir() points to the app bundle
-    let working_dir = dirs::home_dir()
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
+    // Try to load workspace from config, otherwise use current directory
+    let working_dir = commands::workspace::load_workspace_config()
+        .or_else(|| {
+            // Try current directory if it's a git repo
+            let current = std::env::current_dir().ok()?;
+            if current.join(".git").exists() {
+                Some(current)
+            } else {
+                None
+            }
+        })
+        .unwrap_or_else(|| {
+            // Fallback to home directory (user will need to select workspace)
+            dirs::home_dir()
+                .unwrap_or_else(|| std::path::PathBuf::from("."))
+        });
 
     info!("Working directory set to: {}", working_dir.display());
 

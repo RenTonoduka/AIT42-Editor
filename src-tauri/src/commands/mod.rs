@@ -11,6 +11,7 @@ pub mod ait42;
 pub mod worktree;
 pub mod optimizer;
 pub mod session_history;
+pub mod workspace;
 
 #[cfg(feature = "terminal")]
 pub mod terminal;
@@ -25,6 +26,7 @@ pub use ait42::*;
 pub use worktree::*;
 pub use optimizer::*;
 pub use session_history::*;
+pub use workspace::*;
 
 #[cfg(feature = "terminal")]
 pub use terminal::*;
