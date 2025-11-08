@@ -72,7 +72,7 @@ function App() {
   };
 
   // Handle competition start (競争モード)
-  const handleCompetitionStart = (competitionId: string, instanceCount: number, task: string) => {
+  const handleCompetitionStart = async (competitionId: string, instanceCount: number, task: string) => {
     const newInstances: ClaudeCodeInstance[] = Array.from({ length: instanceCount }, (_, i) => ({
       id: `${competitionId}-${i}`,
       agentName: `競争 Agent ${i + 1}`,
@@ -85,14 +85,38 @@ function App() {
       worktreeBranch: `claude-competition-${competitionId}-${i}`,
     }));
 
+    // セッション履歴に保存
+    try {
+      await tauriApi.createSession({
+        id: competitionId,
+        type: 'competition',
+        task,
+        status: 'running',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        instances: newInstances.map((inst, i) => ({
+          instanceId: i,
+          worktreePath: inst.worktreePath,
+          branch: inst.worktreeBranch,
+          agentName: inst.agentName,
+          status: 'running',
+          tmuxSessionId: inst.tmuxSessionId,
+          startTime: inst.startTime,
+        })),
+        chatHistory: [],
+      });
+    } catch (error) {
+      console.error('Failed to create session:', error);
+    }
+
     setClaudeInstances(newInstances);
-    setActiveCompetitionId(competitionId); // 🔥 NEW: Store competition ID
+    setActiveCompetitionId(competitionId);
     setShowCompetitionDialog(false);
     setViewMode('multi-agent');
   };
 
   // Handle ensemble start (アンサンブルモード)
-  const handleEnsembleStart = (competitionId: string, instanceCount: number, task: string) => {
+  const handleEnsembleStart = async (competitionId: string, instanceCount: number, task: string) => {
     const newInstances: ClaudeCodeInstance[] = Array.from({ length: instanceCount }, (_, i) => ({
       id: `${competitionId}-${i}`,
       agentName: `アンサンブル Agent ${i + 1}`,
@@ -105,8 +129,32 @@ function App() {
       worktreeBranch: `claude-ensemble-${competitionId}-${i}`,
     }));
 
+    // セッション履歴に保存
+    try {
+      await tauriApi.createSession({
+        id: competitionId,
+        type: 'ensemble',
+        task,
+        status: 'running',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        instances: newInstances.map((inst, i) => ({
+          instanceId: i,
+          worktreePath: inst.worktreePath,
+          branch: inst.worktreeBranch,
+          agentName: inst.agentName,
+          status: 'running',
+          tmuxSessionId: inst.tmuxSessionId,
+          startTime: inst.startTime,
+        })),
+        chatHistory: [],
+      });
+    } catch (error) {
+      console.error('Failed to create session:', error);
+    }
+
     setClaudeInstances(newInstances);
-    setActiveCompetitionId(competitionId); // 🔥 NEW: Store competition ID
+    setActiveCompetitionId(competitionId);
     setShowEnsembleDialog(false);
     setViewMode('multi-agent');
   };
