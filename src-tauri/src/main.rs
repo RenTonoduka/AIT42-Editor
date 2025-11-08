@@ -251,12 +251,21 @@ fn main() {
             let current = std::env::current_dir().ok()?;
             if current.join(".git").exists() {
                 Some(current)
+            } else if let Some(parent) = current.parent() {
+                // Check parent directory (for src-tauri case in development mode)
+                if parent.join(".git").exists() {
+                    info!("Found Git repository in parent directory: {}", parent.display());
+                    Some(parent.to_path_buf())
+                } else {
+                    None
+                }
             } else {
                 None
             }
         })
         .unwrap_or_else(|| {
             // Fallback to home directory (user will need to select workspace)
+            info!("No Git repository found, using home directory as fallback");
             dirs::home_dir()
                 .unwrap_or_else(|| std::path::PathBuf::from("."))
         });
