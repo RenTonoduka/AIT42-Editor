@@ -240,13 +240,20 @@ function App() {
           branch: '', // Debateモードはbranchを使用しない
           agentName: `${role.name} - ${shortTask} (${time})`,
           status: 'running',
-          tmuxSessionId: `claude-debate-${newDebateId}-${i}`,
+          tmuxSessionId: `debate-${newDebateId}`, // Debate全体で単一のセッションID
           startTime: new Date().toISOString(),
+          output: '', // 初期化
+          filesChanged: 0, // 統計情報を初期化
+          linesAdded: 0,
+          linesDeleted: 0,
         })),
         chatHistory: [],
       });
     } catch (error) {
       console.error('Failed to create debate session:', error);
+      alert(
+        `⚠️ Debateは正常に開始されましたが、セッション履歴の保存に失敗しました：\n${error instanceof Error ? error.message : error}\n\nDebateは正常に実行されますが、ダッシュボードには表示されません。`
+      );
     }
 
     setDebateId(newDebateId);
