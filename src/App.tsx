@@ -79,12 +79,15 @@ function App() {
     checkWorkspace();
   }, []);
 
-  // Sync workspace path to session history store
+  // Sync workspace path to session history store (only if it's a valid git repo)
   useEffect(() => {
-    if (workspacePath) {
+    if (workspacePath && isGitRepo) {
       sessionHistorySetWorkspacePath(workspacePath);
+    } else if (!isGitRepo) {
+      // Clear session history if workspace is not a git repo
+      sessionHistorySetWorkspacePath('');
     }
-  }, [workspacePath, sessionHistorySetWorkspacePath]);
+  }, [workspacePath, isGitRepo, sessionHistorySetWorkspacePath]);
 
   // Handle workspace selection
   const handleSelectWorkspace = async () => {
@@ -214,7 +217,7 @@ function App() {
   };
 
   // Handle debate start (ディベートモード)
-  const handleDebateStart = async (newDebateId: string, task: string) => {
+  const handleDebateStart = async (result: { debateId: string; worktreePath: string; branch: string }, task: string) => {
     const shortTask = shortenTaskDescription(task);
     const time = getCurrentTime();
 
@@ -228,7 +231,7 @@ function App() {
     // セッション履歴に保存
     try {
       await tauriApi.createSession(workspacePath, {
-        id: newDebateId,
+        id: result.debateId,
         type: 'debate',
         task,
         status: 'running',
@@ -236,11 +239,11 @@ function App() {
         updatedAt: new Date().toISOString(),
         instances: debateRoles.map((role, i) => ({
           instanceId: i,
-          worktreePath: '', // Debateモードはworktreeを使用しない
-          branch: '', // Debateモードはbranchを使用しない
+          worktreePath: result.worktreePath,
+          branch: result.branch,
           agentName: `${role.name} - ${shortTask} (${time})`,
           status: 'running',
-          tmuxSessionId: `debate-${newDebateId}`, // Debate全体で単一のセッションID
+          tmuxSessionId: `debate-${result.debateId}`, // Debate全体で単一のセッションID
           startTime: new Date().toISOString(),
           output: '', // 初期化
           filesChanged: 0, // 統計情報を初期化
@@ -256,7 +259,7 @@ function App() {
       );
     }
 
-    setDebateId(newDebateId);
+    setDebateId(result.debateId);
     setDebateTask(task);
     setShowDebateDialog(false);
     setViewMode('debate');
