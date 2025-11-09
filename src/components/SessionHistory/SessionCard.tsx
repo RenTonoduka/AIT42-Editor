@@ -35,18 +35,34 @@ const getStatusIcon = (status: string) => {
 };
 
 /**
- * Get session type badge color
+ * Get session type badge color and emoji
  */
-const getTypeBadgeColor = (type: string) => {
+const getTypeBadgeConfig = (type: string) => {
   switch (type) {
     case 'competition':
-      return 'bg-purple-100 text-purple-800 border-purple-200';
+      return {
+        color: 'bg-purple-100 text-purple-800 border-purple-200',
+        emoji: '🏆',
+        label: 'Competition',
+      };
     case 'ensemble':
-      return 'bg-blue-100 text-blue-800 border-blue-200';
+      return {
+        color: 'bg-blue-100 text-blue-800 border-blue-200',
+        emoji: '🎯',
+        label: 'Ensemble',
+      };
     case 'debate':
-      return 'bg-green-100 text-green-800 border-green-200';
+      return {
+        color: 'bg-green-100 text-green-800 border-green-200',
+        emoji: '💬',
+        label: 'Debate',
+      };
     default:
-      return 'bg-gray-100 text-gray-800 border-gray-200';
+      return {
+        color: 'bg-gray-100 text-gray-800 border-gray-200',
+        emoji: '📝',
+        label: type,
+      };
   }
 };
 
@@ -86,6 +102,20 @@ const formatDate = (dateStr: string): string => {
   return date.toLocaleDateString();
 };
 
+/**
+ * Format absolute date and time
+ */
+const formatAbsoluteDateTime = (dateStr: string): string => {
+  const date = new Date(dateStr);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+
+  return `${year}/${month}/${day} ${hours}:${minutes}`;
+};
+
 export const SessionCard: React.FC<SessionCardProps> = ({ session, onSelect }) => {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: ITEM_TYPE,
@@ -114,11 +144,12 @@ export const SessionCard: React.FC<SessionCardProps> = ({ session, onSelect }) =
       <div className="flex items-start justify-between mb-3">
         <span
           className={`
-            inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-            border ${getTypeBadgeColor(session.type)}
+            inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium
+            border ${getTypeBadgeConfig(session.type).color}
           `}
         >
-          {session.type.toUpperCase()}
+          <span>{getTypeBadgeConfig(session.type).emoji}</span>
+          <span>{getTypeBadgeConfig(session.type).label}</span>
         </span>
         {getStatusIcon(session.status)}
       </div>
@@ -153,8 +184,11 @@ export const SessionCard: React.FC<SessionCardProps> = ({ session, onSelect }) =
         )}
       </div>
 
-      {/* Footer: Updated Time */}
-      <div className="mt-3 pt-3 border-t border-gray-100">
+      {/* Footer: Created Time + Updated Time */}
+      <div className="mt-3 pt-3 border-t border-gray-100 space-y-1">
+        <p className="text-xs text-gray-700 font-medium">
+          📅 {formatAbsoluteDateTime(session.createdAt)}
+        </p>
         <p className="text-xs text-gray-500">
           Updated {formatDate(session.updatedAt)}
         </p>
