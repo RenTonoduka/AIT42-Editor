@@ -256,31 +256,33 @@ fn main() {
     info!("Starting AIT42 Editor GUI");
 
     // Initialize application state
-    // Try to load workspace from config, otherwise use current directory
-    let working_dir = commands::workspace::load_workspace_config()
-        .or_else(|| {
-            // Try current directory if it's a git repo
-            let current = std::env::current_dir().ok()?;
-            if current.join(".git").exists() {
-                Some(current)
-            } else if let Some(parent) = current.parent() {
-                // Check parent directory (for src-tauri case in development mode)
-                if parent.join(".git").exists() {
-                    info!("Found Git repository in parent directory: {}", parent.display());
-                    Some(parent.to_path_buf())
-                } else {
-                    None
-                }
-            } else {
-                None
+    // Prioritize current/parent directory (opened folder) over saved config
+    let working_dir = (|| {
+        // First: Try current directory if it's a git repo
+        let current = std::env::current_dir().ok()?;
+        if current.join(".git").exists() {
+            info!("Using current directory as workspace: {}", current.display());
+            return Some(current);
+        }
+
+        // Second: Check parent directory (for src-tauri case in development mode)
+        if let Some(parent) = current.parent() {
+            if parent.join(".git").exists() {
+                info!("Using parent directory as workspace: {}", parent.display());
+                return Some(parent.to_path_buf());
             }
-        })
-        .unwrap_or_else(|| {
-            // Fallback to home directory (user will need to select workspace)
-            info!("No Git repository found, using home directory as fallback");
-            dirs::home_dir()
-                .unwrap_or_else(|| std::path::PathBuf::from("."))
-        });
+        }
+
+        // Third: Try to load from saved config as fallback
+        if let Some(saved_path) = commands::workspace::load_workspace_config() {
+            info!("Using saved workspace from config: {}", saved_path.display());
+            return Some(saved_path);
+        }
+
+        // Last: Fallback to home directory (user will need to select workspace)
+        info!("No Git repository found, using home directory as fallback");
+        Some(dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from(".")))
+    })().unwrap();
 
     info!("Working directory set to: {}", working_dir.display());
 
