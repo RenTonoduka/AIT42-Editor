@@ -1,6 +1,6 @@
 [package]
 name = "ait42-editor"
-version = "0.1.0"
+version = "1.0.0"
 description = "AIT42 Editor - GUI Application"
 authors = ["AIT42 Team"]
 edition = "2021"
