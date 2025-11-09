@@ -762,6 +762,18 @@ export const tauriApi = {
     }
   },
 
+  /**
+   * Initialize a new Git repository
+   */
+  async gitInit(path: string): Promise<string> {
+    try {
+      const result = await invoke<string>('git_init', { path });
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to initialize Git repository: ${error}`);
+    }
+  },
+
   // ===== Plugin Commands =====
 
   /**

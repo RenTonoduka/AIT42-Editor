@@ -80,8 +80,29 @@ function App() {
     try {
       const workspace = await tauriApi.selectWorkspace();
       setWorkspacePath(workspace.path);
-      setIsGitRepo(workspace.is_git_repo);
-      alert(`ワークスペースを設定しました:\n${workspace.path}`);
+
+      // 自動的にgit initを実行（Gitリポジトリでない場合）
+      if (!workspace.is_git_repo) {
+        try {
+          await tauriApi.gitInit(workspace.path);
+          setIsGitRepo(true);
+          alert(
+            `ワークスペースを設定しました:\n${workspace.path}\n\n` +
+            `Gitリポジトリが作成されました。\n` +
+            `Competition/Ensembleモードが使用可能です。`
+          );
+        } catch (error) {
+          setIsGitRepo(false);
+          alert(
+            `ワークスペースを設定しました:\n${workspace.path}\n\n` +
+            `警告: Gitリポジトリの初期化に失敗しました。\n${error}\n\n` +
+            `Competition/Ensembleモードは使用できません。`
+          );
+        }
+      } else {
+        setIsGitRepo(true);
+        alert(`ワークスペースを設定しました:\n${workspace.path}`);
+      }
     } catch (error) {
       alert(`ワークスペースの選択に失敗しました:\n${error}`);
     }

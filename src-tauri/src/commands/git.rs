@@ -182,6 +182,28 @@ pub async fn git_create_branch(
     Ok(())
 }
 
+/**
+ * Initialize a new Git repository
+ */
+#[tauri::command]
+pub async fn git_init(path: String) -> Result<String, String> {
+    tracing::info!("🔧 Initializing Git repository at: {}", path);
+
+    let output = Command::new("git")
+        .arg("init")
+        .current_dir(&path)
+        .output()
+        .map_err(|e| format!("Failed to execute git init: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("git init failed: {}", stderr));
+    }
+
+    tracing::info!("✅ Git repository initialized successfully at: {}", path);
+    Ok(format!("Git repository initialized at: {}", path))
+}
+
 //
 // ============================================================
 // Git Worktree Management
