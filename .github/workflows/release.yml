@@ -4,62 +4,182 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.6.0)'
+        required: true
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
 
 jobs:
   create-release:
     name: Create Release
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     outputs:
+      release_id: ${{ steps.create_release.outputs.id }}
       upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Get version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          name: AIT42-Editor ${{ steps.get_version.outputs.version }}
+          draft: true
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            ## AIT42-Editor ${{ steps.get_version.outputs.version }}
+
+            ### Downloads
+            Choose the appropriate installer for your operating system:
+
+            - **macOS** (Apple Silicon): `AIT42-Editor_aarch64.dmg`
+            - **macOS** (Intel): `AIT42-Editor_x64.dmg`
+            - **Windows**: `AIT42-Editor_x64_en-US.msi`
+            - **Linux** (Debian/Ubuntu): `ait42-editor_amd64.deb`
+            - **Linux** (AppImage): `ait42-editor_amd64.AppImage`
+
+            ### What's New
+            See the full changelog for details.
+
+            ### Installation Instructions
+
+            #### macOS
+            1. Download the appropriate `.dmg` file for your Mac (Apple Silicon or Intel)
+            2. Open the `.dmg` file
+            3. Drag AIT42-Editor to Applications folder
+            4. Right-click and select "Open" (first time only, to bypass Gatekeeper)
+
+            #### Windows
+            1. Download `AIT42-Editor_x64_en-US.msi`
+            2. Run the installer
+            3. Follow the installation wizard
+            4. Launch from Start Menu
+
+            #### Linux (Debian/Ubuntu)
+            ```bash
+            sudo dpkg -i ait42-editor_amd64.deb
+            # Or use AppImage:
+            chmod +x ait42-editor_amd64.AppImage
+            ./ait42-editor_amd64.AppImage
+            ```
+
+            ### Prerequisites
+            - **Node.js**: 20.0 or higher
+            - **Git**: 2.40 or higher
+            - **Tmux**: 3.3 or higher
+            - **Claude Code CLI**: Latest version
+            - **Environment Variables**:
+              ```bash
+              export ANTHROPIC_API_KEY="your_api_key_here"
+              ```
+
+            ### Support
+            - Report issues: https://github.com/MarkXAI/AIT42-Editor/issues
+            - Documentation: https://github.com/MarkXAI/AIT42-Editor/blob/main/README.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
 
-  build-release:
-    name: Build Release
+  build-tauri:
+    name: Build Tauri (${{ matrix.platform }})
     needs: create-release
-    runs-on: macos-latest
     strategy:
+      fail-fast: false
       matrix:
-        target:
-          - x86_64-apple-darwin
-          - aarch64-apple-darwin
+        include:
+          - platform: 'macos-latest'
+            args: '--target aarch64-apple-darwin'
+            rust_target: 'aarch64-apple-darwin'
+          - platform: 'macos-latest'
+            args: '--target x86_64-apple-darwin'
+            rust_target: 'x86_64-apple-darwin'
+          - platform: 'ubuntu-22.04'
+            args: ''
+            rust_target: 'x86_64-unknown-linux-gnu'
+          - platform: 'windows-latest'
+            args: ''
+            rust_target: 'x86_64-pc-windows-msvc'
+
+    runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: ${{ matrix.rust_target }}
 
-      - name: Build release binary
-        run: cargo build --release --target ${{ matrix.target }}
-
-      - name: Create tarball
+      - name: Install dependencies (Ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
         run: |
-          cd target/${{ matrix.target }}/release
-          tar -czf ait42-${{ github.ref_name }}-${{ matrix.target }}.tar.gz ait42
-          mv ait42-${{ github.ref_name }}-${{ matrix.target }}.tar.gz ../../..
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
 
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/target
+          key: ${{ runner.os }}-${{ matrix.rust_target }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build Tauri Application
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./ait42-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
-          asset_name: ait42-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
-          asset_content_type: application/gzip
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          args: ${{ matrix.args }}
+
+  publish-release:
+    name: Publish Release
+    needs: [create-release, build-tauri]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v1
+        with:
+          id: ${{ needs.create-release.outputs.release_id }}
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

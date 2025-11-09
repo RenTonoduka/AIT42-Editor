@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Icon Converter</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: system-ui;
+            background: #f5f5f5;
+        }
+        #container {
+            text-align: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        canvas {
+            border: 2px solid #ccc;
+            margin: 20px auto;
+            display: block;
+            background: white;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+        #instructions {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1>AIT42-Editor Icon Generator</h1>
+        <canvas id="canvas" width="1024" height="1024"></canvas>
+        <div>
+            <button onclick="downloadPNG()">Download PNG (1024x1024)</button>
+            <button onclick="downloadSmall()">Download PNG (512x512)</button>
+        </div>
+        <div id="instructions">
+            <h2>Instructions:</h2>
+            <ol>
+                <li>Click "Download PNG (1024x1024)" to save the icon</li>
+                <li>Save it as <code>icon.png</code> in <code>src-tauri/icons/</code></li>
+                <li>Run: <code>npm run tauri icon src-tauri/icons/icon.png</code></li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        const svgData = `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="iconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#fbbf24;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f59e0b;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="512" cy="512" r="480" fill="url(#bgGrad)"/>
+
+  <!-- Code editor icon -->
+  <g transform="translate(512, 512)">
+    <!-- Bracket symbols representing code -->
+    <path d="M -200,-200 L -150,-200 L -150,-150 M -200,200 L -150,200 L -150,150"
+          stroke="url(#iconGrad)" stroke-width="40" fill="none" stroke-linecap="round"/>
+    <path d="M 200,-200 L 150,-200 L 150,-150 M 200,200 L 150,200 L 150,150"
+          stroke="url(#iconGrad)" stroke-width="40" fill="none" stroke-linecap="round"/>
+
+    <!-- AI brain symbol in center -->
+    <circle cx="0" cy="-80" r="30" fill="url(#iconGrad)"/>
+    <circle cx="-60" cy="0" r="30" fill="url(#iconGrad)"/>
+    <circle cx="60" cy="0" r="30" fill="url(#iconGrad)"/>
+    <circle cx="0" cy="80" r="30" fill="url(#iconGrad)"/>
+
+    <!-- Connection lines -->
+    <line x1="0" y1="-50" x2="-42" y2="-21" stroke="url(#iconGrad)" stroke-width="8"/>
+    <line x1="0" y1="-50" x2="42" y2="-21" stroke="url(#iconGrad)" stroke-width="8"/>
+    <line x1="-42" y1="21" x2="0" y2="50" stroke="url(#iconGrad)" stroke-width="8"/>
+    <line x1="42" y1="21" x2="0" y2="50" stroke="url(#iconGrad)" stroke-width="8"/>
+    <line x1="-42" y1="-21" x2="-42" y2="21" stroke="url(#iconGrad)" stroke-width="8"/>
+    <line x1="42" y1="-21" x2="42" y2="21" stroke="url(#iconGrad)" stroke-width="8"/>
+  </g>
+</svg>`;
+
+        function renderSVG(size = 1024) {
+            const canvas = document.getElementById('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            const img = new Image();
+            const svgBlob = new Blob([svgData], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(svgBlob);
+
+            img.onload = function() {
+                ctx.clearRect(0, 0, size, size);
+                ctx.drawImage(img, 0, 0, size, size);
+                URL.revokeObjectURL(url);
+            };
+
+            img.src = url;
+            return canvas;
+        }
+
+        function downloadPNG() {
+            const canvas = renderSVG(1024);
+            setTimeout(() => {
+                canvas.toBlob(function(blob) {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'icon.png';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                });
+            }, 100);
+        }
+
+        function downloadSmall() {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 512;
+            tempCanvas.height = 512;
+            const ctx = tempCanvas.getContext('2d');
+
+            const img = new Image();
+            const svgBlob = new Blob([svgData], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(svgBlob);
+
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0, 512, 512);
+                tempCanvas.toBlob(function(blob) {
+                    const downloadUrl = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = 'icon-512.png';
+                    a.click();
+                    URL.revokeObjectURL(downloadUrl);
+                    URL.revokeObjectURL(url);
+                });
+            };
+
+            img.src = url;
+        }
+
+        // Auto-render on load
+        window.onload = () => renderSVG(1024);
+    </script>
+</body>
+</html>
