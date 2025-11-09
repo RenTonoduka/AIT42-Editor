@@ -12,6 +12,7 @@ pub mod worktree;
 pub mod optimizer;
 pub mod session_history;
 pub mod workspace;
+pub mod system;
 
 #[cfg(feature = "terminal")]
 pub mod terminal;
@@ -27,6 +28,7 @@ pub use worktree::*;
 pub use optimizer::*;
 pub use session_history::*;
 pub use workspace::*;
+pub use system::*;
 
 #[cfg(feature = "terminal")]
 pub use terminal::*;

@@ -1267,6 +1267,56 @@ export const tauriApi = {
       throw new Error(`Failed to get workspace: ${error}`);
     }
   },
+
+  // ===== System Integration Commands =====
+
+  /**
+   * Open a directory in VS Code
+   */
+  async openInVscode(path: string): Promise<string> {
+    try {
+      const result = await invoke<string>('open_in_vscode', { path });
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to open in VS Code: ${error}`);
+    }
+  },
+
+  /**
+   * Open a terminal in a directory
+   */
+  async openTerminal(path: string): Promise<string> {
+    try {
+      const result = await invoke<string>('open_terminal', { path });
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to open terminal: ${error}`);
+    }
+  },
+
+  /**
+   * Open a directory in the system file manager (Finder/Explorer)
+   */
+  async openInFinder(path: string): Promise<string> {
+    try {
+      const result = await invoke<string>('open_in_finder', { path });
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to open in file manager: ${error}`);
+    }
+  },
+
+  /**
+   * Copy text to clipboard
+   */
+  async copyToClipboard(text: string): Promise<string> {
+    try {
+      const result = await invoke<string>('copy_to_clipboard', { text });
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to copy to clipboard: ${error}`);
+    }
+  },
 };
 
 /**

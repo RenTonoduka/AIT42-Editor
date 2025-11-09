@@ -124,7 +124,12 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::update_instance_status,
             // Workspace operations
             commands::select_workspace,
-            commands::get_workspace
+            commands::get_workspace,
+            // System integration operations
+            commands::open_in_vscode,
+            commands::open_terminal,
+            commands::open_in_finder,
+            commands::copy_to_clipboard
         ]
     }
 
@@ -227,7 +232,12 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::update_instance_status,
             // Workspace operations
             commands::select_workspace,
-            commands::get_workspace
+            commands::get_workspace,
+            // System integration operations
+            commands::open_in_vscode,
+            commands::open_terminal,
+            commands::open_in_finder,
+            commands::copy_to_clipboard
         ]
     }
 }

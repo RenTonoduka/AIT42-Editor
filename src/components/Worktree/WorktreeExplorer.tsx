@@ -20,12 +20,17 @@ import {
   Eye,
   GitCompare,
   Grid,
+  Code,
+  Terminal,
+  Copy,
+  ExternalLink,
 } from 'lucide-react';
 import type { FileNode } from '@/services/worktree';
 import { FileSearch } from './FileSearch';
 import { FilePreview } from './FilePreview';
 import { DiffViewer } from './DiffViewer';
 import { ComparisonMatrix } from './ComparisonMatrix';
+import { tauriApi } from '@/services/tauri';
 
 interface WorktreeExplorerProps {
   competitionId: string;
@@ -196,6 +201,45 @@ export const WorktreeExplorer: React.FC<WorktreeExplorerProps> = ({ competitionI
     }
   };
 
+  // Quick action handlers
+  const handleOpenVSCode = async (path: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await tauriApi.openInVscode(path);
+    } catch (error) {
+      alert(`Failed to open VS Code: ${error}`);
+    }
+  };
+
+  const handleOpenTerminal = async (path: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await tauriApi.openTerminal(path);
+    } catch (error) {
+      alert(`Failed to open terminal: ${error}`);
+    }
+  };
+
+  const handleOpenFinder = async (path: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await tauriApi.openInFinder(path);
+    } catch (error) {
+      alert(`Failed to open file manager: ${error}`);
+    }
+  };
+
+  const handleCopyPath = async (path: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await tauriApi.copyToClipboard(path);
+      // Show temporary success message
+      alert(`Path copied to clipboard: ${path}`);
+    } catch (error) {
+      alert(`Failed to copy path: ${error}`);
+    }
+  };
+
   // Get selected worktree path for DiffViewer
   const selectedWorktreePath = useMemo(() => {
     if (!selectedWorktree) return null;
@@ -297,11 +341,49 @@ export const WorktreeExplorer: React.FC<WorktreeExplorerProps> = ({ competitionI
               </div>
 
               {/* Path */}
-              <div className="flex items-start space-x-2 mb-2">
+              <div className="flex items-start space-x-2 mb-3">
                 <Folder className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
                 <span className="text-xs font-mono text-gray-400 break-all">
                   {worktree.path}
                 </span>
+              </div>
+
+              {/* Quick Action Buttons */}
+              <div className="flex items-center space-x-2 mb-2">
+                <button
+                  onClick={(e) => handleOpenVSCode(worktree.path, e)}
+                  className="flex items-center space-x-1 px-2 py-1 rounded bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 transition-colors"
+                  title="Open in VS Code"
+                >
+                  <Code size={12} className="text-blue-400" />
+                  <span className="text-xs text-blue-300">Code</span>
+                </button>
+
+                <button
+                  onClick={(e) => handleOpenTerminal(worktree.path, e)}
+                  className="flex items-center space-x-1 px-2 py-1 rounded bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 transition-colors"
+                  title="Open Terminal"
+                >
+                  <Terminal size={12} className="text-purple-400" />
+                  <span className="text-xs text-purple-300">Terminal</span>
+                </button>
+
+                <button
+                  onClick={(e) => handleOpenFinder(worktree.path, e)}
+                  className="flex items-center space-x-1 px-2 py-1 rounded bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 transition-colors"
+                  title="Open in Finder"
+                >
+                  <ExternalLink size={12} className="text-green-400" />
+                  <span className="text-xs text-green-300">Finder</span>
+                </button>
+
+                <button
+                  onClick={(e) => handleCopyPath(worktree.path, e)}
+                  className="flex items-center space-x-1 px-2 py-1 rounded bg-gray-500/10 hover:bg-gray-500/20 border border-gray-500/30 transition-colors"
+                  title="Copy path to clipboard"
+                >
+                  <Copy size={12} className="text-gray-400" />
+                </button>
               </div>
 
               {/* Metadata */}
