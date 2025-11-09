@@ -256,33 +256,16 @@ fn main() {
     info!("Starting AIT42 Editor GUI");
 
     // Initialize application state
-    // Prioritize current/parent directory (opened folder) over saved config
-    let working_dir = (|| {
-        // First: Try current directory if it's a git repo
-        let current = std::env::current_dir().ok()?;
-        if current.join(".git").exists() {
-            info!("Using current directory as workspace: {}", current.display());
-            return Some(current);
-        }
-
-        // Second: Check parent directory (for src-tauri case in development mode)
-        if let Some(parent) = current.parent() {
-            if parent.join(".git").exists() {
-                info!("Using parent directory as workspace: {}", parent.display());
-                return Some(parent.to_path_buf());
-            }
-        }
-
-        // Third: Try to load from saved config as fallback
-        if let Some(saved_path) = commands::workspace::load_workspace_config() {
-            info!("Using saved workspace from config: {}", saved_path.display());
-            return Some(saved_path);
-        }
-
-        // Last: Fallback to home directory (user will need to select workspace)
-        info!("No Git repository found, using home directory as fallback");
-        Some(dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from(".")))
-    })().unwrap();
+    // Load workspace from saved config, or use home directory as fallback
+    // User will select workspace through GUI folder picker
+    let working_dir = if let Some(saved_path) = commands::workspace::load_workspace_config() {
+        info!("📁 Loaded saved workspace: {}", saved_path.display());
+        saved_path
+    } else {
+        let home = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+        info!("⚠️  No workspace configured - using home directory. User should select workspace through GUI.");
+        home
+    };
 
     info!("Working directory set to: {}", working_dir.display());
 
