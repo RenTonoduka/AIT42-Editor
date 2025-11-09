@@ -12,6 +12,7 @@ import DebateStatusPanel from '@/components/AI/DebateStatusPanel';
 import { SessionHistory } from '@/components/SessionHistory';
 import { useEditorStore } from '@/store/editorStore';
 import { useSessionHistoryStore } from '@/store/sessionHistoryStore';
+import { useFileTreeStore } from '@/store/fileTreeStore';
 import { tauriApi } from '@/services/tauri';
 
 // View Mode Type
@@ -54,6 +55,9 @@ function App() {
   // Get session history store methods
   const sessionHistorySetWorkspacePath = useSessionHistoryStore((state) => state.setWorkspacePath);
 
+  // Get file tree store methods
+  const { setRootPath, setTree, setLoading, setError } = useFileTreeStore();
+
   // Check workspace on mount
   useEffect(() => {
     const checkWorkspace = async () => {
@@ -89,6 +93,24 @@ function App() {
     }
   }, [workspacePath, isGitRepo, sessionHistorySetWorkspacePath]);
 
+  // Helper function to load directory contents into file tree
+  const loadDirectoryIntoFileTree = async (path: string) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const entries = await tauriApi.readDirectory(path);
+      setRootPath(path);
+      setTree(entries);
+      console.log(`✅ Loaded directory into Explorer: ${path}`);
+    } catch (error) {
+      console.error('Failed to load directory:', error);
+      setError(`Failed to load directory: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Handle workspace selection
   const handleSelectWorkspace = async () => {
     try {
@@ -100,6 +122,10 @@ function App() {
         try {
           await tauriApi.gitInit(workspace.path);
           setIsGitRepo(true);
+
+          // 🔥 Load directory contents into Explorer
+          await loadDirectoryIntoFileTree(workspace.path);
+
           alert(
             `ワークスペースを設定しました:\n${workspace.path}\n\n` +
             `Gitリポジトリが作成されました。\n` +
@@ -107,6 +133,10 @@ function App() {
           );
         } catch (error) {
           setIsGitRepo(false);
+
+          // 🔥 Load directory contents into Explorer even if git init failed
+          await loadDirectoryIntoFileTree(workspace.path);
+
           alert(
             `ワークスペースを設定しました:\n${workspace.path}\n\n` +
             `警告: Gitリポジトリの初期化に失敗しました。\n${error}\n\n` +
@@ -115,6 +145,10 @@ function App() {
         }
       } else {
         setIsGitRepo(true);
+
+        // 🔥 Load directory contents into Explorer
+        await loadDirectoryIntoFileTree(workspace.path);
+
         alert(`ワークスペースを設定しました:\n${workspace.path}`);
       }
     } catch (error) {
