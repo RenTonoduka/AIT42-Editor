@@ -1160,9 +1160,9 @@ export const tauriApi = {
   /**
    * Create a new worktree session
    */
-  async createSession(session: import('@/types/worktree').WorktreeSession): Promise<import('@/types/worktree').WorktreeSession> {
+  async createSession(workspacePath: string, session: import('@/types/worktree').WorktreeSession): Promise<import('@/types/worktree').WorktreeSession> {
     try {
-      const result = await invoke<import('@/types/worktree').WorktreeSession>('create_session', { session });
+      const result = await invoke<import('@/types/worktree').WorktreeSession>('create_session', { workspacePath, session });
       return result;
     } catch (error) {
       throw new Error(`Failed to create session: ${error}`);
@@ -1172,9 +1172,9 @@ export const tauriApi = {
   /**
    * Update an existing session
    */
-  async updateSession(session: import('@/types/worktree').WorktreeSession): Promise<import('@/types/worktree').WorktreeSession> {
+  async updateSession(workspacePath: string, session: import('@/types/worktree').WorktreeSession): Promise<import('@/types/worktree').WorktreeSession> {
     try {
-      const result = await invoke<import('@/types/worktree').WorktreeSession>('update_session', { session });
+      const result = await invoke<import('@/types/worktree').WorktreeSession>('update_session', { workspacePath, session });
       return result;
     } catch (error) {
       throw new Error(`Failed to update session: ${error}`);
@@ -1184,9 +1184,9 @@ export const tauriApi = {
   /**
    * Get a specific session by ID
    */
-  async getSession(sessionId: string): Promise<import('@/types/worktree').WorktreeSession> {
+  async getSession(workspacePath: string, sessionId: string): Promise<import('@/types/worktree').WorktreeSession> {
     try {
-      const result = await invoke<import('@/types/worktree').WorktreeSession>('get_session', { sessionId });
+      const result = await invoke<import('@/types/worktree').WorktreeSession>('get_session', { workspacePath, sessionId });
       return result;
     } catch (error) {
       throw new Error(`Failed to get session: ${error}`);
@@ -1194,11 +1194,11 @@ export const tauriApi = {
   },
 
   /**
-   * Get all sessions
+   * Get all sessions for a workspace
    */
-  async getAllSessions(): Promise<import('@/types/worktree').WorktreeSession[]> {
+  async getAllSessions(workspacePath: string): Promise<import('@/types/worktree').WorktreeSession[]> {
     try {
-      const result = await invoke<import('@/types/worktree').WorktreeSession[]>('get_all_sessions');
+      const result = await invoke<import('@/types/worktree').WorktreeSession[]>('get_all_sessions', { workspacePath });
       return result;
     } catch (error) {
       throw new Error(`Failed to get all sessions: ${error}`);
@@ -1208,9 +1208,9 @@ export const tauriApi = {
   /**
    * Delete a session
    */
-  async deleteSession(sessionId: string): Promise<void> {
+  async deleteSession(workspacePath: string, sessionId: string): Promise<void> {
     try {
-      await invoke('delete_session', { sessionId });
+      await invoke('delete_session', { workspacePath, sessionId });
     } catch (error) {
       throw new Error(`Failed to delete session: ${error}`);
     }
@@ -1220,11 +1220,13 @@ export const tauriApi = {
    * Add a chat message to a session
    */
   async addChatMessage(
+    workspacePath: string,
     sessionId: string,
     message: import('@/types/worktree').ChatMessage
   ): Promise<import('@/types/worktree').WorktreeSession> {
     try {
       const result = await invoke<import('@/types/worktree').WorktreeSession>('add_chat_message', {
+        workspacePath,
         sessionId,
         message,
       });
@@ -1238,12 +1240,14 @@ export const tauriApi = {
    * Update instance status within a session
    */
   async updateInstanceStatus(
+    workspacePath: string,
     sessionId: string,
     instanceId: number,
     newStatus: string
   ): Promise<import('@/types/worktree').WorktreeSession> {
     try {
       const result = await invoke<import('@/types/worktree').WorktreeSession>('update_instance_status', {
+        workspacePath,
         sessionId,
         instanceId,
         newStatus,

@@ -21,6 +21,8 @@ interface SessionHistoryStore {
   sessions: WorktreeSession[];
   /** Currently selected/active session ID */
   activeSessionId: string | null;
+  /** Current workspace path for session filtering */
+  workspacePath: string;
   /** Loading state */
   isLoading: boolean;
   /** Error message */
@@ -31,6 +33,8 @@ interface SessionHistoryStore {
   sortOptions: SessionSortOptions;
 
   // Actions
+  /** Set workspace path and reload sessions */
+  setWorkspacePath: (workspacePath: string) => Promise<void>;
   /** Load all sessions from disk */
   loadSessions: () => Promise<void>;
   /** Create a new session */
@@ -67,6 +71,7 @@ interface SessionHistoryStore {
 const initialState = {
   sessions: [],
   activeSessionId: null,
+  workspacePath: '',
   isLoading: false,
   error: null,
   filters: {},
@@ -82,11 +87,62 @@ const initialState = {
 export const useSessionHistoryStore = create<SessionHistoryStore>((set, get) => ({
   ...initialState,
 
+  setWorkspacePath: async (workspacePath: string) => {
+    // Validation: Check if workspace path is valid
+    if (!workspacePath || workspacePath.trim() === '') {
+      set({
+        workspacePath: '',
+        sessions: [],
+        error: 'Workspace path cannot be empty',
+        isLoading: false
+      });
+      return;
+    }
+
+    // Race condition prevention: Skip if same path is already set
+    const currentPath = get().workspacePath;
+    if (currentPath === workspacePath) {
+      // Already set to this workspace, no need to reload
+      return;
+    }
+
+    // Check for invalid characters (basic validation)
+    if (/[\x00-\x1f\x7f]/.test(workspacePath)) {
+      set({
+        workspacePath: '',
+        sessions: [],
+        error: 'Workspace path contains invalid characters',
+        isLoading: false
+      });
+      return;
+    }
+
+    set({ workspacePath, isLoading: true, error: null });
+
+    // Reload sessions for new workspace
+    try {
+      const sessions = await tauriApi.getAllSessions(workspacePath);
+      set({ sessions, isLoading: false });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to load sessions',
+        isLoading: false,
+        sessions: [],
+      });
+    }
+  },
+
   loadSessions: async () => {
+    const { workspacePath } = get();
+    if (!workspacePath) {
+      set({ sessions: [], error: 'No workspace path set' });
+      return;
+    }
+
     set({ isLoading: true, error: null });
 
     try {
-      const sessions = await tauriApi.getAllSessions();
+      const sessions = await tauriApi.getAllSessions(workspacePath);
       set({ sessions, isLoading: false });
     } catch (error) {
       set({
@@ -97,10 +153,15 @@ export const useSessionHistoryStore = create<SessionHistoryStore>((set, get) => 
   },
 
   createSession: async (session: WorktreeSession) => {
+    const { workspacePath } = get();
+    if (!workspacePath) {
+      throw new Error('No workspace path set');
+    }
+
     set({ isLoading: true, error: null });
 
     try {
-      const created = await tauriApi.createSession(session);
+      const created = await tauriApi.createSession(workspacePath, session);
 
       // Add to local state
       const { sessions } = get();
@@ -119,10 +180,15 @@ export const useSessionHistoryStore = create<SessionHistoryStore>((set, get) => 
   },
 
   updateSession: async (session: WorktreeSession) => {
+    const { workspacePath } = get();
+    if (!workspacePath) {
+      throw new Error('No workspace path set');
+    }
+
     set({ isLoading: true, error: null });
 
     try {
-      const updated = await tauriApi.updateSession(session);
+      const updated = await tauriApi.updateSession(workspacePath, session);
 
       // Update local state
       const { sessions } = get();
@@ -142,10 +208,15 @@ export const useSessionHistoryStore = create<SessionHistoryStore>((set, get) => 
   },
 
   getSession: async (sessionId: string) => {
+    const { workspacePath } = get();
+    if (!workspacePath) {
+      throw new Error('No workspace path set');
+    }
+
     set({ isLoading: true, error: null });
 
     try {
-      const session = await tauriApi.getSession(sessionId);
+      const session = await tauriApi.getSession(workspacePath, sessionId);
       set({ isLoading: false });
       return session;
     } catch (error) {
@@ -158,10 +229,15 @@ export const useSessionHistoryStore = create<SessionHistoryStore>((set, get) => 
   },
 
   deleteSession: async (sessionId: string) => {
+    const { workspacePath } = get();
+    if (!workspacePath) {
+      throw new Error('No workspace path set');
+    }
+
     set({ isLoading: true, error: null });
 
     try {
-      await tauriApi.deleteSession(sessionId);
+      await tauriApi.deleteSession(workspacePath, sessionId);
 
       // Remove from local state
       const { sessions, activeSessionId } = get();
@@ -186,8 +262,13 @@ export const useSessionHistoryStore = create<SessionHistoryStore>((set, get) => 
   },
 
   addChatMessage: async (sessionId: string, message: ChatMessage) => {
+    const { workspacePath } = get();
+    if (!workspacePath) {
+      throw new Error('No workspace path set');
+    }
+
     try {
-      const updated = await tauriApi.addChatMessage(sessionId, message);
+      const updated = await tauriApi.addChatMessage(workspacePath, sessionId, message);
 
       // Update local state
       const { sessions } = get();
@@ -207,8 +288,13 @@ export const useSessionHistoryStore = create<SessionHistoryStore>((set, get) => 
     instanceId: number,
     newStatus: string
   ) => {
+    const { workspacePath } = get();
+    if (!workspacePath) {
+      throw new Error('No workspace path set');
+    }
+
     try {
-      const updated = await tauriApi.updateInstanceStatus(sessionId, instanceId, newStatus);
+      const updated = await tauriApi.updateInstanceStatus(workspacePath, sessionId, instanceId, newStatus);
 
       // Update local state
       const { sessions } = get();

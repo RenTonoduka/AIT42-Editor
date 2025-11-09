@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, Settings, Users, Layout, Sparkles, Trophy, MessageSquare, History, FolderOpen } from 'lucide-react';
+import { FileText, Settings, Users, Layout, Sparkles, Trophy, MessageSquare, LayoutDashboard, FolderOpen } from 'lucide-react';
 import { Sidebar } from './components/Sidebar/Sidebar';
 import { EditorContainer } from '@/components/Editor';
 import { StatusBar } from '@/components/StatusBar';
@@ -11,6 +11,7 @@ import { DebateDialog } from '@/components/AI/DebateDialog';
 import DebateStatusPanel from '@/components/AI/DebateStatusPanel';
 import { SessionHistory } from '@/components/SessionHistory';
 import { useEditorStore } from '@/store/editorStore';
+import { useSessionHistoryStore } from '@/store/sessionHistoryStore';
 import { tauriApi } from '@/services/tauri';
 
 // View Mode Type
@@ -50,6 +51,9 @@ function App() {
   const getActiveTab = useEditorStore((state) => state.getActiveTab);
   const activeFile = getActiveTab();
 
+  // Get session history store methods
+  const sessionHistorySetWorkspacePath = useSessionHistoryStore((state) => state.setWorkspacePath);
+
   // Check workspace on mount
   useEffect(() => {
     const checkWorkspace = async () => {
@@ -74,6 +78,13 @@ function App() {
 
     checkWorkspace();
   }, []);
+
+  // Sync workspace path to session history store
+  useEffect(() => {
+    if (workspacePath) {
+      sessionHistorySetWorkspacePath(workspacePath);
+    }
+  }, [workspacePath, sessionHistorySetWorkspacePath]);
 
   // Handle workspace selection
   const handleSelectWorkspace = async () => {
@@ -127,7 +138,7 @@ function App() {
 
     // セッション履歴に保存
     try {
-      await tauriApi.createSession({
+      await tauriApi.createSession(workspacePath, {
         id: competitionId,
         type: 'competition',
         task,
@@ -174,7 +185,7 @@ function App() {
 
     // セッション履歴に保存
     try {
-      await tauriApi.createSession({
+      await tauriApi.createSession(workspacePath, {
         id: competitionId,
         type: 'ensemble',
         task,
@@ -273,6 +284,17 @@ function App() {
           {/* View Mode Toggle */}
           <div className="flex items-center space-x-2 ml-2 pl-2 border-l border-gray-700">
             <button
+              onClick={() => setViewMode('session-history')}
+              className={`px-3 py-1 rounded-md text-sm transition-colors ${
+                viewMode === 'session-history'
+                  ? 'bg-orange-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              <LayoutDashboard className="w-4 h-4 inline-block mr-1" />
+              ダッシュボード
+            </button>
+            <button
               onClick={() => setViewMode('editor')}
               className={`px-3 py-1 rounded-md text-sm transition-colors ${
                 viewMode === 'editor'
@@ -306,17 +328,6 @@ function App() {
             >
               <MessageSquare className="w-4 h-4 inline-block mr-1" />
               Debate
-            </button>
-            <button
-              onClick={() => setViewMode('session-history')}
-              className={`px-3 py-1 rounded-md text-sm transition-colors ${
-                viewMode === 'session-history'
-                  ? 'bg-orange-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
-            >
-              <History className="w-4 h-4 inline-block mr-1" />
-              履歴
             </button>
           </div>
         </div>
