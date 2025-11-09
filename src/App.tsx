@@ -16,6 +16,23 @@ import { tauriApi } from '@/services/tauri';
 // View Mode Type
 type ViewMode = 'editor' | 'multi-agent' | 'debate' | 'session-history';
 
+/**
+ * タスク説明を短縮（最大50文字）
+ */
+function shortenTaskDescription(task: string, maxLength: number = 50): string {
+  const cleaned = task.trim().replace(/\s+/g, ' ');
+  if (cleaned.length <= maxLength) return cleaned;
+  return cleaned.substring(0, maxLength - 3) + '...';
+}
+
+/**
+ * 現在時刻を HH:MM 形式で取得
+ */
+function getCurrentTime(): string {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+}
+
 function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('editor');
   const [showSettings, setShowSettings] = useState(false);
@@ -72,9 +89,12 @@ function App() {
 
   // Handle competition start (競争モード)
   const handleCompetitionStart = async (competitionId: string, instanceCount: number, task: string) => {
+    const shortTask = shortenTaskDescription(task);
+    const time = getCurrentTime();
+
     const newInstances: ClaudeCodeInstance[] = Array.from({ length: instanceCount }, (_, i) => ({
       id: `${competitionId}-${i}`,
-      agentName: `競争 Agent ${i + 1}`,
+      agentName: `🏆 ${shortTask} #${i + 1} (${time})`,
       task: task,
       status: 'running',
       output: '',
@@ -116,9 +136,12 @@ function App() {
 
   // Handle ensemble start (アンサンブルモード)
   const handleEnsembleStart = async (competitionId: string, instanceCount: number, task: string) => {
+    const shortTask = shortenTaskDescription(task);
+    const time = getCurrentTime();
+
     const newInstances: ClaudeCodeInstance[] = Array.from({ length: instanceCount }, (_, i) => ({
       id: `${competitionId}-${i}`,
-      agentName: `アンサンブル Agent ${i + 1}`,
+      agentName: `🎯 ${shortTask} #${i + 1} (${time})`,
       task: task,
       status: 'running',
       output: '',
