@@ -5,7 +5,7 @@
  * and compares their results for the same task.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Trophy, X, Settings as SettingsIcon, Code2, Cpu, Sparkles, Loader2 } from 'lucide-react';
 import { tauriApi, ClaudeCodeCompetitionRequest } from '@/services/tauri';
 import { ModeIndicator } from './ModeIndicator';
@@ -23,6 +23,9 @@ export interface CompetitionDialogProps {
 }
 
 type ClaudeModel = 'sonnet' | 'haiku' | 'opus';
+
+// ✅ Low Priority: Magic number defined as constant
+const DEFAULT_INSTANCE_COUNT = 3;
 
 const MODEL_INFO: Record<ClaudeModel, { label: string; description: string; emoji: string }> = {
   sonnet: {
@@ -43,6 +46,33 @@ const MODEL_INFO: Record<ClaudeModel, { label: string; description: string; emoj
 };
 
 /**
+ * ✅ Fixed: XSS vulnerability - Sanitize error messages from backend
+ *
+ * Removes HTML tags, limits length, and escapes special characters
+ * @param error - Error message to sanitize
+ * @returns Sanitized error message (max 200 chars)
+ */
+const sanitizeError = (error: string): string => {
+  // HTMLタグ除去
+  const withoutHtml = error.replace(/<[^>]*>/g, '');
+
+  // 長さ制限（200文字）
+  const truncated = withoutHtml.slice(0, 200);
+
+  // 特殊文字エスケープ（念のため）
+  return truncated.replace(/[<>&"']/g, (char) => {
+    const escapeMap: Record<string, string> = {
+      '<': '&lt;',
+      '>': '&gt;',
+      '&': '&amp;',
+      '"': '&quot;',
+      "'": '&#39;',
+    };
+    return escapeMap[char] || char;
+  });
+};
+
+/**
  * CompetitionDialog component
  */
 export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
@@ -51,12 +81,16 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
   onStart,
 }) => {
   const [task, setTask] = useState('');
-  const [instanceCount, setInstanceCount] = useState(3);
+  const [instanceCount, setInstanceCount] = useState(DEFAULT_INSTANCE_COUNT);
   const [selectedModel, setSelectedModel] = useState<ClaudeModel>('sonnet');
   const [timeoutSeconds, setTimeoutSeconds] = useState(300);
   const [preserveWorktrees, setPreserveWorktrees] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  // ✅ Fixed: Race condition - Track mounted state to prevent state updates after unmount
+  const isMountedRef = useRef(true);
 
   // 🔥 Ω-theory optimizer integration (automatic analysis)
   const { state: optimizerState, analyze, isAnalyzing } = useTaskOptimizer();
@@ -65,14 +99,22 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
   useEffect(() => {
     if (isOpen) {
       setTask('');
-      setInstanceCount(3);
+      setInstanceCount(DEFAULT_INSTANCE_COUNT);
       setSelectedModel('sonnet');
       setTimeoutSeconds(300);
       setPreserveWorktrees(false);
       setShowAdvanced(false);
       setIsStarting(false);
+      setValidationError(null);
     }
   }, [isOpen]);
+
+  // ✅ Fixed: Race condition - Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // 🔥 Auto-update instance count when analysis completes
   useEffect(() => {
@@ -81,38 +123,55 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
     }
   }, [optimizerState]);
 
+  // ✅ Fixed: Silent error handling - Added cancelled flag and proper error logging
   // 🔥 Auto-analyze task when user finishes typing (debounced)
   useEffect(() => {
     if (!task.trim() || task.trim().length < 10) {
       return;
     }
 
-    const debounceTimer = setTimeout(() => {
-      analyze(task.trim());
+    let cancelled = false;
+
+    const debounceTimer = setTimeout(async () => {
+      try {
+        await analyze(task.trim());
+      } catch (error) {
+        console.error('[CompetitionDialog] Unexpected error in auto-analysis:', error);
+
+        // 防御的プログラミング：状態確認
+        if (!cancelled && optimizerState.status === 'analyzing') {
+          console.warn('[CompetitionDialog] analyze() may have failed to update state');
+        }
+      }
     }, 1500); // 1.5秒後に自動分析
 
-    return () => clearTimeout(debounceTimer);
-  }, [task, analyze]);
+    return () => {
+      cancelled = true;
+      clearTimeout(debounceTimer);
+    };
+  }, [task, analyze, optimizerState.status]);
 
   const handleStart = async () => {
+    // ✅ Medium Priority: Replace alert() with inline error display
     if (!task.trim()) {
-      alert('タスクを入力してください');
+      setValidationError('タスクを入力してください');
       return;
     }
+
+    // Clear validation error when starting
+    setValidationError(null);
 
     // Check if workspace is a Git repository
     try {
       const workspace = await tauriApi.getWorkspace();
       if (!workspace.is_git_repo) {
-        alert(
-          `現在のワークスペースはGitリポジトリではありません。\n\n` +
-          `ワークスペース: ${workspace.path}\n\n` +
-          `右上の「フォルダを開く」ボタンからGitリポジトリを選択してください。`
+        setValidationError(
+          `現在のワークスペースはGitリポジトリではありません。右上の「フォルダを開く」ボタンからGitリポジトリを選択してください。`
         );
         return;
       }
     } catch (error) {
-      alert(`ワークスペースの確認に失敗しました:\n${error}`);
+      setValidationError(`ワークスペースの確認に失敗しました: ${error}`);
       return;
     }
 
@@ -134,13 +193,14 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
         // タスクとインスタンス数も渡す
         onStart(result.competitionId, instanceCount, task.trim());
       }
-
-      // 成功後にリセット（onStart内でダイアログが閉じられる）
-      setIsStarting(false);
     } catch (error) {
       console.error('Failed to start competition:', error);
-      alert(`コンペティションの開始に失敗しました: ${error}`);
-      setIsStarting(false);
+      setValidationError(`コンペティションの開始に失敗しました: ${error}`);
+    } finally {
+      // ✅ Fixed: Race condition - Only update state if component is still mounted
+      if (isMountedRef.current) {
+        setIsStarting(false);
+      }
     }
   };
 
@@ -191,19 +251,36 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
             </label>
             <textarea
               value={task}
-              onChange={(e) => setTask(e.target.value)}
+              onChange={(e) => {
+                setTask(e.target.value);
+                // Clear validation error when user types
+                if (validationError) {
+                  setValidationError(null);
+                }
+              }}
               placeholder="各インスタンスに実行させるタスクを入力してください...&#10;例: 'ユーザー認証機能をJWTで実装してください'"
               className="w-full px-4 py-3 bg-editor-bg text-text-primary placeholder-text-tertiary border border-editor-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary/50 resize-none"
               rows={4}
             />
+            {/* ✅ Medium Priority: Inline validation error display */}
+            {validationError && (
+              <div className="text-sm text-red-400 mt-2 px-2">
+                {validationError}
+              </div>
+            )}
           </div>
 
           {/* 🔥 Automatic Ω Analysis Feedback */}
           {isAnalyzing && (
-            <div className="flex items-center gap-3 px-4 py-3 bg-purple-900/20 border border-purple-700/30 rounded-lg">
-              <Loader2 size={16} className="animate-spin text-purple-400" />
-              <span className="text-sm text-purple-300">
-                Claude Codeがタスクを分析中...
+            <div className="flex flex-col gap-2 px-4 py-3 bg-purple-900/20 border border-purple-700/30 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Loader2 size={16} className="animate-spin text-purple-400" />
+                <span className="text-sm text-purple-300">
+                  Claude Codeがタスクを分析中...
+                </span>
+              </div>
+              <span className="text-xs text-purple-400/70">
+                分析完了を待たずにCompetitionを開始することもできます
               </span>
             </div>
           )}
@@ -224,10 +301,19 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
           )}
 
           {optimizerState.status === 'error' && (
-            <div className="px-4 py-3 bg-red-900/20 border border-red-700/30 rounded-lg">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-red-300">
-                  分析エラー: {optimizerState.error}
+            <div className="px-4 py-3 bg-yellow-900/20 border border-yellow-700/30 rounded-lg">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-yellow-300">
+                    ⚠️ 自動分析失敗
+                  </span>
+                </div>
+                {/* ✅ Fixed: XSS vulnerability - Sanitize error message */}
+                <span className="text-xs text-yellow-400/80">
+                  {sanitizeError(optimizerState.error)}
+                </span>
+                <span className="text-xs text-yellow-500/70">
+                  手動でインスタンス数を設定してCompetitionを開始できます（推奨: {DEFAULT_INSTANCE_COUNT}インスタンス）
                 </span>
               </div>
             </div>
