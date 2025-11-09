@@ -214,7 +214,41 @@ function App() {
   };
 
   // Handle debate start (ディベートモード)
-  const handleDebateStart = (newDebateId: string, task: string) => {
+  const handleDebateStart = async (newDebateId: string, task: string) => {
+    const shortTask = shortenTaskDescription(task);
+    const time = getCurrentTime();
+
+    // Debateモードの3つの役割を定義
+    const debateRoles = [
+      { name: '🏛️ 設計者 (Architect)', description: 'システム設計に焦点' },
+      { name: '⚙️ 実務者 (Pragmatist)', description: '実装可能性に焦点' },
+      { name: '💡 革新者 (Innovator)', description: '創造的解決策に焦点' }
+    ];
+
+    // セッション履歴に保存
+    try {
+      await tauriApi.createSession(workspacePath, {
+        id: newDebateId,
+        type: 'debate',
+        task,
+        status: 'running',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        instances: debateRoles.map((role, i) => ({
+          instanceId: i,
+          worktreePath: '', // Debateモードはworktreeを使用しない
+          branch: '', // Debateモードはbranchを使用しない
+          agentName: `${role.name} - ${shortTask} (${time})`,
+          status: 'running',
+          tmuxSessionId: `claude-debate-${newDebateId}-${i}`,
+          startTime: new Date().toISOString(),
+        })),
+        chatHistory: [],
+      });
+    } catch (error) {
+      console.error('Failed to create debate session:', error);
+    }
+
     setDebateId(newDebateId);
     setDebateTask(task);
     setShowDebateDialog(false);
