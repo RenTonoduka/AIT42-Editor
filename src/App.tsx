@@ -139,28 +139,32 @@ function App() {
       worktreeBranch: `claude-competition-${competitionId}-${i}`,
     }));
 
-    // セッション履歴に保存
-    try {
-      await tauriApi.createSession(workspacePath, {
-        id: competitionId,
-        type: 'competition',
-        task,
-        status: 'running',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        instances: newInstances.map((inst, i) => ({
-          instanceId: i,
-          worktreePath: inst.worktreePath,
-          branch: inst.worktreeBranch,
-          agentName: inst.agentName,
+    // セッション履歴に保存 (only if valid workspace is open)
+    if (workspacePath && isGitRepo) {
+      try {
+        await tauriApi.createSession(workspacePath, {
+          id: competitionId,
+          type: 'competition',
+          task,
           status: 'running',
-          tmuxSessionId: inst.tmuxSessionId,
-          startTime: inst.startTime,
-        })),
-        chatHistory: [],
-      });
-    } catch (error) {
-      console.error('Failed to create session:', error);
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          instances: newInstances.map((inst, i) => ({
+            instanceId: i,
+            worktreePath: inst.worktreePath || '',
+            branch: inst.worktreeBranch || '',
+            agentName: inst.agentName || '',
+            status: 'running' as const,
+            tmuxSessionId: inst.tmuxSessionId || '',
+            startTime: typeof inst.startTime === 'string' ? inst.startTime : (typeof inst.startTime === 'number' ? new Date(inst.startTime).toISOString() : new Date().toISOString()),
+          })),
+          chatHistory: [],
+        });
+      } catch (error) {
+        console.error('Failed to create session:', error);
+      }
+    } else {
+      console.warn('Skipping session creation: no valid workspace open');
     }
 
     setClaudeInstances(newInstances);
@@ -186,28 +190,32 @@ function App() {
       worktreeBranch: `claude-ensemble-${competitionId}-${i}`,
     }));
 
-    // セッション履歴に保存
-    try {
-      await tauriApi.createSession(workspacePath, {
-        id: competitionId,
-        type: 'ensemble',
-        task,
-        status: 'running',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        instances: newInstances.map((inst, i) => ({
-          instanceId: i,
-          worktreePath: inst.worktreePath,
-          branch: inst.worktreeBranch,
-          agentName: inst.agentName,
+    // セッション履歴に保存 (only if valid workspace is open)
+    if (workspacePath && isGitRepo) {
+      try {
+        await tauriApi.createSession(workspacePath, {
+          id: competitionId,
+          type: 'ensemble',
+          task,
           status: 'running',
-          tmuxSessionId: inst.tmuxSessionId,
-          startTime: inst.startTime,
-        })),
-        chatHistory: [],
-      });
-    } catch (error) {
-      console.error('Failed to create session:', error);
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          instances: newInstances.map((inst, i) => ({
+            instanceId: i,
+            worktreePath: inst.worktreePath || '',
+            branch: inst.worktreeBranch || '',
+            agentName: inst.agentName || '',
+            status: 'running' as const,
+            tmuxSessionId: inst.tmuxSessionId || '',
+            startTime: typeof inst.startTime === 'string' ? inst.startTime : (typeof inst.startTime === 'number' ? new Date(inst.startTime).toISOString() : new Date().toISOString()),
+          })),
+          chatHistory: [],
+        });
+      } catch (error) {
+        console.error('Failed to create session:', error);
+      }
+    } else {
+      console.warn('Skipping session creation: no valid workspace open');
     }
 
     setClaudeInstances(newInstances);
@@ -228,35 +236,38 @@ function App() {
       { name: '💡 革新者 (Innovator)', description: '創造的解決策に焦点' }
     ];
 
-    // セッション履歴に保存
-    try {
-      await tauriApi.createSession(workspacePath, {
-        id: result.debateId,
-        type: 'debate',
-        task,
-        status: 'running',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        instances: debateRoles.map((role, i) => ({
-          instanceId: i,
-          worktreePath: result.worktreePath,
-          branch: result.branch,
-          agentName: `${role.name} - ${shortTask} (${time})`,
+    // セッション履歴に保存 (only if valid workspace is open)
+    if (workspacePath && isGitRepo) {
+      try {
+        await tauriApi.createSession(workspacePath, {
+          id: result.debateId,
+          type: 'debate',
+          task,
           status: 'running',
-          tmuxSessionId: `debate-${result.debateId}`, // Debate全体で単一のセッションID
-          startTime: new Date().toISOString(),
-          output: '', // 初期化
-          filesChanged: 0, // 統計情報を初期化
-          linesAdded: 0,
-          linesDeleted: 0,
-        })),
-        chatHistory: [],
-      });
-    } catch (error) {
-      console.error('Failed to create debate session:', error);
-      alert(
-        `⚠️ Debateは正常に開始されましたが、セッション履歴の保存に失敗しました：\n${error instanceof Error ? error.message : error}\n\nDebateは正常に実行されますが、ダッシュボードには表示されません。`
-      );
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          instances: debateRoles.map((role, i) => ({
+            instanceId: i,
+            worktreePath: result.worktreePath,
+            branch: result.branch,
+            agentName: `${role.name} - ${shortTask} (${time})`,
+            status: 'running',
+            tmuxSessionId: `debate-${result.debateId}`, // Debate全体で単一のセッションID
+            startTime: new Date().toISOString(),
+            output: '', // 初期化
+            filesChanged: 0, // 統計情報を初期化
+            linesAdded: 0,
+            linesDeleted: 0,
+          })),
+          chatHistory: [],
+        });
+      } catch (error) {
+        console.error('Failed to create debate session:', error);
+        // Note: Do NOT alert user - sessions are optional for execution
+        console.warn('Debate will run without session history (no valid workspace)');
+      }
+    } else {
+      console.warn('Skipping session creation: no valid workspace open');
     }
 
     setDebateId(result.debateId);

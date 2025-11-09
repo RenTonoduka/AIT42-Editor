@@ -16,7 +16,7 @@ export interface DebateDialogProps {
   /** Callback when dialog should close */
   onClose: () => void;
   /** Callback when debate starts */
-  onStart?: (debateId: string, task: string) => void;
+  onStart?: (result: { debateId: string; worktreePath: string; branch: string }, task: string) => void;
 }
 
 type ClaudeModel = 'sonnet' | 'haiku' | 'opus';
@@ -279,7 +279,7 @@ export const DebateDialog: React.FC<DebateDialogProps> = ({
       console.log('Debate started:', result);
 
       if (onStart) {
-        onStart(result.debateId, task.trim());
+        onStart(result, task.trim());
       }
 
       setIsStarting(false);

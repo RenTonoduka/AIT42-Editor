@@ -282,6 +282,8 @@ export interface DebateResult {
   debateId: string;
   status: string;  // "started", "round_1", "round_2", "round_3", "completed", "failed"
   message: string;
+  worktreePath: string;
+  branch: string;
 }
 
 /**

@@ -159,6 +159,12 @@ pub async fn create_session(
 ) -> Result<WorktreeSession, String> {
     tracing::info!("Creating new session: {} for workspace: {}", session.id, workspace_path);
 
+    // Validation: Reject empty workspace paths
+    if workspace_path.is_empty() || workspace_path.trim().is_empty() {
+        tracing::error!("Attempted to create session with empty workspace path");
+        return Err("Cannot create session: workspace path is empty. Please open a valid Git repository.".to_string());
+    }
+
     let mut sessions = load_sessions(&state, &workspace_path)?;
     sessions.push(session.clone());
     save_sessions(&state, &workspace_path, &sessions)?;
@@ -174,6 +180,12 @@ pub async fn update_session(
     session: WorktreeSession,
 ) -> Result<WorktreeSession, String> {
     tracing::info!("Updating session: {} for workspace: {}", session.id, workspace_path);
+
+    // Validation: Reject empty workspace paths
+    if workspace_path.is_empty() || workspace_path.trim().is_empty() {
+        tracing::error!("Attempted to update session with empty workspace path");
+        return Err("Cannot update session: workspace path is empty.".to_string());
+    }
 
     let mut sessions = load_sessions(&state, &workspace_path)?;
 
@@ -197,6 +209,11 @@ pub async fn get_session(
 ) -> Result<WorktreeSession, String> {
     tracing::info!("Fetching session: {} for workspace: {}", session_id, workspace_path);
 
+    // Validation: Reject empty workspace paths
+    if workspace_path.is_empty() || workspace_path.trim().is_empty() {
+        return Err("Cannot get session: workspace path is empty.".to_string());
+    }
+
     let sessions = load_sessions(&state, &workspace_path)?;
 
     sessions
@@ -213,6 +230,12 @@ pub async fn get_all_sessions(
 ) -> Result<Vec<WorktreeSession>, String> {
     tracing::info!("Fetching all sessions for workspace: {}", workspace_path);
 
+    // Validation: Reject empty workspace paths
+    if workspace_path.is_empty() || workspace_path.trim().is_empty() {
+        tracing::warn!("Attempted to get all sessions with empty workspace path - returning empty array");
+        return Ok(Vec::new()); // Return empty array instead of error for graceful degradation
+    }
+
     load_sessions(&state, &workspace_path)
 }
 
@@ -224,6 +247,11 @@ pub async fn delete_session(
     session_id: String,
 ) -> Result<(), String> {
     tracing::info!("Deleting session: {} for workspace: {}", session_id, workspace_path);
+
+    // Validation: Reject empty workspace paths
+    if workspace_path.is_empty() || workspace_path.trim().is_empty() {
+        return Err("Cannot delete session: workspace path is empty.".to_string());
+    }
 
     let mut sessions = load_sessions(&state, &workspace_path)?;
     sessions.retain(|s| s.id != session_id);
@@ -246,6 +274,11 @@ pub async fn add_chat_message(
         workspace_path,
         message.id
     );
+
+    // Validation: Reject empty workspace paths
+    if workspace_path.is_empty() || workspace_path.trim().is_empty() {
+        return Err("Cannot add chat message: workspace path is empty.".to_string());
+    }
 
     let mut sessions = load_sessions(&state, &workspace_path)?;
 
@@ -276,6 +309,11 @@ pub async fn update_instance_status(
         new_status,
         workspace_path
     );
+
+    // Validation: Reject empty workspace paths
+    if workspace_path.is_empty() || workspace_path.trim().is_empty() {
+        return Err("Cannot update instance status: workspace path is empty.".to_string());
+    }
 
     let mut sessions = load_sessions(&state, &workspace_path)?;
 

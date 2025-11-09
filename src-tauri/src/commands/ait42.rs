@@ -1217,6 +1217,8 @@ pub struct DebateResult {
     pub debate_id: String,
     pub status: String,  // "started", "round_1", "round_2", "round_3", "completed", "failed"
     pub message: String,
+    pub worktree_path: String,
+    pub branch: String,
 }
 
 /// Round output (result from one agent in one round)
@@ -1349,11 +1351,13 @@ pub async fn execute_debate(
     let worktree_path_clone = worktree_path.clone();
     let context_dir_clone = context_dir.clone();
     let debates_clone = Arc::clone(&state.debates);
+    let working_dir_clone = Arc::clone(&state.working_dir);
 
     tauri::async_runtime::spawn(async move {
         if let Err(e) = execute_debate_rounds(
             app,
             debates_clone,
+            working_dir_clone,
             debate_id_clone,
             request_clone,
             worktree_path_clone,
@@ -1367,6 +1371,8 @@ pub async fn execute_debate(
         debate_id,
         status: "started".to_string(),
         message: "Debate started successfully".to_string(),
+        worktree_path,
+        branch: branch_name,
     })
 }
 
@@ -1374,6 +1380,7 @@ pub async fn execute_debate(
 async fn execute_debate_rounds(
     app: tauri::AppHandle,
     debates: Arc<Mutex<HashMap<String, DebateStatus>>>,
+    working_dir: Arc<tokio::sync::Mutex<std::path::PathBuf>>,
     debate_id: String,
     request: DebateRequest,
     worktree_path: String,
@@ -1381,19 +1388,128 @@ async fn execute_debate_rounds(
 ) -> Result<(), String> {
     tracing::info!("Starting 3-round debate execution for {}", debate_id);
 
-    // Helper function to update debate status
-    let update_status = |round: u8, status: &str| {
-        if let Ok(mut debates_lock) = debates.lock() {
-            if let Some(debate) = debates_lock.get_mut(&debate_id) {
-                debate.current_round = round;
-                debate.status = status.to_string();
+    // Helper function to update debate status and persist to session history
+    let update_status = |round: u8, status: String| {
+        let debate_id_clone = debate_id.clone();
+        let working_dir_clone = working_dir.clone();
+        let debates_clone = debates.clone();
+
+        // Spawn async task for persistence
+        tauri::async_runtime::spawn(async move {
+            // Update in-memory state
+            let (started_at, updated_at) = {
+                let mut debates_lock = match debates_clone.lock() {
+                    Ok(lock) => lock,
+                    Err(e) => {
+                        tracing::error!("Failed to lock debates: {}", e);
+                        return;
+                    }
+                };
+
+                if let Some(debate) = debates_lock.get_mut(&debate_id_clone) {
+                    debate.current_round = round;
+                    debate.status = status.clone();
+                    if status == "completed" {
+                        debate.completed_at = Some(chrono::Utc::now().to_rfc3339());
+                    }
+                    (debate.started_at.clone(), chrono::Utc::now().to_rfc3339())
+                } else {
+                    tracing::error!("Debate {} not found in state", debate_id_clone);
+                    return;
+                }
+            };
+
+            // Get workspace path
+            let workspace_path = {
+                let wd = working_dir_clone.lock().await;
+                wd.to_string_lossy().to_string()
+            };
+
+            // Prepare session data for persistence
+            let session = crate::commands::session_history::WorktreeSession {
+                id: debate_id_clone.clone(),
+                r#type: "debate".to_string(),
+                task: "Debate in progress".to_string(),
+                status: status.clone(),
+                created_at: started_at,
+                updated_at: updated_at.clone(),
+                completed_at: if status == "completed" {
+                    Some(updated_at)
+                } else {
+                    None
+                },
+                instances: vec![], // Instances will be updated separately
+                chat_history: vec![],
+                model: None,
+                timeout_seconds: None,
+                preserve_worktrees: None,
+                winner_id: None,
+                total_duration: None,
+                total_files_changed: Some(0),
+                total_lines_added: Some(0),
+                total_lines_deleted: Some(0),
+            };
+
+            // Persist to session history using direct file operations
+            use sha2::{Sha256, Digest};
+
+            let mut hasher = Sha256::new();
+            hasher.update(workspace_path.as_bytes());
+            let hash = format!("{:x}", hasher.finalize())[..16].to_string();
+
+            let home_dir = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
+            let sessions_file = home_dir
+                .join(".ait42")
+                .join("sessions")
+                .join(format!("{}.json", hash));
+
+            // Load existing sessions
+            let mut sessions: Vec<crate::commands::session_history::WorktreeSession> = if sessions_file.exists() {
+                if let Ok(content) = std::fs::read_to_string(&sessions_file) {
+                    serde_json::from_str(&content).unwrap_or_else(|_| Vec::new())
+                } else {
+                    Vec::new()
+                }
+            } else {
+                Vec::new()
+            };
+
+            // Update or insert session
+            if let Some(existing) = sessions.iter_mut().find(|s| s.id == session.id) {
+                *existing = session;
+            } else {
+                sessions.push(session);
             }
-        }
+
+            // Save back to file
+            if let Ok(content) = serde_json::to_string_pretty(&sessions) {
+                // Ensure directory exists
+                if let Some(parent) = sessions_file.parent() {
+                    let _ = std::fs::create_dir_all(parent);
+                }
+                if let Err(e) = std::fs::write(&sessions_file, content) {
+                    tracing::error!("Failed to persist debate status: {}", e);
+                } else {
+                    tracing::info!("Persisted debate status update: {} - {}", debate_id_clone, status);
+                }
+            }
+        });
     };
 
+    // Set global timeout for entire debate (3 rounds * timeout_seconds)
+    let total_timeout = tokio::time::Duration::from_secs(request.timeout_seconds * 3);
+    let debate_start_time = tokio::time::Instant::now();
+
     // Round 1: Independent proposals
-    update_status(1, "round_1");
+    update_status(1, "round_1".to_string());
     emit_debate_status(&app, &debate_id, 1, "round_1");
+
+    if debate_start_time.elapsed() > total_timeout {
+        tracing::error!("Debate {} timed out before Round 1", debate_id);
+        update_status(1, "failed".to_string());
+        return Err("Debate timed out".to_string());
+    }
+
     execute_round(
         app.clone(),
         debate_id.clone(),
@@ -1405,8 +1521,15 @@ async fn execute_debate_rounds(
     ).await?;
 
     // Round 2: Critical analysis with Round 1 context
-    update_status(2, "round_2");
+    update_status(2, "round_2".to_string());
     emit_debate_status(&app, &debate_id, 2, "round_2");
+
+    if debate_start_time.elapsed() > total_timeout {
+        tracing::error!("Debate {} timed out before Round 2", debate_id);
+        update_status(2, "failed".to_string());
+        return Err("Debate timed out".to_string());
+    }
+
     let round1_context = load_round_context(&context_dir, 1)?;
     execute_round(
         app.clone(),
@@ -1419,8 +1542,15 @@ async fn execute_debate_rounds(
     ).await?;
 
     // Round 3: Consensus formation with Round 1+2 context
-    update_status(3, "round_3");
+    update_status(3, "round_3".to_string());
     emit_debate_status(&app, &debate_id, 3, "round_3");
+
+    if debate_start_time.elapsed() > total_timeout {
+        tracing::error!("Debate {} timed out before Round 3", debate_id);
+        update_status(3, "failed".to_string());
+        return Err("Debate timed out".to_string());
+    }
+
     let round2_context = load_round_context(&context_dir, 2)?;
     let combined_context = format!("{}\n\n--- Round 2 ---\n\n{}",
         load_round_context(&context_dir, 1)?,
@@ -1437,12 +1567,7 @@ async fn execute_debate_rounds(
     ).await?;
 
     // Debate completed - update final status
-    if let Ok(mut debates_lock) = debates.lock() {
-        if let Some(debate) = debates_lock.get_mut(&debate_id) {
-            debate.status = "completed".to_string();
-            debate.completed_at = Some(chrono::Utc::now().to_rfc3339());
-        }
-    }
+    update_status(3, "completed".to_string());
     emit_debate_status(&app, &debate_id, 3, "completed");
     tracing::info!("Debate {} completed successfully", debate_id);
 

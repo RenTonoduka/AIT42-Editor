@@ -310,7 +310,7 @@ export const CompetitionDialog: React.FC<CompetitionDialogProps> = ({
                 </div>
                 {/* ✅ Fixed: XSS vulnerability - Sanitize error message */}
                 <span className="text-xs text-yellow-400/80">
-                  {sanitizeError(optimizerState.error)}
+                  {sanitizeError(optimizerState.error || '不明なエラー')}
                 </span>
                 <span className="text-xs text-yellow-500/70">
                   手動でインスタンス数を設定してCompetitionを開始できます（推奨: {DEFAULT_INSTANCE_COUNT}インスタンス）
