@@ -578,7 +578,7 @@ pub async fn send_tmux_keys(
         .arg("-t")
         .arg(&session_id)
         .arg(&keys)
-        .arg("C-m") // Enter key
+        .arg("Enter") // Enter key
         .output()
         .map_err(|e| e.to_string())?;
 
@@ -1967,7 +1967,7 @@ REASONING: [なぜこの複雑度クラスと分解数が適切か、詳細な�
         .arg("-t")
         .arg(&session_id)
         .arg(format!("{} && exit", claude_cmd))
-        .arg("C-m")
+        .arg("Enter")
         .output()
         .map_err(|e| format!("Failed to send command: {}", e))?;
 
