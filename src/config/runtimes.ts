@@ -7,14 +7,14 @@ export interface RuntimeDefinition {
   defaultModel: string;
   modelOptions: string[];
   emoji: string;
-  envVar: string;
+  envVar?: string; // Optional: 既存のCLI認証を優先、なければ環境変数を参照
 }
 
 export const RUNTIME_DEFINITIONS: RuntimeDefinition[] = [
   {
     id: 'claude',
     label: 'Claude Code',
-    description: 'Anthropic Claude Code CLI 実行',
+    description: 'claude CLIログイン済みなら使用可能',
     defaultModel: 'sonnet',
     modelOptions: ['sonnet', 'haiku', 'opus'],
     emoji: '🤖',
@@ -23,7 +23,7 @@ export const RUNTIME_DEFINITIONS: RuntimeDefinition[] = [
   {
     id: 'codex',
     label: 'Codex (OpenAI)',
-    description: 'CodeX CLI / GPT-4 実行',
+    description: 'openai/gpt CLIログイン済みなら使用可能',
     defaultModel: 'gpt-4',
     modelOptions: ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo', 'code-davinci-002'],
     emoji: '🧠',
@@ -32,7 +32,7 @@ export const RUNTIME_DEFINITIONS: RuntimeDefinition[] = [
   {
     id: 'gemini',
     label: 'Gemini CLI',
-    description: 'Google Gemini 1.5 Pro 実行',
+    description: 'gemini CLIログイン済みなら使用可能',
     defaultModel: 'gemini-1.5-pro',
     modelOptions: ['gemini-1.5-pro', 'gemini-1.5-flash'],
     emoji: '✨',
