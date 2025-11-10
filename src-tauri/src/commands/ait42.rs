@@ -1129,6 +1129,7 @@ async fn run_multi_runtime_competition(
 
     tracing::info!("📁 Project root for competition: {}", project_root.display());
 
+    let started_at = chrono::Utc::now();
     let ait42_worktrees = project_root.join(".ait42").join(".worktrees");
     tracing::info!("📁 Worktrees directory: {}", ait42_worktrees.display());
 
@@ -1812,6 +1813,7 @@ async fn execute_debate_rounds(
                 total_files_changed: Some(0),
                 total_lines_added: Some(0),
                 total_lines_deleted: Some(0),
+                runtime_mix: None,
             };
 
             // Persist to session history using direct file operations
