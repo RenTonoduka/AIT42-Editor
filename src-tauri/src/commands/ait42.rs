@@ -1022,7 +1022,7 @@ pub async fn execute_claude_code_competition(
             .arg("-t")
             .arg(&session_id)
             .arg(format!("{} && exit", claude_cmd))
-            .arg("C-m")
+            .arg("Enter")
             .output()
             .map_err(|e| format!("Failed to send command: {}", e))?;
 
@@ -1649,7 +1649,7 @@ async fn execute_round(
             .arg("-t")
             .arg(&session_id)
             .arg(format!("{} && exit", claude_cmd))
-            .arg("C-m")
+            .arg("Enter")
             .output()
             .map_err(|e| format!("Failed to send command: {}", e))?;
 
