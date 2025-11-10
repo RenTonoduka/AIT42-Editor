@@ -6,6 +6,7 @@
 
 use tauri::{State, Manager};
 use crate::state::AppState;
+use crate::utils::AIT42Installer;
 use std::path::PathBuf;
 use serde::{Serialize, Deserialize};
 
@@ -45,6 +46,49 @@ pub async fn select_workspace(
         drop(working_dir);
 
         tracing::info!("📁 Workspace set to: {}", path.display());
+
+        // Auto-install AIT42 system if not already present
+        let source_ait42 = PathBuf::from("/Users/tonodukaren/Programming/AI/02_Workspace/05_Client/03_Sun/AIT42");
+        let installer = AIT42Installer::new(source_ait42);
+
+        if !installer.is_installed(&path) {
+            tracing::info!("🚀 AIT42 not found in workspace. Installing...");
+            match installer.install_to_workspace(&path) {
+                Ok(result) => {
+                    if result.success {
+                        tracing::info!("✅ AIT42 installation successful:");
+                        tracing::info!("   - {} agents installed", result.agents_installed);
+                        tracing::info!("   - Memory system: {}", if result.memory_setup { "✓" } else { "✗" });
+                        tracing::info!("   - {} SOPs installed", result.sops_installed);
+                    } else {
+                        tracing::warn!("⚠️ AIT42 installation completed with errors:");
+                        for error in &result.errors {
+                            tracing::warn!("   - {}", error);
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("❌ AIT42 installation failed: {}", e);
+                    // Don't fail workspace selection on installation error
+                }
+            }
+        } else {
+            tracing::info!("✓ AIT42 already installed in workspace");
+            // Verify installation health
+            match installer.verify_installation(&path) {
+                Ok(result) => {
+                    if result.success {
+                        tracing::info!("✓ AIT42 installation verified ({} agents, {} SOPs)",
+                                     result.agents_installed, result.sops_installed);
+                    } else {
+                        tracing::warn!("⚠️ AIT42 installation incomplete. Consider reinstalling.");
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("⚠️ AIT42 verification failed: {}", e);
+                }
+            }
+        }
 
         // Save to config
         save_workspace_config(&path)?;

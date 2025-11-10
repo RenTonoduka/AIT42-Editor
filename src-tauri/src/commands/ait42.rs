@@ -11,8 +11,10 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use ait42_ait42::{AgentRegistry, AgentExecutor, Coordinator, config::AIT42Config, ExecutionMode};
 use tracing::{info, warn, error};
+use std::path::PathBuf;
 
 use crate::state::AppState;
+use crate::utils::AIT42Installer;
 
 /**
  * Agent information
@@ -952,6 +954,28 @@ pub async fn execute_claude_code_competition(
             return Err(format!("Failed to create worktree {}: {}", i, error));
         }
 
+        // Auto-install AIT42 in the worktree
+        tracing::info!("🚀 Installing AIT42 in worktree instance {}", i);
+        let source_ait42 = PathBuf::from("/Users/tonodukaren/Programming/AI/02_Workspace/05_Client/03_Sun/AIT42");
+        let installer = AIT42Installer::new(source_ait42);
+        let worktree_pathbuf = PathBuf::from(&worktree_path);
+
+        match installer.install_to_workspace(&worktree_pathbuf) {
+            Ok(result) => {
+                if result.success {
+                    tracing::info!("✅ AIT42 installed in instance {} ({} agents, {} SOPs)",
+                                 i, result.agents_installed, result.sops_installed);
+                } else {
+                    tracing::warn!("⚠️ AIT42 installation partially failed in instance {}: {:?}",
+                                 i, result.errors);
+                }
+            }
+            Err(e) => {
+                tracing::warn!("⚠️ Failed to install AIT42 in instance {}: {}", i, e);
+                // Continue execution - don't fail the competition
+            }
+        }
+
         // Create tmux session for this instance
         let session_id = format!("claude-code-comp-{}-{}", &competition_id[..8], i);
         let output_log_path = format!("{}/.claude-output.log", worktree_path);
@@ -1324,6 +1348,28 @@ pub async fn execute_debate(
     }
 
     tracing::info!("Debate worktree created successfully");
+
+    // Auto-install AIT42 in the debate worktree
+    tracing::info!("🚀 Installing AIT42 in debate worktree");
+    let source_ait42 = PathBuf::from("/Users/tonodukaren/Programming/AI/02_Workspace/05_Client/03_Sun/AIT42");
+    let installer = AIT42Installer::new(source_ait42);
+    let worktree_pathbuf = PathBuf::from(&worktree_path);
+
+    match installer.install_to_workspace(&worktree_pathbuf) {
+        Ok(result) => {
+            if result.success {
+                tracing::info!("✅ AIT42 installed in debate worktree ({} agents, {} SOPs)",
+                             result.agents_installed, result.sops_installed);
+            } else {
+                tracing::warn!("⚠️ AIT42 installation partially failed in debate worktree: {:?}",
+                             result.errors);
+            }
+        }
+        Err(e) => {
+            tracing::warn!("⚠️ Failed to install AIT42 in debate worktree: {}", e);
+            // Continue execution - don't fail the debate
+        }
+    }
 
     // Initialize debate status in state
     let initial_status = DebateStatus {

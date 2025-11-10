@@ -8,6 +8,7 @@ mod commands;
 mod optimizer;
 mod plugin;
 mod state;
+mod utils;
 
 use commands::optimizer::OptimizerState;
 use state::AppState;
