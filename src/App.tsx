@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { FileText, Settings, Users, Layout, Sparkles, Trophy, MessageSquare, LayoutDashboard, FolderOpen } from 'lucide-react';
 import { Sidebar } from './components/Sidebar/Sidebar';
 import { EditorContainer } from '@/components/Editor';
@@ -58,6 +58,24 @@ function App() {
   // Get file tree store methods
   const { setRootPath, setTree, setLoading, setError } = useFileTreeStore();
 
+  // Helper function to load directory contents into file tree
+  const loadDirectoryIntoFileTree = useCallback(async (path: string) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const entries = await tauriApi.readDirectory(path);
+      setRootPath(path);
+      setTree(entries);
+      console.log(`✅ Loaded directory into Explorer: ${path}`);
+    } catch (error) {
+      console.error('Failed to load directory:', error);
+      setError(`Failed to load directory: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [setRootPath, setTree, setLoading, setError]);
+
   // Check workspace on mount
   useEffect(() => {
     const checkWorkspace = async () => {
@@ -93,23 +111,12 @@ function App() {
     }
   }, [workspacePath, isGitRepo, sessionHistorySetWorkspacePath]);
 
-  // Helper function to load directory contents into file tree
-  const loadDirectoryIntoFileTree = async (path: string) => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const entries = await tauriApi.readDirectory(path);
-      setRootPath(path);
-      setTree(entries);
-      console.log(`✅ Loaded directory into Explorer: ${path}`);
-    } catch (error) {
-      console.error('Failed to load directory:', error);
-      setError(`Failed to load directory: ${error}`);
-    } finally {
-      setLoading(false);
+  // 🔥 Auto-load directory into Explorer when workspace path changes
+  useEffect(() => {
+    if (workspacePath && isGitRepo) {
+      loadDirectoryIntoFileTree(workspacePath);
     }
-  };
+  }, [workspacePath, isGitRepo, loadDirectoryIntoFileTree]);
 
   // Handle workspace selection
   const handleSelectWorkspace = async () => {
