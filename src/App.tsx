@@ -454,7 +454,7 @@ function App() {
           <>
             <Sidebar />
             <div className="flex-1">
-              <EditorContainer />
+              <EditorContainer onWorkspaceSelect={handleSelectWorkspace} />
             </div>
           </>
         )}

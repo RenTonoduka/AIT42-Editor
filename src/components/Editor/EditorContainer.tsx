@@ -6,7 +6,7 @@
  */
 
 import React, { useRef, useCallback, useMemo } from 'react';
-import { FileText } from 'lucide-react';
+import { FileText, FolderOpen } from 'lucide-react';
 import { TabBar } from './TabBar';
 import { EditorPane } from './EditorPane';
 import { Terminal } from '@/components/Terminal';
@@ -20,12 +20,13 @@ import { open } from '@tauri-apps/api/dialog';
 
 interface EmptyStateProps {
   onFileOpen?: (path: string) => void;
+  onWorkspaceSelect?: () => void;
 }
 
 /**
  * Empty state when no files are open
  */
-const EmptyState: React.FC<EmptyStateProps> = ({ onFileOpen }) => {
+const EmptyState: React.FC<EmptyStateProps> = ({ onFileOpen, onWorkspaceSelect }) => {
   const handleOpenFile = async () => {
     try {
       const selected = await open({
@@ -64,6 +65,12 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onFileOpen }) => {
       activeTabId: newTab.id,
     }));
   };
+
+  const handleOpenWorkspace = () => {
+    if (onWorkspaceSelect) {
+      onWorkspaceSelect();
+    }
+  };
   return (
     <div className="flex items-center justify-center h-full bg-editor-bg text-text-primary animate-fade-in">
       <div className="text-center space-y-6 max-w-md px-8">
@@ -89,6 +96,17 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onFileOpen }) => {
 
         {/* Action buttons - Modern gradient design */}
         <div className="flex gap-3 justify-center mt-8">
+          <button
+            onClick={handleOpenWorkspace}
+            className="group relative px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-semibold transition-all duration-300 hover:shadow-glow-lg hover:scale-105 overflow-hidden"
+            title="Open workspace folder"
+          >
+            <span className="relative z-10 flex items-center gap-2">
+              <FolderOpen size={18} />
+              Open Workspace
+            </span>
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          </button>
           <button
             onClick={handleOpenFile}
             className="group relative px-6 py-3 bg-gradient-to-r from-accent-primary to-accent-secondary rounded-xl text-white font-semibold transition-all duration-300 hover:shadow-glow-lg hover:scale-105 overflow-hidden"
@@ -133,12 +151,13 @@ const ResizeHandle: React.FC<{
 interface EditorContainerProps {
   onFileOpen?: (path: string) => void;
   onAIAction?: (action: string, selectedText: string) => void;
+  onWorkspaceSelect?: () => void;
 }
 
 /**
  * EditorContainer - Main editor UI
  */
-export const EditorContainer: React.FC<EditorContainerProps> = ({ onFileOpen, onAIAction }) => {
+export const EditorContainer: React.FC<EditorContainerProps> = ({ onFileOpen, onAIAction, onWorkspaceSelect }) => {
   const { tabs, activeTabId, updateTabContent, saveTab } = useEditorStore();
   const {
     isVisible: isTerminalVisible,
@@ -261,7 +280,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({ onFileOpen, on
             onAIAction={onAIAction}
           />
         ) : (
-          <EmptyState onFileOpen={onFileOpen} />
+          <EmptyState onFileOpen={onFileOpen} onWorkspaceSelect={onWorkspaceSelect} />
         )}
       </div>
 
