@@ -1639,7 +1639,7 @@ async fn execute_round(
             .replace('\'', "'\\''");    // Escape single quotes
 
         let claude_cmd = format!(
-            "echo -e '{}' | claude --model {} code --print --permission-mode bypassPermissions",
+            "echo -e '{}' | claude --model {} --print --permission-mode bypassPermissions",
             escaped_prompt,
             request.model
         );
