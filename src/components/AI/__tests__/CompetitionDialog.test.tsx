@@ -14,7 +14,7 @@ import * as tauriApiModule from '@/services/tauri';
 jest.mock('@/services/tauri', () => ({
   tauriApi: {
     analyzeTaskWithClaudeCode: jest.fn(),
-    executeClaudeCodeCompetition: jest.fn(),
+    executeMultiRuntimeCompetition: jest.fn(),
     getWorkspace: jest.fn(),
   },
 }));
@@ -50,7 +50,7 @@ describe('CompetitionDialog - Error Handling', () => {
     );
 
     // Type task description
-    const textarea = screen.getByPlaceholderText(/各インスタンスに実行させるタスク/);
+    const textarea = screen.getByPlaceholderText(/各ランタイムに実行させるタスク/);
     await user.type(textarea, 'AIT42最適化したいです');
 
     // Wait for debounced analysis to trigger
@@ -74,7 +74,7 @@ describe('CompetitionDialog - Error Handling', () => {
 
     // Verify fallback message is shown
     expect(
-      screen.getByText(/手動でインスタンス数を設定してCompetitionを開始できます/)
+      screen.getByText(/手動でランタイム配分を設定してCompetitionを開始できます/)
     ).toBeInTheDocument();
   });
 
@@ -84,7 +84,7 @@ describe('CompetitionDialog - Error Handling', () => {
       new Error('Request timed out after 120 seconds')
     );
 
-    (tauriApiModule.tauriApi.executeClaudeCodeCompetition as jest.Mock).mockResolvedValue({
+    (tauriApiModule.tauriApi.executeMultiRuntimeCompetition as jest.Mock).mockResolvedValue({
       competitionId: 'test-competition-123',
       instanceCount: 3,
       worktreePaths: [],
@@ -101,7 +101,7 @@ describe('CompetitionDialog - Error Handling', () => {
     );
 
     // Type task description
-    const textarea = screen.getByPlaceholderText(/各インスタンスに実行させるタスク/);
+    const textarea = screen.getByPlaceholderText(/各ランタイムに実行させるタスク/);
     await user.type(textarea, 'AIT42最適化したいです');
 
     // Wait for error state
@@ -120,10 +120,14 @@ describe('CompetitionDialog - Error Handling', () => {
 
     // Verify competition was started
     await waitFor(() => {
-      expect(tauriApiModule.tauriApi.executeClaudeCodeCompetition).toHaveBeenCalled();
+      expect(tauriApiModule.tauriApi.executeMultiRuntimeCompetition).toHaveBeenCalled();
     });
 
-    expect(mockOnStart).toHaveBeenCalledWith('test-competition-123', 3, 'AIT42最適化したいです');
+    expect(mockOnStart).toHaveBeenCalledWith(
+      'test-competition-123',
+      expect.any(Array),
+      'AIT42最適化したいです'
+    );
   });
 
   it('should allow closing dialog during analysis', async () => {
@@ -143,7 +147,7 @@ describe('CompetitionDialog - Error Handling', () => {
     );
 
     // Type task description to trigger analysis
-    const textarea = screen.getByPlaceholderText(/各インスタンスに実行させるタスク/);
+    const textarea = screen.getByPlaceholderText(/各ランタイムに実行させるタスク/);
     await user.type(textarea, 'Long running task');
 
     // Wait for analysis to start
@@ -179,7 +183,7 @@ describe('CompetitionDialog - Error Handling', () => {
     );
 
     // Type task description
-    const textarea = screen.getByPlaceholderText(/各インスタンスに実行させるタスク/);
+    const textarea = screen.getByPlaceholderText(/各ランタイムに実行させるタスク/);
     await user.type(textarea, 'Implement user authentication');
 
     // Wait for success state

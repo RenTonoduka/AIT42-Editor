@@ -14,6 +14,8 @@ import { useEditorStore } from '@/store/editorStore';
 import { useSessionHistoryStore } from '@/store/sessionHistoryStore';
 import { useFileTreeStore } from '@/store/fileTreeStore';
 import { tauriApi } from '@/services/tauri';
+import { RuntimeAllocation } from '@/types/worktree';
+import { getRuntimeDefinition } from '@/config/runtimes';
 
 // View Mode Type
 type ViewMode = 'editor' | 'multi-agent' | 'debate' | 'session-history';
@@ -34,6 +36,45 @@ function getCurrentTime(): string {
   const now = new Date();
   return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 }
+
+const buildInstancesFromAllocations = (
+  competitionId: string,
+  task: string,
+  allocations: RuntimeAllocation[],
+  mode: 'competition' | 'ensemble'
+): ClaudeCodeInstance[] => {
+  const shortTask = shortenTaskDescription(task);
+  const time = getCurrentTime();
+  const prefix = mode === 'competition' ? 'comp' : 'ens';
+  const icon = mode === 'competition' ? '🏆' : '🎯';
+  const instances: ClaudeCodeInstance[] = [];
+
+  allocations.forEach((allocation) => {
+    const def = getRuntimeDefinition(allocation.runtime);
+    const model = allocation.model ?? def.defaultModel;
+
+    for (let i = 0; i < allocation.count; i += 1) {
+      const index = instances.length + 1;
+      instances.push({
+        id: `${competitionId}-${index}`,
+        agentName: `${icon} ${shortTask} ${def.emoji} #${index} (${time})`,
+        task,
+        status: 'running',
+        output: '',
+        startTime: new Date().toISOString(),
+        tmuxSessionId: `${allocation.runtime}-${prefix}-${competitionId}-${index}`,
+        worktreePath: `/tmp/worktree-${prefix}-${competitionId}-${index}`,
+        worktreeBranch: `${allocation.runtime}-${mode}-${competitionId}-${index}`,
+        runtime: allocation.runtime,
+        model,
+        runtimeLabel: def.label,
+        runtimeEmoji: def.emoji,
+      });
+    }
+  });
+
+  return instances;
+};
 
 function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('editor');
@@ -164,21 +205,12 @@ function App() {
   };
 
   // Handle competition start (競争モード)
-  const handleCompetitionStart = async (competitionId: string, instanceCount: number, task: string) => {
-    const shortTask = shortenTaskDescription(task);
-    const time = getCurrentTime();
+  const handleCompetitionStart = async (competitionId: string, allocations: RuntimeAllocation[], task: string) => {
+    const newInstances = buildInstancesFromAllocations(competitionId, task, allocations, 'competition');
 
-    const newInstances: ClaudeCodeInstance[] = Array.from({ length: instanceCount }, (_, i) => ({
-      id: `${competitionId}-${i}`,
-      agentName: `🏆 ${shortTask} #${i + 1} (${time})`,
-      task: task,
-      status: 'running',
-      output: '',
-      startTime: new Date().toISOString(),
-      tmuxSessionId: `claude-comp-${competitionId}-${i}`,
-      worktreePath: `/tmp/worktree-comp-${competitionId}-${i}`,
-      worktreeBranch: `claude-competition-${competitionId}-${i}`,
-    }));
+    if (newInstances.length === 0) {
+      return;
+    }
 
     // セッション履歴に保存 (only if valid workspace is open)
     if (workspacePath && isGitRepo) {
@@ -197,9 +229,18 @@ function App() {
             agentName: inst.agentName || '',
             status: 'running' as const,
             tmuxSessionId: inst.tmuxSessionId || '',
-            startTime: typeof inst.startTime === 'string' ? inst.startTime : (typeof inst.startTime === 'number' ? new Date(inst.startTime).toISOString() : new Date().toISOString()),
+            startTime:
+              typeof inst.startTime === 'string'
+                ? inst.startTime
+                : typeof inst.startTime === 'number'
+                  ? new Date(inst.startTime).toISOString()
+                  : new Date().toISOString(),
+            runtime: inst.runtime,
+            model: inst.model,
+            runtimeLabel: inst.runtimeLabel,
           })),
           chatHistory: [],
+          runtimeMix: allocations.map((allocation) => allocation.runtime),
         });
       } catch (error) {
         console.error('Failed to create session:', error);
@@ -215,21 +256,12 @@ function App() {
   };
 
   // Handle ensemble start (アンサンブルモード)
-  const handleEnsembleStart = async (competitionId: string, instanceCount: number, task: string) => {
-    const shortTask = shortenTaskDescription(task);
-    const time = getCurrentTime();
+  const handleEnsembleStart = async (competitionId: string, allocations: RuntimeAllocation[], task: string) => {
+    const newInstances = buildInstancesFromAllocations(competitionId, task, allocations, 'ensemble');
 
-    const newInstances: ClaudeCodeInstance[] = Array.from({ length: instanceCount }, (_, i) => ({
-      id: `${competitionId}-${i}`,
-      agentName: `🎯 ${shortTask} #${i + 1} (${time})`,
-      task: task,
-      status: 'running',
-      output: '',
-      startTime: new Date().toISOString(),
-      tmuxSessionId: `claude-ens-${competitionId}-${i}`,
-      worktreePath: `/tmp/worktree-ens-${competitionId}-${i}`,
-      worktreeBranch: `claude-ensemble-${competitionId}-${i}`,
-    }));
+    if (newInstances.length === 0) {
+      return;
+    }
 
     // セッション履歴に保存 (only if valid workspace is open)
     if (workspacePath && isGitRepo) {
@@ -248,9 +280,18 @@ function App() {
             agentName: inst.agentName || '',
             status: 'running' as const,
             tmuxSessionId: inst.tmuxSessionId || '',
-            startTime: typeof inst.startTime === 'string' ? inst.startTime : (typeof inst.startTime === 'number' ? new Date(inst.startTime).toISOString() : new Date().toISOString()),
+            startTime:
+              typeof inst.startTime === 'string'
+                ? inst.startTime
+                : typeof inst.startTime === 'number'
+                  ? new Date(inst.startTime).toISOString()
+                  : new Date().toISOString(),
+            runtime: inst.runtime,
+            model: inst.model,
+            runtimeLabel: inst.runtimeLabel,
           })),
           chatHistory: [],
+          runtimeMix: allocations.map((allocation) => allocation.runtime),
         });
       } catch (error) {
         console.error('Failed to create session:', error);

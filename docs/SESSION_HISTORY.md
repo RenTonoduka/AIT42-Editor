@@ -95,6 +95,7 @@ interface WorktreeSession {
   model?: string;
   timeoutSeconds?: number;
   preserveWorktrees?: boolean;
+  runtimeMix?: Array<'claude' | 'codex' | 'gemini'>;
   winnerId?: number;
 
   // 統計
@@ -120,6 +121,9 @@ interface WorktreeInstance {
   filesChanged?: number;
   linesAdded?: number;
   linesDeleted?: number;
+  runtime?: 'claude' | 'codex' | 'gemini';
+  model?: string;
+  runtimeLabel?: string;
 }
 ```
 

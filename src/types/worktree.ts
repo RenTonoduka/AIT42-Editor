@@ -6,6 +6,13 @@
 export type SessionType = 'competition' | 'ensemble' | 'debate';
 export type SessionStatus = 'running' | 'completed' | 'failed' | 'paused';
 export type InstanceStatus = 'idle' | 'running' | 'completed' | 'failed' | 'paused';
+export type AgentRuntime = 'claude' | 'codex' | 'gemini';
+
+export interface RuntimeAllocation {
+  runtime: AgentRuntime;
+  count: number;
+  model?: string;
+}
 
 /**
  * Individual worktree instance within a session
@@ -23,6 +30,9 @@ export interface WorktreeInstance {
   filesChanged?: number;
   linesAdded?: number;
   linesDeleted?: number;
+  runtime?: AgentRuntime;
+  model?: string;
+  runtimeLabel?: string;
 }
 
 /**
@@ -59,6 +69,7 @@ export interface WorktreeSession {
   model?: string; // sonnet/haiku/opus
   timeoutSeconds?: number;
   preserveWorktrees?: boolean;
+  runtimeMix?: AgentRuntime[]; // Order of runtimes launched
 
   // Results (for Competition mode)
   winnerId?: number;

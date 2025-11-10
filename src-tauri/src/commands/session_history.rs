@@ -4,9 +4,8 @@
  *
  * Sessions are now workspace-specific, stored in ~/.ait42/sessions/{workspace_hash}.json
  */
-
 use serde::{Deserialize, Serialize};
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::PathBuf;
 use tauri::State;
@@ -28,6 +27,9 @@ pub struct WorktreeInstance {
     pub files_changed: Option<u32>,
     pub lines_added: Option<u32>,
     pub lines_deleted: Option<u32>,
+    pub runtime: Option<String>,
+    pub model: Option<String>,
+    pub runtime_label: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,6 +58,7 @@ pub struct WorktreeSession {
     pub timeout_seconds: Option<u32>,
     pub preserve_worktrees: Option<bool>,
     pub winner_id: Option<u32>,
+    pub runtime_mix: Option<Vec<String>>,
     pub total_duration: Option<u64>,
     pub total_files_changed: Option<u32>,
     pub total_lines_added: Option<u32>,
@@ -139,7 +142,11 @@ fn load_sessions(state: &AppState, workspace_path: &str) -> Result<Vec<WorktreeS
 }
 
 /// Save all sessions to disk for a specific workspace
-fn save_sessions(state: &AppState, workspace_path: &str, sessions: &[WorktreeSession]) -> Result<(), String> {
+fn save_sessions(
+    state: &AppState,
+    workspace_path: &str,
+    sessions: &[WorktreeSession],
+) -> Result<(), String> {
     ensure_storage_dir(state)?;
 
     let sessions_file = get_sessions_file_path(state, workspace_path);
@@ -162,7 +169,10 @@ pub async fn create_session(
     // Validation: Reject empty workspace paths
     if workspace_path.is_empty() || workspace_path.trim().is_empty() {
         tracing::error!("Attempted to create session with empty workspace path");
-        return Err("Cannot create session: workspace path is empty. Please open a valid Git repository.".to_string());
+        return Err(
+            "Cannot create session: workspace path is empty. Please open a valid Git repository."
+                .to_string(),
+        );
     }
 
     let mut sessions = load_sessions(&state, &workspace_path)?;
@@ -232,7 +242,9 @@ pub async fn get_all_sessions(
 
     // Validation: Reject empty workspace paths
     if workspace_path.is_empty() || workspace_path.trim().is_empty() {
-        tracing::warn!("Attempted to get all sessions with empty workspace path - returning empty array");
+        tracing::warn!(
+            "Attempted to get all sessions with empty workspace path - returning empty array"
+        );
         return Ok(Vec::new()); // Return empty array instead of error for graceful degradation
     }
 
@@ -329,10 +341,7 @@ pub async fn update_instance_status(
             save_sessions(&state, &workspace_path, &sessions)?;
             Ok(result)
         } else {
-            Err(format!(
-                "Instance {} not found in session {}",
-                instance_id, session_id
-            ))
+            Err(format!("Instance {} not found in session {}", instance_id, session_id))
         }
     } else {
         Err(format!("Session {} not found", session_id))

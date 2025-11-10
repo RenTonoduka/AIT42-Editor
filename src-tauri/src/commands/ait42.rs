@@ -1,17 +1,16 @@
+use ait42_ait42::{config::AIT42Config, AgentExecutor, AgentRegistry, Coordinator, ExecutionMode};
 /**
  * AIT42 Agent Commands
  *
  * Tauri commands for executing AIT42 AI agents with Tmux support
  */
-
 use serde::{Deserialize, Serialize};
-use tauri::{Manager, State};
-use std::process::Command;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::{Arc, Mutex};
-use ait42_ait42::{AgentRegistry, AgentExecutor, Coordinator, config::AIT42Config, ExecutionMode};
-use tracing::{info, warn, error};
-use std::path::PathBuf;
+use tauri::{Manager, State};
+use tracing::{error, info, warn};
 
 use crate::state::AppState;
 use crate::utils::AIT42Installer;
@@ -68,10 +67,151 @@ pub struct ParallelExecutionRequest {
 #[serde(rename_all = "camelCase")]
 pub struct ClaudeCodeCompetitionRequest {
     pub task: String,
-    pub instance_count: usize,  // 2-10 instances
-    pub model: String,  // "sonnet", "haiku", "opus"
-    pub timeout_seconds: u64,  // Default: 300
-    pub preserve_worktrees: bool,  // Keep worktrees after completion
+    pub instance_count: usize,    // 2-10 instances
+    pub model: String,            // "sonnet", "haiku", "opus"
+    pub timeout_seconds: u64,     // Default: 300
+    pub preserve_worktrees: bool, // Keep worktrees after completion
+}
+
+/// Runtime allocation request for multi-runtime competition
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeAllocationRequest {
+    pub runtime: String, // "claude" | "codex" | "gemini"
+    pub count: usize,    // instances for this runtime
+    pub model: String,   // runtime-specific model identifier
+}
+
+/// Multi-runtime competition request (competition / ensemble)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MultiRuntimeCompetitionRequest {
+    pub task: String,
+    pub allocations: Vec<RuntimeAllocationRequest>,
+    pub timeout_seconds: u64,
+    pub preserve_worktrees: bool,
+    pub mode: String, // "competition" | "ensemble"
+}
+
+#[derive(Clone, Debug)]
+enum RuntimeEngine {
+    Claude,
+    Codex,
+    Gemini,
+}
+
+#[derive(Clone)]
+struct InstancePlan {
+    runtime: RuntimeEngine,
+    model: String,
+}
+
+impl RuntimeEngine {
+    fn from_str(value: &str) -> Result<Self, String> {
+        match value.to_lowercase().as_str() {
+            "claude" => Ok(RuntimeEngine::Claude),
+            "codex" => Ok(RuntimeEngine::Codex),
+            "gemini" => Ok(RuntimeEngine::Gemini),
+            other => Err(format!("Unsupported runtime: {}", other)),
+        }
+    }
+
+    fn as_str(&self) -> &'static str {
+        match self {
+            RuntimeEngine::Claude => "claude",
+            RuntimeEngine::Codex => "codex",
+            RuntimeEngine::Gemini => "gemini",
+        }
+    }
+
+    fn validate_model(&self, model: &str) -> Result<(), String> {
+        match self {
+            RuntimeEngine::Claude => {
+                let valid_models = ["sonnet", "haiku", "opus"];
+                if !valid_models.contains(&model) {
+                    return Err(format!(
+                        "Invalid Claude model '{}'. Must be one of {:?}",
+                        model, valid_models
+                    ));
+                }
+            }
+            RuntimeEngine::Codex => {
+                if model.trim().is_empty() {
+                    return Err("Codex model must be specified".to_string());
+                }
+            }
+            RuntimeEngine::Gemini => {
+                if model.trim().is_empty() {
+                    return Err("Gemini model must be specified".to_string());
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn build_command(
+        &self,
+        escaped_task: &str,
+        model: &str,
+        source_root: &Path,
+    ) -> Result<String, String> {
+        match self {
+            RuntimeEngine::Claude => Ok(format!(
+                "echo -e '{}' | claude --model {} --print --permission-mode bypassPermissions",
+                escaped_task, model
+            )),
+            RuntimeEngine::Codex => {
+                let script_path = source_root
+                    .join("scripts")
+                    .join("codex_ait42_coordinator.py");
+                if !script_path.exists() {
+                    return Err(format!(
+                        "Codex coordinator script not found at {}",
+                        script_path.display()
+                    ));
+                }
+                let escaped_script = escape_single_quotes(&script_path.to_string_lossy());
+                Ok(format!(
+                    "python3 '{}' '{}' --project-root . --model {}",
+                    escaped_script, escaped_task, model
+                ))
+            }
+            RuntimeEngine::Gemini => {
+                let script_path = source_root
+                    .join("scripts")
+                    .join("gemini_ait42_coordinator.py");
+                if !script_path.exists() {
+                    return Err(format!(
+                        "Gemini coordinator script not found at {}",
+                        script_path.display()
+                    ));
+                }
+                let escaped_script = escape_single_quotes(&script_path.to_string_lossy());
+                let mut command =
+                    format!("python3 '{}' '{}' --project-root .", escaped_script, escaped_task);
+                if !model.is_empty() {
+                    let escaped_model = escape_single_quotes(model);
+                    command = format!("AIT42_GEMINI_MODEL='{}' {}", escaped_model, command);
+                }
+                Ok(command)
+            }
+        }
+    }
+
+    fn log_suffix(&self) -> &'static str {
+        self.as_str()
+    }
+}
+
+fn escape_for_shell(input: &str) -> String {
+    input
+        .replace('\\', "\\\\")
+        .replace('\n', "\\n")
+        .replace('\'', "'\\''")
+}
+
+fn escape_single_quotes(input: &str) -> String {
+    input.replace('\'', "'\\''")
 }
 
 /**
@@ -84,7 +224,7 @@ pub struct ClaudeCodeCompetitionResult {
     pub instances: Vec<ClaudeCodeInstanceResult>,
     pub started_at: String,
     pub completed_at: Option<String>,
-    pub status: String,  // "running", "completed", "failed"
+    pub status: String, // "running", "completed", "failed"
 }
 
 /**
@@ -97,17 +237,21 @@ pub struct ClaudeCodeInstanceResult {
     pub instance_number: usize,
     pub worktree_path: String,
     pub tmux_session_id: String,
-    pub status: String,  // "starting", "running", "completed", "failed", "timeout"
+    pub status: String, // "starting", "running", "completed", "failed", "timeout"
     pub output: String,
     pub error: Option<String>,
     pub execution_time_ms: u64,
     pub started_at: String,
     pub completed_at: Option<String>,
+    pub runtime: Option<String>,
+    pub model: Option<String>,
 }
 
 /// Initialize AIT42 agent registry if not already initialized
 async fn ensure_registry_initialized(state: &State<'_, AppState>) -> Result<(), String> {
-    let mut registry_guard = state.agent_registry.lock()
+    let mut registry_guard = state
+        .agent_registry
+        .lock()
         .map_err(|e| format!("Failed to lock agent registry: {}", e))?;
 
     if registry_guard.is_some() {
@@ -135,10 +279,14 @@ async fn ensure_registry_initialized(state: &State<'_, AppState>) -> Result<(), 
 }
 
 /// Get registry (must be initialized first)
-fn get_registry<'a>(state: &'a State<'a, AppState>) -> Result<std::sync::MutexGuard<'a, Option<AgentRegistry>>, String> {
+fn get_registry<'a>(
+    state: &'a State<'a, AppState>,
+) -> Result<std::sync::MutexGuard<'a, Option<AgentRegistry>>, String> {
     // Note: This is a synchronous function, but we need async initialization
     // For now, we'll initialize synchronously if needed
-    let mut registry_guard = state.agent_registry.lock()
+    let mut registry_guard = state
+        .agent_registry
+        .lock()
         .map_err(|e| format!("Failed to lock agent registry: {}", e))?;
 
     if registry_guard.is_none() {
@@ -182,15 +330,17 @@ async fn ensure_coordinator_initialized(state: &State<'_, AppState>) -> Result<(
         }
     };
 
-    let coordinator = Coordinator::new(config)
-        .map_err(|e| format!("Failed to initialize coordinator: {}", e))?;
+    let coordinator =
+        Coordinator::new(config).map_err(|e| format!("Failed to initialize coordinator: {}", e))?;
 
     *coordinator_guard = Some(coordinator);
     Ok(())
 }
 
 /// Get coordinator (must be initialized first)
-async fn get_coordinator<'a>(state: &'a State<'a, AppState>) -> Result<tokio::sync::MutexGuard<'a, Option<Coordinator>>, String> {
+async fn get_coordinator<'a>(
+    state: &'a State<'a, AppState>,
+) -> Result<tokio::sync::MutexGuard<'a, Option<Coordinator>>, String> {
     ensure_coordinator_initialized(state).await?;
     Ok(state.coordinator.lock().await)
 }
@@ -202,7 +352,8 @@ async fn get_coordinator<'a>(state: &'a State<'a, AppState>) -> Result<tokio::sy
 pub async fn list_agents(state: State<'_, AppState>) -> Result<Vec<AgentInfo>, String> {
     ensure_registry_initialized(&state).await?;
     let registry_guard = get_registry(&state)?;
-    let registry = registry_guard.as_ref()
+    let registry = registry_guard
+        .as_ref()
         .ok_or_else(|| "Agent registry not initialized".to_string())?;
 
     let agents = registry.list();
@@ -231,10 +382,12 @@ pub async fn get_agent_info(
 ) -> Result<AgentInfo, String> {
     ensure_registry_initialized(&state).await?;
     let registry_guard = get_registry(&state)?;
-    let registry = registry_guard.as_ref()
+    let registry = registry_guard
+        .as_ref()
         .ok_or_else(|| "Agent registry not initialized".to_string())?;
 
-    let agent = registry.get(&agent_name)
+    let agent = registry
+        .get(&agent_name)
         .ok_or_else(|| format!("Agent not found: {}", agent_name))?;
 
     Ok(AgentInfo {
@@ -257,7 +410,8 @@ pub async fn execute_agent(
     {
         ensure_registry_initialized(&state).await?;
         let registry_guard = get_registry(&state)?;
-        let registry = registry_guard.as_ref()
+        let registry = registry_guard
+            .as_ref()
             .ok_or_else(|| "Agent registry not initialized".to_string())?;
         if registry.get(&request.agent_name).is_none() {
             return Err(format!("Agent not found: {}", request.agent_name));
@@ -287,8 +441,8 @@ pub async fn execute_agent(
         }
     };
 
-    let coordinator = Coordinator::new(config)
-        .map_err(|e| format!("Failed to initialize coordinator: {}", e))?;
+    let coordinator =
+        Coordinator::new(config).map_err(|e| format!("Failed to initialize coordinator: {}", e))?;
     let mut executor = AgentExecutor::new(coordinator);
     let mode = ExecutionMode::Single(request.agent_name.clone());
 
@@ -332,7 +486,8 @@ pub async fn execute_parallel(
     {
         ensure_registry_initialized(&state).await?;
         let registry_guard = get_registry(&state)?;
-        let registry = registry_guard.as_ref()
+        let registry = registry_guard
+            .as_ref()
             .ok_or_else(|| "Agent registry not initialized".to_string())?;
         for agent_name in &request.agents {
             if registry.get(agent_name).is_none() {
@@ -362,8 +517,8 @@ pub async fn execute_parallel(
         }
     };
 
-    let coordinator = Coordinator::new(config)
-        .map_err(|e| format!("Failed to initialize coordinator: {}", e))?;
+    let coordinator =
+        Coordinator::new(config).map_err(|e| format!("Failed to initialize coordinator: {}", e))?;
     let mut executor = AgentExecutor::new(coordinator);
     let mode = ExecutionMode::Parallel(request.agents.clone());
 
@@ -462,15 +617,11 @@ pub async fn create_tmux_session(
     let session_id = format!("ait42-{}-{}", request.agent_name, timestamp);
 
     // Check if tmux is available
-    let tmux_check = Command::new("tmux")
-        .arg("-V")
-        .output();
+    let tmux_check = Command::new("tmux").arg("-V").output();
 
     match tmux_check {
         Err(_) => return Err("Tmux is not installed or not in PATH".to_string()),
-        Ok(output) if !output.status.success() => {
-            return Err("Tmux is not available".to_string())
-        }
+        Ok(output) if !output.status.success() => return Err("Tmux is not available".to_string()),
         _ => {}
     }
 
@@ -525,7 +676,7 @@ pub async fn list_tmux_sessions(_state: State<'_, AppState>) -> Result<Vec<TmuxS
         .map(|session_name| {
             let parts: Vec<&str> = session_name.split('-').collect();
             let agent_name = if parts.len() >= 3 {
-                parts[1..parts.len()-1].join("-")
+                parts[1..parts.len() - 1].join("-")
             } else {
                 "unknown".to_string()
             };
@@ -585,10 +736,7 @@ pub async fn send_tmux_keys(
         .map_err(|e| e.to_string())?;
 
     if !output.status.success() {
-        return Err(format!(
-            "Failed to send keys: {}",
-            String::from_utf8_lossy(&output.stderr)
-        ));
+        return Err(format!("Failed to send keys: {}", String::from_utf8_lossy(&output.stderr)));
     }
 
     Ok(())
@@ -608,10 +756,7 @@ pub async fn kill_tmux_session(
         .map_err(|e| e.to_string())?;
 
     if !output.status.success() {
-        return Err(format!(
-            "Failed to kill session: {}",
-            String::from_utf8_lossy(&output.stderr)
-        ));
+        return Err(format!("Failed to kill session: {}", String::from_utf8_lossy(&output.stderr)));
     }
 
     tracing::info!("Killed tmux session: {}", session_id);
@@ -631,7 +776,11 @@ async fn monitor_tmux_session(
     instance_number: usize,
     log_file_path: String,
 ) {
-    tracing::info!("🔍 Starting monitoring for session {} (instance {})", session_id, instance_number);
+    tracing::info!(
+        "🔍 Starting monitoring for session {} (instance {})",
+        session_id,
+        instance_number
+    );
 
     let mut last_output = String::new();
     let mut last_line_count = 0;
@@ -642,13 +791,13 @@ async fn monitor_tmux_session(
     let strip_ansi = |text: &str| -> String {
         let mut result = String::with_capacity(text.len());
         let mut chars = text.chars().peekable();
-        
+
         while let Some(ch) = chars.next() {
             if ch == '\x1b' {
                 // Skip ANSI escape sequence
                 if let Some(&'[') = chars.peek() {
                     chars.next(); // consume '['
-                    // Skip until we find a letter (end of escape sequence)
+                                  // Skip until we find a letter (end of escape sequence)
                     while let Some(&next_ch) = chars.peek() {
                         if next_ch.is_alphabetic() || next_ch == 'm' {
                             chars.next();
@@ -674,7 +823,7 @@ async fn monitor_tmux_session(
                 result.push(ch);
             }
         }
-        
+
         result
     };
 
@@ -726,8 +875,16 @@ async fn monitor_tmux_session(
                             );
 
                             match app.emit_all("competition-output", payload.clone()) {
-                                Ok(_) => tracing::info!("✅ Sent {} bytes (incremental) for instance {}", cleaned_content.len(), instance_number),
-                                Err(e) => tracing::error!("❌ Failed to emit incremental output for instance {}: {}", instance_number, e),
+                                Ok(_) => tracing::info!(
+                                    "✅ Sent {} bytes (incremental) for instance {}",
+                                    cleaned_content.len(),
+                                    instance_number
+                                ),
+                                Err(e) => tracing::error!(
+                                    "❌ Failed to emit incremental output for instance {}: {}",
+                                    instance_number,
+                                    e
+                                ),
                             }
                         }
 
@@ -746,7 +903,8 @@ async fn monitor_tmux_session(
 
                     if let Ok(capture) = capture_output {
                         if capture.status.success() {
-                            let current_output = String::from_utf8_lossy(&capture.stdout).to_string();
+                            let current_output =
+                                String::from_utf8_lossy(&capture.stdout).to_string();
                             let current_lines: Vec<&str> = current_output.lines().collect();
 
                             // Only send new lines
@@ -767,8 +925,14 @@ async fn monitor_tmux_session(
                                     });
 
                                     match app.emit_all("competition-output", payload) {
-                                        Ok(_) => tracing::debug!("📤 Sent {} bytes (tmux fallback) for instance {}", content_len, instance_number),
-                                        Err(e) => tracing::warn!("⚠️ Failed to emit tmux output: {}", e),
+                                        Ok(_) => tracing::debug!(
+                                            "📤 Sent {} bytes (tmux fallback) for instance {}",
+                                            content_len,
+                                            instance_number
+                                        ),
+                                        Err(e) => {
+                                            tracing::warn!("⚠️ Failed to emit tmux output: {}", e)
+                                        }
                                     }
                                 }
 
@@ -790,7 +954,7 @@ async fn monitor_tmux_session(
                         if !final_output.trim().is_empty() {
                             // Strip ANSI codes before sending
                             let cleaned_output = strip_ansi(&final_output);
-                            
+
                             let payload = serde_json::json!({
                                 "instance": instance_number,
                                 "output": cleaned_output,
@@ -802,8 +966,16 @@ async fn monitor_tmux_session(
                                 instance_number, cleaned_output.len());
 
                             match app.emit_all("competition-output", payload) {
-                                Ok(_) => tracing::info!("✅ Sent final output for instance {} ({} bytes)", instance_number, cleaned_output.len()),
-                                Err(e) => tracing::error!("❌ Failed to emit final output for instance {}: {}", instance_number, e),
+                                Ok(_) => tracing::info!(
+                                    "✅ Sent final output for instance {} ({} bytes)",
+                                    instance_number,
+                                    cleaned_output.len()
+                                ),
+                                Err(e) => tracing::error!(
+                                    "❌ Failed to emit final output for instance {}: {}",
+                                    instance_number,
+                                    e
+                                ),
                             }
                         } else {
                             tracing::warn!("⚠️ Log file for instance {} is empty", instance_number);
@@ -818,7 +990,11 @@ async fn monitor_tmux_session(
                         }
                     }
                     Err(e) => {
-                        tracing::error!("❌ Failed to read log file for instance {}: {}", instance_number, e);
+                        tracing::error!(
+                            "❌ Failed to read log file for instance {}: {}",
+                            instance_number,
+                            e
+                        );
 
                         // Send completion event even if file read failed
                         let payload = serde_json::json!({
@@ -846,75 +1022,157 @@ pub async fn execute_claude_code_competition(
     state: State<'_, AppState>,
     request: ClaudeCodeCompetitionRequest,
 ) -> Result<ClaudeCodeCompetitionResult, String> {
-    // Validation
-    if request.instance_count < 2 || request.instance_count > 10 {
-        return Err("Instance count must be between 2 and 10".to_string());
-    }
+    let general_request = MultiRuntimeCompetitionRequest {
+        task: request.task,
+        allocations: vec![RuntimeAllocationRequest {
+            runtime: "claude".to_string(),
+            count: request.instance_count,
+            model: request.model,
+        }],
+        timeout_seconds: request.timeout_seconds,
+        preserve_worktrees: request.preserve_worktrees,
+        mode: "competition".to_string(),
+    };
 
+    execute_multi_runtime_competition(app_handle, state, general_request).await
+}
+
+#[tauri::command]
+pub async fn execute_multi_runtime_competition(
+    app_handle: tauri::AppHandle,
+    state: State<'_, AppState>,
+    request: MultiRuntimeCompetitionRequest,
+) -> Result<ClaudeCodeCompetitionResult, String> {
     if request.task.trim().is_empty() {
         return Err("Task cannot be empty".to_string());
     }
 
-    let valid_models = ["sonnet", "haiku", "opus"];
-    if !valid_models.contains(&request.model.as_str()) {
-        return Err(format!("Invalid model. Must be one of: {:?}", valid_models));
+    if request.allocations.is_empty() {
+        return Err("At least one runtime allocation is required".to_string());
     }
 
+    let mode = match request.mode.to_lowercase().as_str() {
+        "competition" => "competition".to_string(),
+        "ensemble" => "ensemble".to_string(),
+        other => return Err(format!("Invalid mode: {}", other)),
+    };
+
+    let timeout_seconds = if request.timeout_seconds == 0 {
+        300
+    } else {
+        request.timeout_seconds
+    };
+
+    let mut plans = Vec::new();
+    for allocation in &request.allocations {
+        if allocation.count == 0 {
+            continue;
+        }
+
+        let runtime = RuntimeEngine::from_str(&allocation.runtime)?;
+        runtime.validate_model(&allocation.model)?;
+
+        for _ in 0..allocation.count {
+            plans.push(InstancePlan {
+                runtime: runtime.clone(),
+                model: allocation.model.clone(),
+            });
+        }
+    }
+
+    if plans.is_empty() {
+        return Err("No runtime allocations after filtering counts".to_string());
+    }
+
+    if plans.len() < 2 || plans.len() > 10 {
+        return Err("Total instance count must be between 2 and 10".to_string());
+    }
+
+    run_multi_runtime_competition(
+        app_handle,
+        state,
+        request.task,
+        mode,
+        timeout_seconds,
+        request.preserve_worktrees,
+        plans,
+    )
+    .await
+}
+
+async fn run_multi_runtime_competition(
+    app_handle: tauri::AppHandle,
+    state: State<'_, AppState>,
+    task: String,
+    mode: String,
+    timeout_seconds: u64,
+    preserve_worktrees: bool,
+    plans: Vec<InstancePlan>,
+) -> Result<ClaudeCodeCompetitionResult, String> {
     let competition_id = uuid::Uuid::new_v4().to_string();
-    let started_at = chrono::Utc::now();
+    let short_id = &competition_id[..8];
+    let total_instances = plans.len();
+    let task_preview: String = task.chars().take(80).collect();
 
     tracing::info!(
-        "Starting Claude Code competition: {} instances, model: {}, task: {}",
-        request.instance_count,
-        request.model,
-        request.task.chars().take(50).collect::<String>()
+        "Starting {} mode multi-runtime competition: {} instances (timeout {}s, preserve_worktrees={})",
+        mode,
+        total_instances,
+        timeout_seconds,
+        preserve_worktrees
     );
+    tracing::info!("Task preview: {}", task_preview);
 
     let working_dir = state.working_dir.lock().await;
     let project_root = working_dir.clone();
-    drop(working_dir); // Release lock
+    drop(working_dir);
 
     tracing::info!("📁 Project root for competition: {}", project_root.display());
 
-    // Create worktrees in the project directory (not in home directory)
-    // This keeps worktrees with their respective projects
     let ait42_worktrees = project_root.join(".ait42").join(".worktrees");
-
     tracing::info!("📁 Worktrees directory: {}", ait42_worktrees.display());
 
-    // Create competition directory in project's .ait42 directory
-    let competition_dir = format!("{}/competition-{}", ait42_worktrees.display(), &competition_id[..8]);
-
-    tracing::info!("📁 Creating competition directory: {}", competition_dir);
-    std::fs::create_dir_all(&competition_dir).map_err(|e| {
-        let err_msg = format!("Failed to create competition directory at {}: {}", competition_dir, e);
+    std::fs::create_dir_all(&ait42_worktrees).map_err(|e| {
+        let err_msg =
+            format!("Failed to create worktrees directory at {}: {}", ait42_worktrees.display(), e);
         tracing::error!("{}", err_msg);
         err_msg
     })?;
 
-    let mut instances = Vec::new();
+    let competition_dir = ait42_worktrees.join(format!("competition-{}", short_id));
+    tracing::info!("📁 Creating competition directory: {}", competition_dir.display());
+    std::fs::create_dir_all(&competition_dir).map_err(|e| {
+        let err_msg = format!(
+            "Failed to create competition directory at {}: {}",
+            competition_dir.display(),
+            e
+        );
+        tracing::error!("{}", err_msg);
+        err_msg
+    })?;
 
-    // ハンドシェイク準備: フロントエンドのリスナー登録を待つ仕組み
     let ready_signal_received = Arc::new(Mutex::new(false));
     let ready_clone = Arc::clone(&ready_signal_received);
     let competition_id_for_listener = competition_id.clone();
 
-    tracing::info!("🕐 [HANDSHAKE] Registering global listener BEFORE creating worktrees for competition {} at {:?}",
-        competition_id, std::time::SystemTime::now());
-
-    // STEP 1: グローバルリスナーを先に登録（非同期タスクの外で）
     let listener_handle = app_handle.listen_global("competition-listener-ready", move |event| {
-        tracing::info!("🔔 [HANDSHAKE] Received event on 'competition-listener-ready' at {:?}", std::time::SystemTime::now());
+        tracing::info!("🔔 [HANDSHAKE] Received event on 'competition-listener-ready'");
         if let Some(payload) = event.payload() {
             tracing::debug!("📦 [HANDSHAKE] Payload: {}", payload);
             if let Ok(data) = serde_json::from_str::<serde_json::Value>(payload) {
                 if let Some(received_id) = data.get("competitionId").and_then(|v| v.as_str()) {
-                    tracing::info!("🔍 [HANDSHAKE] Checking received_id='{}' vs expected='{}'", received_id, competition_id_for_listener);
                     if received_id == competition_id_for_listener {
-                        tracing::info!("✅ [HANDSHAKE] Frontend ready signal received for competition {}", competition_id_for_listener);
+                        tracing::info!(
+                            "✅ [HANDSHAKE] Frontend ready signal received for competition {}",
+                            competition_id_for_listener
+                        );
                         *ready_clone.lock().unwrap() = true;
                     } else {
-                        tracing::warn!("⚠️ [HANDSHAKE] Competition ID mismatch: received '{}', expected '{}'", received_id, competition_id_for_listener);
+                        tracing::warn!(
+                            "⚠️ [HANDSHAKE] Competition ID mismatch: received '{}', expected '{}'",
+                            received_id,
+                            competition_id_for_listener
+                        );
                     }
                 } else {
                     tracing::warn!("⚠️ [HANDSHAKE] No competitionId field in payload: {:?}", data);
@@ -927,14 +1185,36 @@ pub async fn execute_claude_code_competition(
         }
     });
 
-    // Create worktrees and launch instances
-    for i in 1..=request.instance_count {
-        let instance_id = format!("{}-instance-{}", competition_id, i);
-        let worktree_path = format!("{}/instance-{}", competition_dir, i);
-        let branch_name = format!("competition-{}-{}", &competition_id[..8], i);
+    let source_ait42 =
+        PathBuf::from("/Users/tonodukaren/Programming/AI/02_Workspace/05_Client/03_Sun/AIT42");
+    let installer = AIT42Installer::new(source_ait42.clone());
 
-        // Create git worktree
-        tracing::info!("Creating worktree {} at {}", i, worktree_path);
+    let enhanced_task = format!(
+        "{task}\n\n{instructions}",
+        task = task,
+        instructions = "あなたはこのタスクを完遂する開発者です。以下の手順で実行してください：\n\\
+1. タスクの要件を分析\n\\
+2. 必要なファイルやコードを特定\n\\
+3. 具体的な実装を提案・実行\n\\
+4. テストと検証\n\n質問はせず、直接実装してください。"
+    );
+    let escaped_task = escape_for_shell(&enhanced_task);
+
+    let mut instances = Vec::new();
+
+    for (idx, plan) in plans.iter().enumerate() {
+        let instance_number = idx + 1;
+        let instance_id = format!("{}-instance-{}", competition_id, instance_number);
+        let worktree_path = competition_dir.join(format!("instance-{}", instance_number));
+        let branch_name =
+            format!("{}-{}-{}-{}", plan.runtime.as_str(), mode, short_id, instance_number);
+
+        tracing::info!(
+            "Creating worktree {} (runtime: {}) at {}",
+            instance_number,
+            plan.runtime.as_str(),
+            worktree_path.display()
+        );
 
         let mut cmd = Command::new("git");
         cmd.arg("worktree")
@@ -944,41 +1224,60 @@ pub async fn execute_claude_code_competition(
             .arg(&worktree_path)
             .current_dir(&project_root);
 
-        let output = cmd.output().map_err(|e| {
-            format!("Failed to create worktree {}: {}", i, e)
-        })?;
+        let output = cmd
+            .output()
+            .map_err(|e| format!("Failed to create worktree {}: {}", instance_number, e))?;
 
         if !output.status.success() {
             let error = String::from_utf8_lossy(&output.stderr);
             tracing::error!("Worktree creation failed: {}", error);
-            return Err(format!("Failed to create worktree {}: {}", i, error));
+            return Err(format!("Failed to create worktree {}: {}", instance_number, error));
         }
 
-        // Auto-install AIT42 in the worktree
-        tracing::info!("🚀 Installing AIT42 in worktree instance {}", i);
-        let source_ait42 = PathBuf::from("/Users/tonodukaren/Programming/AI/02_Workspace/05_Client/03_Sun/AIT42");
-        let installer = AIT42Installer::new(source_ait42);
-        let worktree_pathbuf = PathBuf::from(&worktree_path);
-
-        match installer.install_to_workspace(&worktree_pathbuf) {
+        tracing::info!(
+            "🚀 Installing AIT42 in worktree instance {} (runtime: {})",
+            instance_number,
+            plan.runtime.as_str()
+        );
+        match installer.install_to_workspace(worktree_path.as_path()) {
             Ok(result) => {
                 if result.success {
-                    tracing::info!("✅ AIT42 installed in instance {} ({} agents, {} SOPs)",
-                                 i, result.agents_installed, result.sops_installed);
+                    tracing::info!(
+                        "✅ AIT42 installed in instance {} ({} agents, {} SOPs)",
+                        instance_number,
+                        result.agents_installed,
+                        result.sops_installed
+                    );
+                    for summary in &result.runtime_summaries {
+                        tracing::info!(
+                            "     • {} runtime -> agents: {}, memory: {}, sop: {}",
+                            summary.name.to_uppercase(),
+                            summary.agents_installed,
+                            if summary.memory_setup { "✓" } else { "✗" },
+                            summary.sops_installed
+                        );
+                    }
                 } else {
-                    tracing::warn!("⚠️ AIT42 installation partially failed in instance {}: {:?}",
-                                 i, result.errors);
+                    tracing::warn!(
+                        "⚠️ AIT42 installation partially failed in instance {}: {:?}",
+                        instance_number,
+                        result.errors
+                    );
                 }
             }
             Err(e) => {
-                tracing::warn!("⚠️ Failed to install AIT42 in instance {}: {}", i, e);
-                // Continue execution - don't fail the competition
+                tracing::warn!("⚠️ Failed to install AIT42 in instance {}: {}", instance_number, e);
             }
         }
 
-        // Create tmux session for this instance
-        let session_id = format!("claude-code-comp-{}-{}", &competition_id[..8], i);
-        let output_log_path = format!("{}/.claude-output.log", worktree_path);
+        let session_id =
+            format!("ait42-{}-{}-{}-{}", plan.runtime.as_str(), mode, short_id, instance_number);
+        let output_log_path = worktree_path.join(format!(
+            ".{}-output-{}.log",
+            plan.runtime.log_suffix(),
+            instance_number
+        ));
+        let output_log_path_str = output_log_path.to_string_lossy().to_string();
 
         let tmux_output = Command::new("tmux")
             .arg("new-session")
@@ -992,108 +1291,100 @@ pub async fn execute_claude_code_competition(
 
         if !tmux_output.status.success() {
             let error = String::from_utf8_lossy(&tmux_output.stderr);
-            return Err(format!("Failed to create tmux session {}: {}", i, error));
+            return Err(format!("Failed to create tmux session {}: {}", instance_number, error));
         }
 
-        // Enable pipe-pane to capture all output to a log file
-        // This ensures Claude CLI output is captured even if tmux capture-pane misses it
         let pipe_output = Command::new("tmux")
             .arg("pipe-pane")
             .arg("-t")
             .arg(&session_id)
             .arg("-o")
-            .arg(format!("cat >> {}", output_log_path))
+            .arg(format!("cat >> {}", output_log_path_str))
             .output()
-            .map_err(|e| format!("Failed to enable pipe-pane: {}", e))?;
+            .map_err(|e| format!("Failed to configure pipe-pane: {}", e))?;
 
         if !pipe_output.status.success() {
             let error = String::from_utf8_lossy(&pipe_output.stderr);
-            tracing::warn!("Failed to enable pipe-pane for instance {}: {}", i, error);
+            tracing::warn!(
+                "Failed to enable pipe-pane for instance {}: {}",
+                instance_number,
+                error
+            );
         }
 
-        // Send Claude Code command to tmux session
-        // Use --print flag for non-interactive mode to avoid Ink raw mode errors
-        // Use --permission-mode bypassPermissions to auto-approve changes and prevent interactive prompts
-        // Note: Use echo | claude because it forces non-interactive mode in tmux
-        // Build Claude Code command with explicit instructions
-        let enhanced_task = format!(
-            "{}
-
-あなたはこのタスクを完遂する開発者です。以下の手順で実行してください：
-1. タスクの要件を分析
-2. 必要なファイルやコードを特定
-3. 具体的な実装を提案・実行
-4. テストと検証
-
-質問はせず、直接実装してください。",
-            request.task
-        );
-
-        // Escape newlines and quotes for proper shell handling
-        let escaped_task = enhanced_task
-            .replace('\\', "\\\\")      // Escape backslashes first
-            .replace('\n', "\\n")       // Escape newlines
-            .replace('\'', "'\\''");    // Escape single quotes
-
-        let claude_cmd = format!(
-            "echo -e '{}' | claude --model {} --print --permission-mode bypassPermissions",
-            escaped_task,
-            request.model
-        );
+        let runtime_command =
+            plan.runtime
+                .build_command(&escaped_task, &plan.model, &source_ait42)?;
 
         let send_output = Command::new("tmux")
             .arg("send-keys")
             .arg("-t")
             .arg(&session_id)
-            .arg(format!("{} && exit", claude_cmd))
+            .arg(format!("{} && exit", runtime_command))
             .arg("Enter")
             .output()
             .map_err(|e| format!("Failed to send command: {}", e))?;
 
         if !send_output.status.success() {
             let error = String::from_utf8_lossy(&send_output.stderr);
-            return Err(format!("Failed to send command to instance {}: {}", i, error));
+            return Err(format!(
+                "Failed to send command to instance {}: {}",
+                instance_number, error
+            ));
         }
 
-        tracing::info!("Launched Claude Code instance {} in session {}", i, session_id);
+        tracing::info!(
+            "Launched {} runtime instance {} in session {}",
+            plan.runtime.as_str(),
+            instance_number,
+            session_id
+        );
 
-        // モニタリングタスクを起動（ハンドシェイク待機済み前提）
         let app = app_handle.clone();
         let monitor_session_id = session_id.clone();
-        let monitor_instance_number = i;
-        let monitor_log_path = output_log_path.clone();
+        let monitor_log_path = output_log_path_str.clone();
         let ready_signal_clone = Arc::clone(&ready_signal_received);
 
         tauri::async_runtime::spawn(async move {
-            // STEP 2: フロントエンド準備完了を待機（最大5秒タイムアウト）
             let timeout_duration = std::time::Duration::from_secs(5);
             let start_time = std::time::Instant::now();
 
-            tracing::info!("⏳ [HANDSHAKE] Instance {} waiting for frontend ready signal...", monitor_instance_number);
+            tracing::info!(
+                "⏳ [HANDSHAKE] Instance {} waiting for frontend ready signal...",
+                instance_number
+            );
 
             while !*ready_signal_clone.lock().unwrap() {
                 if start_time.elapsed() > timeout_duration {
-                    tracing::warn!("⚠️ [HANDSHAKE] Frontend ready signal timeout for instance {}, proceeding anyway", monitor_instance_number);
+                    tracing::warn!(
+                        "⚠️ [HANDSHAKE] Frontend ready signal timeout for instance {}, proceeding anyway",
+                        instance_number
+                    );
                     break;
                 }
                 tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
             }
 
             if *ready_signal_clone.lock().unwrap() {
-                tracing::info!("✅ [HANDSHAKE] Frontend ready confirmed for instance {}", monitor_instance_number);
+                tracing::info!(
+                    "✅ [HANDSHAKE] Frontend ready confirmed for instance {}",
+                    instance_number
+                );
             }
 
-            // STEP 3: モニタリング開始
-            tracing::info!("🚀 Starting monitoring for instance {} at {:?}",
-                monitor_instance_number, std::time::SystemTime::now());
+            tracing::info!(
+                "🚀 Starting monitoring for instance {} at {:?}",
+                instance_number,
+                std::time::SystemTime::now()
+            );
 
-            monitor_tmux_session(app, monitor_session_id, monitor_instance_number, monitor_log_path).await;
+            monitor_tmux_session(app, monitor_session_id, instance_number, monitor_log_path).await;
         });
 
         instances.push(ClaudeCodeInstanceResult {
             instance_id,
-            instance_number: i,
-            worktree_path,
+            instance_number,
+            worktree_path: worktree_path.to_string_lossy().to_string(),
             tmux_session_id: session_id,
             status: "running".to_string(),
             output: String::new(),
@@ -1101,18 +1392,20 @@ pub async fn execute_claude_code_competition(
             execution_time_ms: 0,
             started_at: started_at.to_rfc3339(),
             completed_at: None,
+            runtime: Some(plan.runtime.as_str().to_string()),
+            model: Some(plan.model.clone()),
         });
     }
 
-    // STEP 4: リスナークリーンアップは最初のインスタンス完了時に行う
-    // （実際にはタイムアウト後に自動的にunlistenすべきだが、ここでは簡略化）
     let app_for_cleanup = app_handle.clone();
     let competition_id_for_cleanup = competition_id.clone();
     tauri::async_runtime::spawn(async move {
-        // 10秒後にリスナーをクリーンアップ（ハンドシェイク期間終了）
         tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
         app_for_cleanup.unlisten(listener_handle);
-        tracing::info!("🧹 [HANDSHAKE] Cleaned up listener for competition {}", competition_id_for_cleanup);
+        tracing::info!(
+            "🧹 [HANDSHAKE] Cleaned up listener for competition {}",
+            competition_id_for_cleanup
+        );
     });
 
     Ok(ClaudeCodeCompetitionResult {
@@ -1124,7 +1417,7 @@ pub async fn execute_claude_code_competition(
     })
 }
 
-/// Get competition status and results
+/// Get competition status
 #[tauri::command]
 pub async fn get_competition_status(
     _state: State<'_, AppState>,
@@ -1146,6 +1439,7 @@ pub async fn cancel_competition(
 
     // Kill all tmux sessions for this competition
     let session_pattern = format!("claude-code-comp-{}", &competition_id[..8]);
+    let competition_short = &competition_id[..8];
 
     let list_output = Command::new("tmux")
         .arg("list-sessions")
@@ -1157,7 +1451,11 @@ pub async fn cancel_competition(
     if list_output.status.success() {
         let sessions = String::from_utf8_lossy(&list_output.stdout);
         for session in sessions.lines() {
-            if session.contains(&session_pattern) {
+            let matches_legacy = session.contains(&session_pattern);
+            let matches_multi =
+                session.starts_with("ait42-") && session.contains(competition_short);
+
+            if matches_legacy || matches_multi {
                 let _ = Command::new("tmux")
                     .arg("kill-session")
                     .arg("-t")
@@ -1178,7 +1476,8 @@ pub async fn cancel_competition(
 
         // Use project directory for worktrees (not home directory)
         let ait42_worktrees = project_root.join(".ait42").join(".worktrees");
-        let competition_dir = format!("{}/competition-{}", ait42_worktrees.display(), &competition_id[..8]);
+        let competition_dir =
+            format!("{}/competition-{}", ait42_worktrees.display(), &competition_id[..8]);
 
         // Remove all worktrees
         if let Ok(entries) = std::fs::read_dir(&competition_dir) {
@@ -1228,10 +1527,10 @@ pub struct RoleDefinition {
 #[serde(rename_all = "camelCase")]
 pub struct DebateRequest {
     pub task: String,
-    pub roles: Vec<RoleDefinition>,  // 3 roles (Architect, Pragmatist, Innovator)
-    pub model: String,  // "sonnet", "haiku", "opus"
-    pub timeout_seconds: u64,  // Per-round timeout (default: 800s = 13.3 min)
-    pub preserve_worktrees: bool,  // Keep worktrees after completion
+    pub roles: Vec<RoleDefinition>, // 3 roles (Architect, Pragmatist, Innovator)
+    pub model: String,              // "sonnet", "haiku", "opus"
+    pub timeout_seconds: u64,       // Per-round timeout (default: 800s = 13.3 min)
+    pub preserve_worktrees: bool,   // Keep worktrees after completion
 }
 
 /// Debate execution result
@@ -1239,7 +1538,7 @@ pub struct DebateRequest {
 #[serde(rename_all = "camelCase")]
 pub struct DebateResult {
     pub debate_id: String,
-    pub status: String,  // "started", "round_1", "round_2", "round_3", "completed", "failed"
+    pub status: String, // "started", "round_1", "round_2", "round_3", "completed", "failed"
     pub message: String,
     pub worktree_path: String,
     pub branch: String,
@@ -1253,7 +1552,7 @@ pub struct RoundOutput {
     pub role_id: String,
     pub role_name: String,
     pub output: String,
-    pub status: String,  // "running", "completed", "failed"
+    pub status: String, // "running", "completed", "failed"
     pub started_at: String,
     pub completed_at: Option<String>,
     pub execution_time_ms: u64,
@@ -1264,9 +1563,9 @@ pub struct RoundOutput {
 #[serde(rename_all = "camelCase")]
 pub struct DebateStatus {
     pub debate_id: String,
-    pub current_round: u8,  // 1, 2, or 3
+    pub current_round: u8, // 1, 2, or 3
     pub total_rounds: u8,  // Always 3
-    pub status: String,  // "started", "round_1", "round_2", "round_3", "completed", "failed"
+    pub status: String,    // "started", "round_1", "round_2", "round_3", "completed", "failed"
     pub round_outputs: Vec<RoundOutput>,
     pub worktree_path: String,
     pub context_files: Vec<String>,
@@ -1337,9 +1636,9 @@ pub async fn execute_debate(
         .arg(&worktree_path)
         .current_dir(&project_root);
 
-    let output = cmd.output().map_err(|e| {
-        format!("Failed to create worktree: {}", e)
-    })?;
+    let output = cmd
+        .output()
+        .map_err(|e| format!("Failed to create worktree: {}", e))?;
 
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr);
@@ -1351,18 +1650,33 @@ pub async fn execute_debate(
 
     // Auto-install AIT42 in the debate worktree
     tracing::info!("🚀 Installing AIT42 in debate worktree");
-    let source_ait42 = PathBuf::from("/Users/tonodukaren/Programming/AI/02_Workspace/05_Client/03_Sun/AIT42");
+    let source_ait42 =
+        PathBuf::from("/Users/tonodukaren/Programming/AI/02_Workspace/05_Client/03_Sun/AIT42");
     let installer = AIT42Installer::new(source_ait42);
     let worktree_pathbuf = PathBuf::from(&worktree_path);
 
     match installer.install_to_workspace(&worktree_pathbuf) {
         Ok(result) => {
             if result.success {
-                tracing::info!("✅ AIT42 installed in debate worktree ({} agents, {} SOPs)",
-                             result.agents_installed, result.sops_installed);
+                tracing::info!(
+                    "✅ AIT42 installed in debate worktree ({} agents, {} SOPs)",
+                    result.agents_installed,
+                    result.sops_installed
+                );
+                for summary in &result.runtime_summaries {
+                    tracing::info!(
+                        "     • {} runtime -> agents: {}, memory: {}, sop: {}",
+                        summary.name.to_uppercase(),
+                        summary.agents_installed,
+                        if summary.memory_setup { "✓" } else { "✗" },
+                        summary.sops_installed
+                    );
+                }
             } else {
-                tracing::warn!("⚠️ AIT42 installation partially failed in debate worktree: {:?}",
-                             result.errors);
+                tracing::warn!(
+                    "⚠️ AIT42 installation partially failed in debate worktree: {:?}",
+                    result.errors
+                );
             }
         }
         Err(e) => {
@@ -1385,7 +1699,9 @@ pub async fn execute_debate(
     };
 
     {
-        let mut debates = state.debates.lock()
+        let mut debates = state
+            .debates
+            .lock()
             .map_err(|e| format!("Failed to lock debates: {}", e))?;
         debates.insert(debate_id.clone(), initial_status);
     }
@@ -1408,7 +1724,9 @@ pub async fn execute_debate(
             request_clone,
             worktree_path_clone,
             context_dir_clone,
-        ).await {
+        )
+        .await
+        {
             tracing::error!("Debate execution failed: {}", e);
         }
     });
@@ -1497,7 +1815,7 @@ async fn execute_debate_rounds(
             };
 
             // Persist to session history using direct file operations
-            use sha2::{Sha256, Digest};
+            use sha2::{Digest, Sha256};
 
             let mut hasher = Sha256::new();
             hasher.update(workspace_path.as_bytes());
@@ -1510,15 +1828,16 @@ async fn execute_debate_rounds(
                 .join(format!("{}.json", hash));
 
             // Load existing sessions
-            let mut sessions: Vec<crate::commands::session_history::WorktreeSession> = if sessions_file.exists() {
-                if let Ok(content) = std::fs::read_to_string(&sessions_file) {
-                    serde_json::from_str(&content).unwrap_or_else(|_| Vec::new())
+            let mut sessions: Vec<crate::commands::session_history::WorktreeSession> =
+                if sessions_file.exists() {
+                    if let Ok(content) = std::fs::read_to_string(&sessions_file) {
+                        serde_json::from_str(&content).unwrap_or_else(|_| Vec::new())
+                    } else {
+                        Vec::new()
+                    }
                 } else {
                     Vec::new()
-                }
-            } else {
-                Vec::new()
-            };
+                };
 
             // Update or insert session
             if let Some(existing) = sessions.iter_mut().find(|s| s.id == session.id) {
@@ -1536,7 +1855,11 @@ async fn execute_debate_rounds(
                 if let Err(e) = std::fs::write(&sessions_file, content) {
                     tracing::error!("Failed to persist debate status: {}", e);
                 } else {
-                    tracing::info!("Persisted debate status update: {} - {}", debate_id_clone, status);
+                    tracing::info!(
+                        "Persisted debate status update: {} - {}",
+                        debate_id_clone,
+                        status
+                    );
                 }
             }
         });
@@ -1564,7 +1887,8 @@ async fn execute_debate_rounds(
         worktree_path.clone(),
         context_dir.clone(),
         None, // No previous context
-    ).await?;
+    )
+    .await?;
 
     // Round 2: Critical analysis with Round 1 context
     update_status(2, "round_2".to_string());
@@ -1585,7 +1909,8 @@ async fn execute_debate_rounds(
         worktree_path.clone(),
         context_dir.clone(),
         Some(round1_context),
-    ).await?;
+    )
+    .await?;
 
     // Round 3: Consensus formation with Round 1+2 context
     update_status(3, "round_3".to_string());
@@ -1598,7 +1923,8 @@ async fn execute_debate_rounds(
     }
 
     let round2_context = load_round_context(&context_dir, 2)?;
-    let combined_context = format!("{}\n\n--- Round 2 ---\n\n{}",
+    let combined_context = format!(
+        "{}\n\n--- Round 2 ---\n\n{}",
         load_round_context(&context_dir, 1)?,
         round2_context
     );
@@ -1610,7 +1936,8 @@ async fn execute_debate_rounds(
         worktree_path.clone(),
         context_dir.clone(),
         Some(combined_context),
-    ).await?;
+    )
+    .await?;
 
     // Debate completed - update final status
     update_status(3, "completed".to_string());
@@ -1641,9 +1968,7 @@ async fn execute_round(
         let prompt = if let Some(ref context) = previous_context {
             format!(
                 "{}\n\n--- Previous Round Context ---\n{}\n\n--- Your Task ---\n{}",
-                role.system_prompt,
-                context,
-                request.task
+                role.system_prompt, context, request.task
             )
         } else {
             format!("{}\n\n{}", role.system_prompt, request.task)
@@ -1680,14 +2005,13 @@ async fn execute_round(
         // Send Claude Code command using echo -e for proper multiline handling
         // Use --permission-mode bypassPermissions to auto-approve changes and prevent interactive prompts
         let escaped_prompt = prompt
-            .replace('\\', "\\\\")      // Escape backslashes first
-            .replace('\n', "\\n")       // Escape newlines
-            .replace('\'', "'\\''");    // Escape single quotes
+            .replace('\\', "\\\\") // Escape backslashes first
+            .replace('\n', "\\n") // Escape newlines
+            .replace('\'', "'\\''"); // Escape single quotes
 
         let claude_cmd = format!(
             "echo -e '{}' | claude --model {} --print --permission-mode bypassPermissions",
-            escaped_prompt,
-            request.model
+            escaped_prompt, request.model
         );
 
         let send_output = Command::new("tmux")
@@ -1801,10 +2125,13 @@ pub async fn get_debate_status(
     state: State<'_, AppState>,
     debate_id: String,
 ) -> Result<DebateStatus, String> {
-    let debates = state.debates.lock()
+    let debates = state
+        .debates
+        .lock()
         .map_err(|e| format!("Failed to lock debates: {}", e))?;
 
-    debates.get(&debate_id)
+    debates
+        .get(&debate_id)
         .cloned()
         .ok_or_else(|| format!("Debate {} not found", debate_id))
 }
@@ -1882,8 +2209,8 @@ pub async fn cancel_debate(
 #[serde(rename_all = "camelCase")]
 pub struct ClaudeCodeAnalysisRequest {
     pub task: String,
-    pub model: String,  // "sonnet", "haiku", "opus"
-    pub timeout_seconds: u64,  // Default: 120s
+    pub model: String,        // "sonnet", "haiku", "opus"
+    pub timeout_seconds: u64, // Default: 120s
 }
 
 /// Task analysis response from Claude Code
@@ -1891,13 +2218,13 @@ pub struct ClaudeCodeAnalysisRequest {
 #[serde(rename_all = "camelCase")]
 pub struct ClaudeCodeAnalysisResponse {
     pub analysis_id: String,
-    pub complexity_class: String,  // "Logarithmic", "Linear", "Quadratic", "Exponential"
+    pub complexity_class: String, // "Logarithmic", "Linear", "Quadratic", "Exponential"
     pub recommended_subtasks: usize,
     pub recommended_instances: usize,
-    pub confidence: f64,  // 0.0-1.0
+    pub confidence: f64, // 0.0-1.0
     pub reasoning: String,
     pub raw_output: String,
-    pub status: String,  // "completed", "failed", "timeout"
+    pub status: String, // "completed", "failed", "timeout"
 }
 
 /// Analyze task using Claude Code itself (meta-analysis)
@@ -1998,14 +2325,13 @@ REASONING: [なぜこの複雑度クラスと分解数が適切か、詳細な�
 
     // Send Claude Code command using echo -e for proper multiline handling
     let escaped_prompt = analysis_prompt
-        .replace('\\', "\\\\")      // Escape backslashes first
-        .replace('\n', "\\n")       // Escape newlines
-        .replace('\'', "'\\''");    // Escape single quotes
+        .replace('\\', "\\\\") // Escape backslashes first
+        .replace('\n', "\\n") // Escape newlines
+        .replace('\'', "'\\''"); // Escape single quotes
 
     let claude_cmd = format!(
         "echo -e '{}' | claude --model {} --print --permission-mode bypassPermissions",
-        escaped_prompt,
-        request.model
+        escaped_prompt, request.model
     );
 
     let send_output = Command::new("tmux")
@@ -2084,7 +2410,10 @@ REASONING: [なぜこの複雑度クラスと分解数が適切か、詳細な�
 }
 
 /// Parse Claude Code analysis output
-fn parse_analysis_output(output: &str, analysis_id: &str) -> Result<ClaudeCodeAnalysisResponse, String> {
+fn parse_analysis_output(
+    output: &str,
+    analysis_id: &str,
+) -> Result<ClaudeCodeAnalysisResponse, String> {
     let mut complexity_class = String::new();
     let mut subtasks = 0;
     let mut instances = 0;

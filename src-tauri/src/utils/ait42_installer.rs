@@ -1,14 +1,30 @@
 use std::fs;
-use std::path::{Path, PathBuf};
 use std::io;
+use std::path::{Path, PathBuf};
 
-/// AIT42 installation result
+/// Per-runtime installation summary
+#[derive(Debug, Clone)]
+pub struct RuntimeInstallResult {
+    pub name: String,
+    pub agents_installed: usize,
+    pub memory_setup: bool,
+    pub sops_installed: usize,
+}
+
+impl RuntimeInstallResult {
+    pub fn is_healthy(&self) -> bool {
+        self.agents_installed > 0 && self.memory_setup
+    }
+}
+
+/// AIT42 installation result (aggregated across runtimes)
 #[derive(Debug, Clone)]
 pub struct InstallResult {
     pub success: bool,
     pub agents_installed: usize,
     pub memory_setup: bool,
     pub sops_installed: usize,
+    pub runtime_summaries: Vec<RuntimeInstallResult>,
     pub errors: Vec<String>,
 }
 
@@ -27,15 +43,6 @@ impl AIT42Installer {
 
     /// Install complete AIT42 system to target workspace
     pub fn install_to_workspace(&self, workspace_path: &Path) -> Result<InstallResult, String> {
-        let mut result = InstallResult {
-            success: false,
-            agents_installed: 0,
-            memory_setup: false,
-            sops_installed: 0,
-            errors: Vec::new(),
-        };
-
-        // Verify source AIT42 exists
         if !self.source_ait42_path.exists() {
             return Err(format!(
                 "Source AIT42 directory not found: {}",
@@ -43,77 +50,113 @@ impl AIT42Installer {
             ));
         }
 
-        let source_agents = self.source_ait42_path.join(".claude/agents");
-        if !source_agents.exists() {
+        let mut errors = Vec::new();
+        let mut runtime_summaries = Vec::new();
+        let runtimes = ["claude", "codex", "gemini"];
+
+        for runtime in &runtimes {
+            match self.install_runtime(runtime, workspace_path) {
+                Ok(summary) => runtime_summaries.push(summary),
+                Err(e) => {
+                    tracing::warn!("⚠️ Failed to install {} runtime: {}", runtime, e);
+                    errors.push(e);
+                }
+            }
+        }
+
+        let mut result = InstallResult {
+            success: false,
+            agents_installed: 0,
+            memory_setup: false,
+            sops_installed: 0,
+            runtime_summaries,
+            errors,
+        };
+
+        if let Some(claude_summary) = result
+            .runtime_summaries
+            .iter()
+            .find(|summary| summary.name == "claude")
+        {
+            result.agents_installed = claude_summary.agents_installed;
+            result.memory_setup = claude_summary.memory_setup;
+            result.sops_installed = claude_summary.sops_installed;
+        }
+
+        result.success = result.errors.is_empty()
+            && !result.runtime_summaries.is_empty()
+            && result
+                .runtime_summaries
+                .iter()
+                .all(|summary| summary.is_healthy());
+
+        Ok(result)
+    }
+
+    fn install_runtime(
+        &self,
+        runtime: &str,
+        workspace_path: &Path,
+    ) -> Result<RuntimeInstallResult, String> {
+        let runtime_dir_name = format!(".{}", runtime);
+        let source_runtime = self.source_ait42_path.join(&runtime_dir_name);
+        if !source_runtime.exists() {
             return Err(format!(
-                "Source agents directory not found: {}",
-                source_agents.display()
+                "Source runtime directory not found: {}",
+                source_runtime.display()
             ));
         }
 
-        // Create target directories
-        let target_claude = workspace_path.join(".claude");
-        let target_agents = target_claude.join("agents");
-        let target_memory = target_claude.join("memory");
+        let target_runtime = workspace_path.join(&runtime_dir_name);
+        fs::create_dir_all(&target_runtime)
+            .map_err(|e| format!("Failed to create {} directory: {}", runtime_dir_name, e))?;
 
-        fs::create_dir_all(&target_agents)
-            .map_err(|e| format!("Failed to create .claude/agents: {}", e))?;
-
-        // Install agents
-        tracing::info!("📦 Installing AIT42 agents to {}", workspace_path.display());
-        match self.install_agents(&source_agents, &target_agents) {
-            Ok(count) => {
-                result.agents_installed = count;
-                tracing::info!("✅ Installed {} agents", count);
-            }
-            Err(e) => {
-                let err_msg = format!("Agent installation failed: {}", e);
-                tracing::error!("{}", err_msg);
-                result.errors.push(err_msg);
-            }
+        let source_agents = source_runtime.join("agents");
+        let target_agents = target_runtime.join("agents");
+        if source_agents.exists() {
+            fs::create_dir_all(&target_agents)
+                .map_err(|e| format!("Failed to create agents directory for {}: {}", runtime, e))?;
+            self.install_agents(&source_agents, &target_agents)?;
         }
 
-        // Setup memory system
-        let source_memory = self.source_ait42_path.join(".claude/memory");
+        let source_memory = source_runtime.join("memory");
+        let target_memory = target_runtime.join("memory");
         if source_memory.exists() {
-            match self.setup_memory_system(&source_memory, &target_memory) {
-                Ok(_) => {
-                    result.memory_setup = true;
-                    tracing::info!("✅ Memory system configured");
-                }
-                Err(e) => {
-                    let err_msg = format!("Memory setup failed: {}", e);
-                    tracing::error!("{}", err_msg);
-                    result.errors.push(err_msg);
-                }
-            }
+            self.setup_memory_system(&source_memory, &target_memory)?;
+        } else {
+            fs::create_dir_all(&target_memory)
+                .map_err(|e| format!("Failed to create memory directory for {}: {}", runtime, e))?;
         }
 
-        // Install SOPs
         let source_sops = source_memory.join("sop-templates");
         let target_sops = target_memory.join("sop-templates");
         if source_sops.exists() {
-            match self.install_sops(&source_sops, &target_sops) {
-                Ok(count) => {
-                    result.sops_installed = count;
-                    tracing::info!("✅ Installed {} SOPs", count);
-                }
-                Err(e) => {
-                    let err_msg = format!("SOP installation failed: {}", e);
-                    tracing::error!("{}", err_msg);
-                    result.errors.push(err_msg);
-                }
-            }
+            self.install_sops(&source_sops, &target_sops)?;
         }
 
-        result.success = result.agents_installed > 0 && result.errors.is_empty();
-        Ok(result)
+        Ok(self.collect_runtime_stats(workspace_path, runtime))
+    }
+
+    fn collect_runtime_stats(&self, workspace_path: &Path, runtime: &str) -> RuntimeInstallResult {
+        let runtime_dir = workspace_path.join(format!(".{}", runtime));
+        let agents_dir = runtime_dir.join("agents");
+        let memory_dir = runtime_dir.join("memory");
+        let sops_dir = memory_dir.join("sop-templates");
+
+        RuntimeInstallResult {
+            name: runtime.to_string(),
+            agents_installed: count_markdown_files(&agents_dir),
+            memory_setup: memory_dir.exists()
+                && memory_dir.join("tasks").exists()
+                && memory_dir.join("agents").exists(),
+            sops_installed: count_markdown_files(&sops_dir),
+        }
     }
 
     /// Install all agent files
     fn install_agents(&self, source: &Path, target: &Path) -> Result<usize, String> {
-        let entries = fs::read_dir(source)
-            .map_err(|e| format!("Failed to read source agents: {}", e))?;
+        let entries =
+            fs::read_dir(source).map_err(|e| format!("Failed to read source agents: {}", e))?;
 
         let mut count = 0;
         for entry in entries {
@@ -124,8 +167,9 @@ impl AIT42Installer {
                 let file_name = path.file_name().unwrap();
                 let target_file = target.join(file_name);
 
-                fs::copy(&path, &target_file)
-                    .map_err(|e| format!("Failed to copy {}: {}", file_name.to_string_lossy(), e))?;
+                fs::copy(&path, &target_file).map_err(|e| {
+                    format!("Failed to copy {}: {}", file_name.to_string_lossy(), e)
+                })?;
 
                 count += 1;
             }
@@ -154,6 +198,46 @@ impl AIT42Installer {
                 .map_err(|e| format!("Failed to copy config.yaml: {}", e))?;
         }
 
+        self.copy_memory_extras(source, target)?;
+
+        Ok(())
+    }
+
+    fn copy_memory_extras(&self, source: &Path, target: &Path) -> Result<(), String> {
+        if !source.exists() {
+            return Ok(());
+        }
+
+        let entries =
+            fs::read_dir(source).map_err(|e| format!("Failed to read memory directory: {}", e))?;
+
+        for entry in entries {
+            let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy();
+
+            if name_str == "tasks"
+                || name_str == "agents"
+                || name_str == "config.yaml"
+                || name_str == "sop-templates"
+            {
+                continue;
+            }
+
+            let destination = target.join(&name);
+            let file_type = entry
+                .file_type()
+                .map_err(|e| format!("Failed to inspect entry type: {}", e))?;
+
+            if file_type.is_dir() {
+                copy_dir_recursive(&entry.path(), &destination)
+                    .map_err(|e| format!("Failed to copy directory {:?}: {}", entry.path(), e))?;
+            } else if file_type.is_file() {
+                fs::copy(&entry.path(), &destination)
+                    .map_err(|e| format!("Failed to copy file {:?}: {}", entry.path(), e))?;
+            }
+        }
+
         Ok(())
     }
 
@@ -162,8 +246,8 @@ impl AIT42Installer {
         fs::create_dir_all(target)
             .map_err(|e| format!("Failed to create sop-templates directory: {}", e))?;
 
-        let entries = fs::read_dir(source)
-            .map_err(|e| format!("Failed to read source SOPs: {}", e))?;
+        let entries =
+            fs::read_dir(source).map_err(|e| format!("Failed to read source SOPs: {}", e))?;
 
         let mut count = 0;
         for entry in entries {
@@ -174,8 +258,9 @@ impl AIT42Installer {
                 let file_name = path.file_name().unwrap();
                 let target_file = target.join(file_name);
 
-                fs::copy(&path, &target_file)
-                    .map_err(|e| format!("Failed to copy {}: {}", file_name.to_string_lossy(), e))?;
+                fs::copy(&path, &target_file).map_err(|e| {
+                    format!("Failed to copy {}: {}", file_name.to_string_lossy(), e)
+                })?;
 
                 count += 1;
             }
@@ -194,57 +279,72 @@ impl AIT42Installer {
 
     /// Verify installation completeness
     pub fn verify_installation(&self, workspace_path: &Path) -> Result<InstallResult, String> {
-        let agents_dir = workspace_path.join(".claude/agents");
-        let memory_dir = workspace_path.join(".claude/memory");
+        let runtime_summaries = ["claude", "codex", "gemini"]
+            .iter()
+            .map(|runtime| self.collect_runtime_stats(workspace_path, runtime))
+            .collect::<Vec<_>>();
 
         let mut result = InstallResult {
             success: false,
             agents_installed: 0,
             memory_setup: false,
             sops_installed: 0,
+            runtime_summaries,
             errors: Vec::new(),
         };
 
-        // Count agents
-        if agents_dir.exists() {
-            match fs::read_dir(&agents_dir) {
-                Ok(entries) => {
-                    for entry in entries.flatten() {
-                        if entry.path().extension().map_or(false, |ext| ext == "md") {
-                            result.agents_installed += 1;
-                        }
-                    }
-                }
-                Err(e) => {
-                    result.errors.push(format!("Failed to read agents: {}", e));
-                }
-            }
+        if let Some(claude_summary) = result
+            .runtime_summaries
+            .iter()
+            .find(|summary| summary.name == "claude")
+        {
+            result.agents_installed = claude_summary.agents_installed;
+            result.memory_setup = claude_summary.memory_setup;
+            result.sops_installed = claude_summary.sops_installed;
         }
 
-        // Check memory system
-        result.memory_setup = memory_dir.exists()
-            && memory_dir.join("tasks").exists()
-            && memory_dir.join("agents").exists();
+        result.success = result
+            .runtime_summaries
+            .iter()
+            .all(|summary| summary.is_healthy());
 
-        // Count SOPs
-        let sops_dir = memory_dir.join("sop-templates");
-        if sops_dir.exists() {
-            match fs::read_dir(&sops_dir) {
-                Ok(entries) => {
-                    for entry in entries.flatten() {
-                        if entry.path().extension().map_or(false, |ext| ext == "md") {
-                            result.sops_installed += 1;
-                        }
-                    }
-                }
-                Err(e) => {
-                    result.errors.push(format!("Failed to read SOPs: {}", e));
-                }
-            }
-        }
-
-        result.success = result.agents_installed >= 40 && result.memory_setup;
         Ok(result)
+    }
+}
+
+fn copy_dir_recursive(source: &Path, destination: &Path) -> io::Result<()> {
+    if !source.exists() {
+        return Ok(());
+    }
+
+    fs::create_dir_all(destination)?;
+
+    for entry in fs::read_dir(source)? {
+        let entry = entry?;
+        let entry_path = entry.path();
+        let dest_path = destination.join(entry.file_name());
+
+        if entry.file_type()?.is_dir() {
+            copy_dir_recursive(&entry_path, &dest_path)?;
+        } else {
+            fs::copy(&entry_path, &dest_path)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn count_markdown_files(path: &Path) -> usize {
+    if !path.exists() {
+        return 0;
+    }
+
+    match fs::read_dir(path) {
+        Ok(entries) => entries
+            .flatten()
+            .filter(|entry| entry.path().extension().map_or(false, |ext| ext == "md"))
+            .count(),
+        Err(_) => 0,
     }
 }
 

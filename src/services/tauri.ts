@@ -2,6 +2,7 @@
  * Tauri command bindings for communication with Rust backend
  */
 import { invoke } from '@tauri-apps/api/tauri';
+import { AgentRuntime } from '@/types/worktree';
 
 /**
  * Response from open_file command
@@ -205,6 +206,20 @@ export interface ClaudeCodeCompetitionRequest {
   preserveWorktrees: boolean;  // keep worktrees after completion
 }
 
+export interface RuntimeAllocationRequest {
+  runtime: AgentRuntime;
+  count: number;
+  model: string;
+}
+
+export interface MultiRuntimeCompetitionRequest {
+  task: string;
+  allocations: RuntimeAllocationRequest[];
+  timeoutSeconds: number;
+  preserveWorktrees: boolean;
+  mode: 'competition' | 'ensemble';
+}
+
 /**
  * Claude Code Analysis Request (Meta-Analysis)
  */
@@ -253,6 +268,8 @@ export interface ClaudeCodeInstanceResult {
   executionTimeMs: number;
   startedAt: string;
   completedAt: string | null;
+  runtime?: AgentRuntime;
+  model?: string;
 }
 
 /**
@@ -1048,6 +1065,20 @@ export const tauriApi = {
       return result;
     } catch (error) {
       throw new Error(`Failed to execute Claude Code competition: ${error}`);
+    }
+  },
+
+  async executeMultiRuntimeCompetition(
+    request: MultiRuntimeCompetitionRequest
+  ): Promise<ClaudeCodeCompetitionResult> {
+    try {
+      const result = await invoke<ClaudeCodeCompetitionResult>(
+        'execute_multi_runtime_competition',
+        { request }
+      );
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to execute multi-runtime competition: ${error}`);
     }
   },
 

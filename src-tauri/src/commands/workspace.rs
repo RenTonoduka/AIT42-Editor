@@ -1,14 +1,13 @@
-/**
- * Workspace management commands
- * 
- * Allows users to select and manage their project workspace directory
- */
-
-use tauri::{State, Manager};
 use crate::state::AppState;
 use crate::utils::AIT42Installer;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use serde::{Serialize, Deserialize};
+/**
+ * Workspace management commands
+ *
+ * Allows users to select and manage their project workspace directory
+ */
+use tauri::{Manager, State};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkspaceInfo {
@@ -48,7 +47,8 @@ pub async fn select_workspace(
         tracing::info!("📁 Workspace set to: {}", path.display());
 
         // Auto-install AIT42 system if not already present
-        let source_ait42 = PathBuf::from("/Users/tonodukaren/Programming/AI/02_Workspace/05_Client/03_Sun/AIT42");
+        let source_ait42 =
+            PathBuf::from("/Users/tonodukaren/Programming/AI/02_Workspace/05_Client/03_Sun/AIT42");
         let installer = AIT42Installer::new(source_ait42);
 
         if !installer.is_installed(&path) {
@@ -58,8 +58,20 @@ pub async fn select_workspace(
                     if result.success {
                         tracing::info!("✅ AIT42 installation successful:");
                         tracing::info!("   - {} agents installed", result.agents_installed);
-                        tracing::info!("   - Memory system: {}", if result.memory_setup { "✓" } else { "✗" });
+                        tracing::info!(
+                            "   - Memory system: {}",
+                            if result.memory_setup { "✓" } else { "✗" }
+                        );
                         tracing::info!("   - {} SOPs installed", result.sops_installed);
+                        for summary in &result.runtime_summaries {
+                            tracing::info!(
+                                "     • {} runtime -> agents: {}, memory: {}, sop: {}",
+                                summary.name.to_uppercase(),
+                                summary.agents_installed,
+                                if summary.memory_setup { "✓" } else { "✗" },
+                                summary.sops_installed
+                            );
+                        }
                     } else {
                         tracing::warn!("⚠️ AIT42 installation completed with errors:");
                         for error in &result.errors {
@@ -78,8 +90,20 @@ pub async fn select_workspace(
             match installer.verify_installation(&path) {
                 Ok(result) => {
                     if result.success {
-                        tracing::info!("✓ AIT42 installation verified ({} agents, {} SOPs)",
-                                     result.agents_installed, result.sops_installed);
+                        tracing::info!(
+                            "✓ AIT42 installation verified ({} agents, {} SOPs)",
+                            result.agents_installed,
+                            result.sops_installed
+                        );
+                        for summary in &result.runtime_summaries {
+                            tracing::info!(
+                                "     • {} runtime -> agents: {}, memory: {}, sop: {}",
+                                summary.name.to_uppercase(),
+                                summary.agents_installed,
+                                if summary.memory_setup { "✓" } else { "✗" },
+                                summary.sops_installed
+                            );
+                        }
                     } else {
                         tracing::warn!("⚠️ AIT42 installation incomplete. Consider reinstalling.");
                     }

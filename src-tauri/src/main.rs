@@ -87,6 +87,7 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::kill_tmux_session,
             // AIT42 Competition operations
             commands::execute_claude_code_competition,
+            commands::execute_multi_runtime_competition,
             commands::get_competition_status,
             commands::cancel_competition,
             // AIT42 Debate operations
@@ -207,6 +208,7 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::kill_tmux_session,
             // AIT42 Competition operations
             commands::execute_claude_code_competition,
+            commands::execute_multi_runtime_competition,
             commands::get_competition_status,
             commands::cancel_competition,
             // AIT42 Debate operations

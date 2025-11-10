@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import WorktreeExplorer from '@/components/Worktree/WorktreeExplorer';
 import { listen, emit } from '@tauri-apps/api/event'; // 🔥 NEW: Tauri event system
+import { AgentRuntime } from '@/types/worktree';
+import { getRuntimeDefinition } from '@/config/runtimes';
 
 export interface ClaudeCodeInstance {
   id: string;
@@ -30,6 +32,10 @@ export interface ClaudeCodeInstance {
   tmuxSessionId?: string;
   worktreePath?: string;
   worktreeBranch?: string;
+  runtime?: AgentRuntime;
+  model?: string;
+  runtimeLabel?: string;
+  runtimeEmoji?: string;
 }
 
 export interface MultiAgentPanelProps {
@@ -151,6 +157,32 @@ const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({ instances, competitio
       default:
         return <Clock className="w-5 h-5" />;
     }
+  };
+
+  const renderRuntimeBadge = (instance: ClaudeCodeInstance) => {
+    if (!instance.runtime) {
+      return null;
+    }
+
+    let runtimeLabel = instance.runtimeLabel;
+    let runtimeEmoji = instance.runtimeEmoji;
+    try {
+      if (!runtimeLabel || !runtimeEmoji) {
+        const def = getRuntimeDefinition(instance.runtime);
+        runtimeLabel = runtimeLabel ?? def.label;
+        runtimeEmoji = runtimeEmoji ?? def.emoji;
+      }
+    } catch (error) {
+      console.warn('[MultiAgentPanel] Unknown runtime metadata', instance.runtime, error);
+    }
+
+    return (
+      <span className="px-2 py-1 bg-gray-900/60 border border-gray-700 rounded-full text-xs font-semibold text-gray-200 flex items-center gap-1">
+        {runtimeEmoji && <span>{runtimeEmoji}</span>}
+        {runtimeLabel || instance.runtime}
+        {instance.model && <span className="text-gray-400">({instance.model})</span>}
+      </span>
+    );
   };
 
   // Empty state
@@ -280,6 +312,7 @@ const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({ instances, competitio
                     >
                       {instance.status}
                     </span>
+                    {renderRuntimeBadge(instance)}
                   </div>
 
                   {/* Task Description */}
