@@ -153,7 +153,7 @@ impl RuntimeEngine {
         &self,
         escaped_task: &str,
         model: &str,
-        source_root: &Path,
+        _source_root: &Path,
     ) -> Result<String, String> {
         match self {
             RuntimeEngine::Claude => Ok(format!(
@@ -161,39 +161,30 @@ impl RuntimeEngine {
                 escaped_task, model
             )),
             RuntimeEngine::Codex => {
-                let script_path = source_root
-                    .join("scripts")
-                    .join("codex_ait42_coordinator.py");
-                if !script_path.exists() {
-                    return Err(format!(
-                        "Codex coordinator script not found at {}",
-                        script_path.display()
-                    ));
-                }
-                let escaped_script = escape_single_quotes(&script_path.to_string_lossy());
+                // Use OpenAI CLI directly if available
+                // Falls back to chatgpt CLI or shows helpful error
                 Ok(format!(
-                    "python3 '{}' '{}' --project-root . --model {}",
-                    escaped_script, escaped_task, model
+                    r#"if command -v chatgpt &> /dev/null; then
+    echo -e '{}' | chatgpt --model {} --no-stream
+elif command -v openai &> /dev/null; then
+    echo -e '{}' | openai api chat.completions.create -m {} --stream false
+else
+    echo "❌ Error: OpenAI CLI not found. Please install one of:"
+    echo "  • chatgpt CLI: npm install -g @michaelornelas/chatgpt-cli"
+    echo "  • openai CLI: pip install openai"
+    echo ""
+    echo "Or set OPENAI_API_KEY environment variable to use API directly."
+    exit 1
+fi"#,
+                    escaped_task, model, escaped_task, model
                 ))
             }
             RuntimeEngine::Gemini => {
-                let script_path = source_root
-                    .join("scripts")
-                    .join("gemini_ait42_coordinator.py");
-                if !script_path.exists() {
-                    return Err(format!(
-                        "Gemini coordinator script not found at {}",
-                        script_path.display()
-                    ));
-                }
-                let escaped_script = escape_single_quotes(&script_path.to_string_lossy());
-                let mut command =
-                    format!("python3 '{}' '{}' --project-root .", escaped_script, escaped_task);
-                if !model.is_empty() {
-                    let escaped_model = escape_single_quotes(model);
-                    command = format!("AIT42_GEMINI_MODEL='{}' {}", escaped_model, command);
-                }
-                Ok(command)
+                // Use Gemini CLI directly (already installed: v0.13.0)
+                Ok(format!(
+                    "echo -e '{}' | gemini --model {} --yolo",
+                    escaped_task, model
+                ))
             }
         }
     }

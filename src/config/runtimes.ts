@@ -23,7 +23,7 @@ export const RUNTIME_DEFINITIONS: RuntimeDefinition[] = [
   {
     id: 'codex',
     label: 'Codex (OpenAI)',
-    description: 'openai/gpt CLIログイン済みなら使用可能',
+    description: 'chatgpt/openai CLIインストール済みなら使用可能',
     defaultModel: 'gpt-4',
     modelOptions: ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo', 'code-davinci-002'],
     emoji: '🧠',
@@ -32,7 +32,7 @@ export const RUNTIME_DEFINITIONS: RuntimeDefinition[] = [
   {
     id: 'gemini',
     label: 'Gemini CLI',
-    description: 'gemini CLIログイン済みなら使用可能',
+    description: 'gemini CLIインストール済み (v0.13.0+) なら使用可能',
     defaultModel: 'gemini-1.5-pro',
     modelOptions: ['gemini-1.5-pro', 'gemini-1.5-flash'],
     emoji: '✨',
