@@ -1121,7 +1121,9 @@ async fn run_multi_runtime_competition(
     tracing::info!("📁 Project root for competition: {}", project_root.display());
 
     let started_at = chrono::Utc::now();
-    let ait42_worktrees = project_root.join(".ait42").join(".worktrees");
+    // Use src-tauri/.worktrees for AIT42-Editor (Tauri app)
+    // This is different from AIT42's .ait42/.worktrees structure
+    let ait42_worktrees = project_root.join("src-tauri").join(".worktrees");
     tracing::info!("📁 Worktrees directory: {}", ait42_worktrees.display());
 
     std::fs::create_dir_all(&ait42_worktrees).map_err(|e| {
