@@ -493,5 +493,5 @@ const ChatTab: React.FC<{ session: WorktreeSession }> = ({ session }) => {
     );
   }
 
-  return <ChatPanel session={session} />;
+  return <ChatPanel key={session.id} session={session} />;
 };

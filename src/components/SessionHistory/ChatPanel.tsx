@@ -3,17 +3,21 @@
  *
  * Interactive chat interface for communicating with Claude Code instances
  * Supports message history, tmux integration, and real-time output
+ * Includes split view with terminal integration
  */
 import React, { useState, useRef, useEffect } from 'react';
 import { useSessionHistoryStore } from '@/store/sessionHistoryStore';
 import { tauriApi } from '@/services/tauri';
 import type { WorktreeSession, ChatMessage } from '@/types/worktree';
-import { Send, Terminal, User, Bot, AlertCircle, Loader } from 'lucide-react';
+import { Send, Terminal, User, Bot, AlertCircle, Loader, MessageSquare, SplitSquareHorizontal, MonitorPlay } from 'lucide-react';
 import { getRuntimeDefinition } from '@/config/runtimes';
+import { TerminalView } from './TerminalView';
 
 interface ChatPanelProps {
   session: WorktreeSession;
 }
+
+type ViewMode = 'chat' | 'terminal' | 'split';
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
   const [message, setMessage] = useState('');
@@ -23,7 +27,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('chat');
+  const [splitPosition, setSplitPosition] = useState(50); // Percentage for split view
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const splitContainerRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
   const { addChatMessage } = useSessionHistoryStore();
 
   /**
@@ -166,11 +174,47 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
     }
   };
 
+  /**
+   * Handle split view resize
+   */
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingRef.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isDraggingRef.current || !splitContainerRef.current) return;
+
+    const containerRect = splitContainerRef.current.getBoundingClientRect();
+    const newPosition = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+
+    // Clamp between 20% and 80%
+    setSplitPosition(Math.max(20, Math.min(80, newPosition)));
+  };
+
+  const handleMouseUp = () => {
+    isDraggingRef.current = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  };
+
+  useEffect(() => {
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
   return (
     <div className="flex flex-col h-full">
-      {/* Instance Selector */}
+      {/* Header: Instance Selector + View Mode Switcher */}
       <div className="border-b bg-gray-50 px-4 py-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mb-3">
           <Terminal className="w-5 h-5 text-gray-600" />
           <span className="text-sm font-semibold text-gray-800">Send to:</span>
           <div className="flex-1 flex flex-wrap items-center gap-2">
@@ -217,8 +261,162 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
             })}
           </div>
         </div>
+
+        {/* View Mode Switcher */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-600">View:</span>
+          <div className="flex gap-1 bg-white border border-gray-300 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('chat')}
+              className={`
+                px-3 py-1 rounded text-xs font-medium transition-all flex items-center gap-1.5
+                ${
+                  viewMode === 'chat'
+                    ? 'bg-blue-500 text-white shadow-sm'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }
+              `}
+              title="Chat view only"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              Chat
+            </button>
+            <button
+              onClick={() => setViewMode('terminal')}
+              className={`
+                px-3 py-1 rounded text-xs font-medium transition-all flex items-center gap-1.5
+                ${
+                  viewMode === 'terminal'
+                    ? 'bg-blue-500 text-white shadow-sm'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }
+              `}
+              title="Terminal view only"
+              disabled={!selectedInstance?.tmuxSessionId}
+            >
+              <MonitorPlay className="w-3.5 h-3.5" />
+              Terminal
+            </button>
+            <button
+              onClick={() => setViewMode('split')}
+              className={`
+                px-3 py-1 rounded text-xs font-medium transition-all flex items-center gap-1.5
+                ${
+                  viewMode === 'split'
+                    ? 'bg-blue-500 text-white shadow-sm'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }
+              `}
+              title="Split view (Chat + Terminal)"
+              disabled={!selectedInstance?.tmuxSessionId}
+            >
+              <SplitSquareHorizontal className="w-3.5 h-3.5" />
+              Split
+            </button>
+          </div>
+          {!selectedInstance?.tmuxSessionId && (
+            <span className="text-xs text-amber-600">
+              Select an instance with tmux session for terminal view
+            </span>
+          )}
+        </div>
       </div>
 
+      {/* Main Content Area - Conditional Rendering based on viewMode */}
+      {viewMode === 'chat' && (
+        <ChatView
+          isLoadingHistory={isLoadingHistory}
+          filteredMessages={filteredMessages}
+          session={session}
+          error={error}
+          messagesEndRef={messagesEndRef}
+          message={message}
+          setMessage={setMessage}
+          handleKeyPress={handleKeyPress}
+          selectedInstance={selectedInstance}
+          isSending={isSending}
+          handleSendMessage={handleSendMessage}
+        />
+      )}
+
+      {viewMode === 'terminal' && selectedInstance?.tmuxSessionId && (
+        <TerminalView
+          tmuxSessionId={selectedInstance.tmuxSessionId}
+          instanceName={selectedInstance.agentName}
+        />
+      )}
+
+      {viewMode === 'split' && selectedInstance?.tmuxSessionId && (
+        <div ref={splitContainerRef} className="flex-1 flex overflow-hidden">
+          {/* Chat Panel */}
+          <div style={{ width: `${splitPosition}%` }} className="flex flex-col border-r">
+            <ChatView
+              isLoadingHistory={isLoadingHistory}
+              filteredMessages={filteredMessages}
+              session={session}
+              error={error}
+              messagesEndRef={messagesEndRef}
+              message={message}
+              setMessage={setMessage}
+              handleKeyPress={handleKeyPress}
+              selectedInstance={selectedInstance}
+              isSending={isSending}
+              handleSendMessage={handleSendMessage}
+            />
+          </div>
+
+          {/* Resizable Splitter */}
+          <div
+            onMouseDown={handleMouseDown}
+            className="w-1 bg-gray-300 hover:bg-blue-500 cursor-col-resize transition-colors flex-shrink-0"
+            style={{ cursor: 'col-resize' }}
+          />
+
+          {/* Terminal Panel */}
+          <div style={{ width: `${100 - splitPosition}%` }} className="flex flex-col">
+            <TerminalView
+              tmuxSessionId={selectedInstance.tmuxSessionId}
+              instanceName={selectedInstance.agentName}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/**
+ * Chat View Component (Reusable)
+ */
+interface ChatViewProps {
+  isLoadingHistory: boolean;
+  filteredMessages: ChatMessage[];
+  session: WorktreeSession;
+  error: string | null;
+  messagesEndRef: React.RefObject<HTMLDivElement>;
+  message: string;
+  setMessage: (msg: string) => void;
+  handleKeyPress: (e: React.KeyboardEvent) => void;
+  selectedInstance: any;
+  isSending: boolean;
+  handleSendMessage: () => void;
+}
+
+const ChatView: React.FC<ChatViewProps> = ({
+  isLoadingHistory,
+  filteredMessages,
+  session,
+  error,
+  messagesEndRef,
+  message,
+  setMessage,
+  handleKeyPress,
+  selectedInstance,
+  isSending,
+  handleSendMessage,
+}) => {
+  return (
+    <>
       {/* Message List */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* Loading History */}
@@ -300,7 +498,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
           Press Enter to send, Shift+Enter for new line
         </p>
       </div>
-    </div>
+    </>
   );
 };
 
