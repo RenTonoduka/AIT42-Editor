@@ -84,6 +84,7 @@ export const useWorktreeStore = create<WorktreeStore>((set, get) => ({
   },
 
   setWorktrees: (worktrees: WorktreeInfo[]) => {
+    console.log('[worktreeStore] setWorktrees called with:', worktrees.length, 'worktrees');
     set({ worktrees });
   },
 
