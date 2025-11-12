@@ -1485,8 +1485,8 @@ pub async fn cancel_competition(
         let project_root = working_dir.clone();
         drop(working_dir);
 
-        // Use project directory for worktrees (not home directory)
-        let ait42_worktrees = project_root.join(".ait42").join(".worktrees");
+        // 🔥 FIX: Use src-tauri/.worktrees to match creation path (line 1126)
+        let ait42_worktrees = project_root.join("src-tauri").join(".worktrees");
         let competition_dir =
             format!("{}/competition-{}", ait42_worktrees.display(), &competition_id[..8]);
 
@@ -1621,11 +1621,11 @@ pub async fn execute_debate(
     let project_root = working_dir.clone();
     drop(working_dir);
 
-    // Create worktrees in the project directory (not in home directory)
-    // This keeps worktrees with their respective projects
-    let ait42_worktrees = project_root.join(".ait42").join(".worktrees");
+    // 🔥 FIX: Use src-tauri/.worktrees to match Competition/Ensemble path (line 1126)
+    // This keeps all worktrees in the same location for consistency
+    let ait42_worktrees = project_root.join("src-tauri").join(".worktrees");
 
-    // Create debate directory in project's .ait42 directory
+    // Create debate directory
     let debate_dir = format!("{}/debate-{}", ait42_worktrees.display(), &debate_id[..8]);
     std::fs::create_dir_all(&debate_dir).map_err(|e| e.to_string())?;
 
@@ -2189,8 +2189,8 @@ pub async fn cancel_debate(
         let project_root = working_dir.clone();
         drop(working_dir);
 
-        // Use project directory for worktrees (not home directory)
-        let ait42_worktrees = project_root.join(".ait42").join(".worktrees");
+        // 🔥 FIX: Use src-tauri/.worktrees to match creation path (line 1626)
+        let ait42_worktrees = project_root.join("src-tauri").join(".worktrees");
         let debate_dir = format!("{}/debate-{}", ait42_worktrees.display(), &debate_id[..8]);
 
         // Remove worktree
