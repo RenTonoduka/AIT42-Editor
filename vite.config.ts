@@ -36,7 +36,7 @@ export default defineConfig({
           // Split Monaco Editor (large dependency)
           'monaco': ['monaco-editor'],
           // Split React libraries
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'react-vendor': ['react', 'react-dom'],
           // Split UI components
           'ui': ['lucide-react'],
           // Split Zustand state management
