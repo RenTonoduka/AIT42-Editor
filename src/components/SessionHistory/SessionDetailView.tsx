@@ -6,6 +6,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { useSessionHistoryStore } from '@/store/sessionHistoryStore';
+import { useWorktreeStore } from '@/store/worktreeStore';
 import type { WorktreeSession } from '@/types/worktree';
 import {
   X,
@@ -84,20 +85,20 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [session, setSession] = useState<WorktreeSession | null>(null);
-  const { getSession, isLoading } = useSessionHistoryStore();
+  const { getSession, sessions, isLoading } = useSessionHistoryStore();
 
-  // Load session details
+  // Get session from store (reactive to changes)
+  const session = sessions.find((s) => s.id === sessionId) || null;
+
+  // Load session details on mount if not in store
   useEffect(() => {
-    const loadSession = async () => {
-      const sessionData = await getSession(sessionId);
-      if (sessionData) {
-        setSession(sessionData);
-      }
-    };
-
-    loadSession();
-  }, [sessionId, getSession]);
+    if (!session) {
+      const loadSession = async () => {
+        await getSession(sessionId);
+      };
+      loadSession();
+    }
+  }, [sessionId, session, getSession]);
 
   if (isLoading || !session) {
     return (
@@ -277,12 +278,173 @@ const OverviewTab: React.FC<{ session: WorktreeSession }> = ({ session }) => {
 };
 
 /**
- * Worktrees Tab - Integrates existing WorktreeExplorer
+ * Worktrees Tab - Displays session instances (worktrees)
  */
 const WorktreesTab: React.FC<{ session: WorktreeSession }> = ({ session }) => {
+  const { setWorktrees } = useWorktreeStore();
+
+  // Sync session instances to worktreeStore for File Browser
+  React.useEffect(() => {
+    if (session.instances.length > 0) {
+      const worktrees = session.instances.map((instance) => ({
+        id: `${session.id}-${instance.instanceId}`,
+        competition_id: session.id,
+        path: instance.worktreePath,
+        branch: instance.branch || `instance-${instance.instanceId}`,
+        created_at: instance.startTime || session.createdAt,
+        changed_files: instance.filesChanged || 0,
+        lines_added: instance.linesAdded || 0,
+        lines_deleted: instance.linesDeleted || 0,
+        status: instance.status as 'running' | 'completed' | 'failed',
+      }));
+
+      setWorktrees(worktrees);
+    }
+  }, [session.instances, session.id, session.createdAt, setWorktrees]);
+
+  if (session.instances.length === 0) {
+    return (
+      <div className="p-6 text-center">
+        <Users className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+        <p className="text-lg font-medium text-gray-600 mb-2">No Worktrees Found</p>
+        <p className="text-sm text-gray-500">
+          Instances will appear here when the session starts
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="h-full">
-      <WorktreeExplorer competitionId={session.id} />
+    <div className="p-6 space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {session.instances.map((instance) => (
+          <div
+            key={instance.instanceId}
+            className="bg-white border-2 border-gray-200 rounded-lg p-5 hover:shadow-lg transition-all hover:border-blue-300"
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white text-lg font-bold shadow-md">
+                  {instance.instanceId}
+                </span>
+                <div>
+                  <div className="font-semibold text-gray-900">
+                    {instance.runtimeLabel || instance.agentName}
+                  </div>
+                  <div className="text-xs text-gray-500">Instance #{instance.instanceId}</div>
+                </div>
+              </div>
+              <span
+                className={`
+                  px-3 py-1 rounded-full text-xs font-semibold
+                  ${
+                    instance.status === 'completed'
+                      ? 'bg-green-100 text-green-800'
+                      : instance.status === 'failed'
+                      ? 'bg-red-100 text-red-800'
+                      : instance.status === 'running'
+                      ? 'bg-blue-100 text-blue-800 animate-pulse'
+                      : 'bg-gray-100 text-gray-800'
+                  }
+                `}
+              >
+                {instance.status}
+              </span>
+            </div>
+
+            {/* Details */}
+            <div className="space-y-2">
+              {instance.branch && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-gray-500 font-medium">Branch:</span>
+                  <code className="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono text-gray-700">
+                    {instance.branch}
+                  </code>
+                </div>
+              )}
+
+              {instance.worktreePath && (
+                <div className="flex items-start gap-2 text-sm">
+                  <span className="text-gray-500 font-medium min-w-fit">Path:</span>
+                  <code className="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono text-gray-700 break-all">
+                    {instance.worktreePath}
+                  </code>
+                </div>
+              )}
+
+              {instance.model && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-gray-500 font-medium">Model:</span>
+                  <span className="px-2 py-0.5 bg-purple-100 rounded text-xs font-medium text-purple-700">
+                    {instance.model}
+                  </span>
+                </div>
+              )}
+
+              {instance.runtime && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-gray-500 font-medium">Runtime:</span>
+                  <span className="px-2 py-0.5 bg-blue-100 rounded text-xs font-medium text-blue-700">
+                    {instance.runtime}
+                  </span>
+                </div>
+              )}
+
+              {instance.tmuxSessionId && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-gray-500 font-medium">Tmux:</span>
+                  <code className="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono text-gray-700">
+                    {instance.tmuxSessionId}
+                  </code>
+                </div>
+              )}
+
+              {instance.startTime && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="w-4 h-4 text-gray-400" />
+                  <span className="text-xs text-gray-600">
+                    {formatDate(instance.startTime)}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Stats */}
+            {(instance.filesChanged !== undefined ||
+              instance.linesAdded !== undefined ||
+              instance.linesDeleted !== undefined) && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <div className="flex items-center justify-between text-sm">
+                  {instance.filesChanged !== undefined && (
+                    <span className="text-gray-600">
+                      <strong className="text-gray-900">{instance.filesChanged}</strong> files
+                    </span>
+                  )}
+                  <div className="flex items-center gap-3">
+                    {instance.linesAdded !== undefined && (
+                      <span className="text-green-600 font-mono">
+                        +{instance.linesAdded}
+                      </span>
+                    )}
+                    {instance.linesDeleted !== undefined && (
+                      <span className="text-red-600 font-mono">
+                        -{instance.linesDeleted}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Legacy WorktreeExplorer (for file browsing) */}
+      <div className="mt-8 pt-8 border-t border-gray-300">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">File Browser</h3>
+        <WorktreeExplorer competitionId={session.id} />
+      </div>
     </div>
   );
 };

@@ -32,6 +32,8 @@ interface WorktreeStore {
   // Actions
   /** Fetch worktrees for a specific competition */
   fetchWorktrees: (competitionId: string) => Promise<void>;
+  /** Manually set worktrees (for session integration) */
+  setWorktrees: (worktrees: WorktreeInfo[]) => void;
   /** Select a worktree by ID */
   selectWorktree: (id: string) => void;
   /** Load file tree for selected worktree */
@@ -79,6 +81,10 @@ export const useWorktreeStore = create<WorktreeStore>((set, get) => ({
         isLoading: false,
       });
     }
+  },
+
+  setWorktrees: (worktrees: WorktreeInfo[]) => {
+    set({ worktrees });
   },
 
   selectWorktree: (id: string) => {

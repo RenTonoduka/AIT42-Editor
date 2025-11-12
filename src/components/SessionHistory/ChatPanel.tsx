@@ -9,6 +9,7 @@ import { useSessionHistoryStore } from '@/store/sessionHistoryStore';
 import { tauriApi } from '@/services/tauri';
 import type { WorktreeSession, ChatMessage } from '@/types/worktree';
 import { Send, Terminal, User, Bot, AlertCircle, Loader } from 'lucide-react';
+import { getRuntimeDefinition } from '@/config/runtimes';
 
 interface ChatPanelProps {
   session: WorktreeSession;
@@ -21,8 +22,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
   );
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { addChatMessage } = useSessionHistoryStore();
+
+  /**
+   * Get selected instance - MUST be defined before useEffect that uses it
+   */
+  const selectedInstance = session.instances.find(
+    (i) => i.instanceId === selectedInstanceId
+  );
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -30,11 +39,60 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
   }, [session.chatHistory]);
 
   /**
-   * Get selected instance
+   * Load tmux session history when component mounts or instance changes
    */
-  const selectedInstance = session.instances.find(
-    (i) => i.instanceId === selectedInstanceId
-  );
+  useEffect(() => {
+    const loadTmuxHistory = async () => {
+      console.log('[ChatPanel] Selected instance:', selectedInstance);
+      console.log('[ChatPanel] Tmux session ID:', selectedInstance?.tmuxSessionId);
+
+      if (!selectedInstance?.tmuxSessionId) {
+        console.log('[ChatPanel] No tmux session ID found, skipping history load');
+        return;
+      }
+
+      console.log('[ChatPanel] Loading tmux history for session:', selectedInstance.tmuxSessionId);
+      setIsLoadingHistory(true);
+      try {
+        // Capture current tmux output
+        const output = await tauriApi.captureTmuxOutput(selectedInstance.tmuxSessionId);
+        console.log('[ChatPanel] Tmux output length:', output?.length || 0);
+
+        if (output && output.trim()) {
+          // Check if this history is already in chat
+          const historyExists = session.chatHistory.some(
+            (msg) =>
+              msg.instanceId === selectedInstanceId &&
+              msg.role === 'assistant' &&
+              msg.content === output
+          );
+
+          if (!historyExists) {
+            // Add history as system message
+            const historyMessage: ChatMessage = {
+              id: `history-${selectedInstanceId}-${Date.now()}`,
+              role: 'system',
+              content: `📜 Tmux Session History:\n\n${output}`,
+              timestamp: new Date().toISOString(),
+              instanceId: selectedInstanceId || undefined,
+            };
+
+            console.log('[ChatPanel] Adding history message to session:', session.id, historyMessage);
+            await addChatMessage(session.id, historyMessage);
+            console.log('[ChatPanel] History message added successfully');
+          } else {
+            console.log('[ChatPanel] History already exists, skipping');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load tmux history:', err);
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+
+    loadTmuxHistory();
+  }, [selectedInstanceId, selectedInstance?.tmuxSessionId]);
 
   /**
    * Get messages for selected instance or all messages
@@ -113,31 +171,64 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
       {/* Instance Selector */}
       <div className="border-b bg-gray-50 px-4 py-3">
         <div className="flex items-center gap-3">
-          <Terminal className="w-4 h-4 text-gray-500" />
-          <span className="text-sm font-medium text-gray-700">Send to:</span>
-          <select
-            value={selectedInstanceId || 'all'}
-            onChange={(e) =>
-              setSelectedInstanceId(e.target.value === 'all' ? null : Number(e.target.value))
-            }
-            className="
-              px-3 py-1.5 rounded-lg text-sm
-              border border-gray-300 bg-white
-              focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-            "
-          >
-            <option value="all">All Instances</option>
-            {session.instances.map((instance) => (
-              <option key={instance.instanceId} value={instance.instanceId}>
-                Instance {instance.instanceId} - {instance.agentName} ({instance.status})
-              </option>
-            ))}
-          </select>
+          <Terminal className="w-5 h-5 text-gray-600" />
+          <span className="text-sm font-semibold text-gray-800">Send to:</span>
+          <div className="flex-1 flex flex-wrap items-center gap-2">
+            {/* All Instances Button */}
+            <button
+              onClick={() => setSelectedInstanceId(null)}
+              className={`
+                px-4 py-2 rounded-lg text-sm font-medium transition-all
+                ${
+                  selectedInstanceId === null
+                    ? 'bg-blue-500 text-white shadow-md'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                }
+              `}
+            >
+              🌐 All Instances
+            </button>
+
+            {/* Individual Instance Buttons */}
+            {session.instances.map((instance) => {
+              const runtimeDef = instance.runtime ? getRuntimeDefinition(instance.runtime) : null;
+              const emoji = runtimeDef?.emoji || '🤖';
+              const label = instance.runtimeLabel || instance.agentName;
+              const isSelected = selectedInstanceId === instance.instanceId;
+
+              return (
+                <button
+                  key={instance.instanceId}
+                  onClick={() => setSelectedInstanceId(instance.instanceId)}
+                  className={`
+                    px-4 py-2 rounded-lg text-sm font-medium transition-all
+                    ${
+                      isSelected
+                        ? 'bg-blue-500 text-white shadow-md'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }
+                  `}
+                  title={`Instance ${instance.instanceId} - ${label} (${instance.status})`}
+                >
+                  <span className="text-lg mr-2">{emoji}</span>
+                  {label} #{instance.instanceId}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
       {/* Message List */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Loading History */}
+        {isLoadingHistory && (
+          <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <Loader className="w-4 h-4 text-blue-500 animate-spin" />
+            <span className="text-sm text-blue-700">Loading tmux session history...</span>
+          </div>
+        )}
+
         {filteredMessages.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-400">
             <div className="text-center">

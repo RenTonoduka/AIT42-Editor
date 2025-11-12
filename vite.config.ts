@@ -29,6 +29,21 @@ export default defineConfig({
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
     // Produce sourcemaps for debug builds
     sourcemap: !!process.env.TAURI_DEBUG,
+    // Bundle size optimization: Split vendor chunks
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Split Monaco Editor (large dependency)
+          'monaco': ['monaco-editor'],
+          // Split React libraries
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          // Split UI components
+          'ui': ['lucide-react'],
+          // Split Zustand state management
+          'store': ['zustand'],
+        },
+      },
+    },
   },
 
   resolve: {

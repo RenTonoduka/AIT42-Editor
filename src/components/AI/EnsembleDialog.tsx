@@ -9,8 +9,9 @@ import { ModeIndicator } from './ModeIndicator';
 import { CollaborativeFlowDiagram } from './CollaborativeFlowDiagram';
 import { ModeTooltip } from './ModeTooltip';
 import { useTaskOptimizer } from '@/hooks/useTaskOptimizer';
-import { RuntimeAllocation, AgentRuntime } from '@/types/worktree';
+import { RuntimeAllocation, AgentRuntime, WorktreeSession, WorktreeInstance } from '@/types/worktree';
 import { RUNTIME_DEFINITIONS, getRuntimeDefinition } from '@/config/runtimes';
+import { useSessionHistoryStore } from '@/store/sessionHistoryStore';
 
 export interface EnsembleDialogProps {
   isOpen: boolean;
@@ -52,6 +53,7 @@ export const EnsembleDialog: React.FC<EnsembleDialogProps> = ({ isOpen, onClose,
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const { state: optimizerState, analyze, isAnalyzing } = useTaskOptimizer();
+  const { createSession, loadSessions } = useSessionHistoryStore();
 
   const totalInstances = useMemo(
     () => runtimeAllocations.reduce((sum, allocation) => sum + allocation.count, 0),
@@ -160,6 +162,41 @@ export const EnsembleDialog: React.FC<EnsembleDialogProps> = ({ isOpen, onClose,
       const result = await tauriApi.executeMultiRuntimeCompetition(request);
 
       console.log('Ensemble started:', result);
+
+      // 🔥 Create session data and save to history
+      const runtimeMix = result.instances.map((inst) => inst.runtime!).filter(Boolean);
+      const sessionInstances: WorktreeInstance[] = result.instances.map((inst) => ({
+        instanceId: inst.instanceNumber,
+        worktreePath: inst.worktreePath,
+        branch: `${inst.runtime}-ensemble-${inst.instanceNumber}`,
+        agentName: inst.runtime || 'unknown',
+        status: 'running',
+        tmuxSessionId: inst.tmuxSessionId,
+        runtime: inst.runtime,
+        model: inst.model,
+        runtimeLabel: inst.runtime ? getRuntimeDefinition(inst.runtime).label : undefined,
+        startTime: inst.startedAt,
+      }));
+
+      const session: WorktreeSession = {
+        id: result.competitionId,
+        type: 'ensemble',
+        task: task.trim(),
+        status: 'running',
+        createdAt: result.startedAt,
+        updatedAt: result.startedAt,
+        instances: sessionInstances,
+        chatHistory: [],
+        timeoutSeconds,
+        preserveWorktrees,
+        runtimeMix: runtimeMix as any,
+      };
+
+      // Save session to database
+      await createSession(session);
+
+      // Reload sessions to update UI
+      await loadSessions();
 
       if (onStart) {
         onStart(result.competitionId, activeAllocations, task.trim());
