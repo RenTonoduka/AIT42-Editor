@@ -1179,8 +1179,25 @@ async fn run_multi_runtime_competition(
         }
     });
 
-    let source_ait42 =
-        PathBuf::from("/Users/tonodukaren/Programming/AI/02_Workspace/05_Client/03_Sun/AIT42");
+    // 🔥 FIX: Read AIT42 source path from environment variable or use default
+    let source_ait42 = if let Ok(custom_path) = std::env::var("AIT42_SOURCE_PATH") {
+        PathBuf::from(custom_path)
+    } else {
+        // Default fallback: ~/.ait42 or the hardcoded path if it exists
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+        let default_ait42 = PathBuf::from(&home).join(".ait42");
+        let legacy_path = PathBuf::from("/Users/tonodukaren/Programming/AI/02_Workspace/05_Client/03_Sun/AIT42");
+
+        if default_ait42.exists() {
+            default_ait42
+        } else if legacy_path.exists() {
+            tracing::warn!("⚠️ Using legacy AIT42 path. Set AIT42_SOURCE_PATH environment variable.");
+            legacy_path
+        } else {
+            tracing::warn!("⚠️ AIT42 source not found. AIT42 installation will be skipped.");
+            default_ait42 // Use default even if it doesn't exist
+        }
+    };
     let installer = AIT42Installer::new(source_ait42.clone());
 
     let enhanced_task = format!(
