@@ -9,7 +9,7 @@ import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { tauriApi } from '@/services/tauri';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, AlertTriangle } from 'lucide-react';
 
 interface TerminalViewProps {
   /**
@@ -38,9 +38,19 @@ export const TerminalView: React.FC<TerminalViewProps> = ({
   const fitAddonRef = useRef<FitAddon | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionAlive, setSessionAlive] = useState(true);
   const lastOutputRef = useRef<string>('');
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const currentInputRef = useRef<string>('');
+  const consecutiveErrorsRef = useRef<number>(0);
+  const sessionAliveRef = useRef<boolean>(true);
+
+  /**
+   * Sync sessionAlive state with ref for event handlers
+   */
+  useEffect(() => {
+    sessionAliveRef.current = sessionAlive;
+  }, [sessionAlive]);
 
   /**
    * Initialize xterm.js terminal
@@ -100,6 +110,11 @@ export const TerminalView: React.FC<TerminalViewProps> = ({
 
     // Handle terminal input
     xterm.onData((data) => {
+      // Disable input if session is not alive
+      if (!sessionAliveRef.current) {
+        return;
+      }
+
       const code = data.charCodeAt(0);
 
       if (code === 13) {
@@ -162,6 +177,20 @@ export const TerminalView: React.FC<TerminalViewProps> = ({
   };
 
   /**
+   * Check if error indicates session termination
+   */
+  const isSessionTerminationError = (error: any): boolean => {
+    const errorMessage = error?.message?.toLowerCase() || String(error).toLowerCase();
+    return (
+      errorMessage.includes('session not found') ||
+      errorMessage.includes('no session') ||
+      errorMessage.includes('can\'t find session') ||
+      errorMessage.includes('session has been deleted') ||
+      errorMessage.includes('no such session')
+    );
+  };
+
+  /**
    * Send command to tmux session
    */
   const sendCommand = async (command: string) => {
@@ -173,13 +202,32 @@ export const TerminalView: React.FC<TerminalViewProps> = ({
 
       // Force immediate output capture after command
       await captureOutput();
+
+      // Reset error counter on successful command
+      consecutiveErrorsRef.current = 0;
     } catch (err) {
       console.error('Failed to send command to tmux:', err);
-      setError(err instanceof Error ? err.message : 'Failed to send command');
 
-      if (xtermRef.current) {
-        xtermRef.current.writeln(`\x1b[1;31mError: ${err}\x1b[0m`);
-        displayPrompt(xtermRef.current);
+      // Check if session has terminated
+      if (isSessionTerminationError(err)) {
+        setSessionAlive(false);
+        setError('Tmux session has ended (exit command detected or session killed)');
+
+        if (xtermRef.current) {
+          xtermRef.current.writeln('');
+          xtermRef.current.writeln('\x1b[1;33m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m');
+          xtermRef.current.writeln('\x1b[1;31m  ⚠️  Session Terminated\x1b[0m');
+          xtermRef.current.writeln('\x1b[90m  The tmux session is no longer active.\x1b[0m');
+          xtermRef.current.writeln('\x1b[1;33m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m');
+          xtermRef.current.writeln('');
+        }
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to send command');
+
+        if (xtermRef.current) {
+          xtermRef.current.writeln(`\x1b[1;31mError: ${err}\x1b[0m`);
+          displayPrompt(xtermRef.current);
+        }
       }
     }
   };
@@ -188,10 +236,13 @@ export const TerminalView: React.FC<TerminalViewProps> = ({
    * Capture tmux output and display in terminal
    */
   const captureOutput = useCallback(async () => {
-    if (!xtermRef.current || !isInitialized) return;
+    if (!xtermRef.current || !isInitialized || !sessionAlive) return;
 
     try {
       const output = await tauriApi.captureTmuxOutput(tmuxSessionId);
+
+      // Reset consecutive errors on success
+      consecutiveErrorsRef.current = 0;
 
       if (output && output !== lastOutputRef.current) {
         // Calculate new content (diff)
@@ -226,9 +277,26 @@ export const TerminalView: React.FC<TerminalViewProps> = ({
       }
     } catch (err) {
       console.error('Failed to capture tmux output:', err);
-      // Don't set error here to avoid spamming
+
+      // Increment consecutive error counter
+      consecutiveErrorsRef.current += 1;
+
+      // Check if session has terminated (after 3 consecutive failures)
+      if (consecutiveErrorsRef.current >= 3 && isSessionTerminationError(err)) {
+        setSessionAlive(false);
+        setError('Tmux session has ended (exit command detected or session killed)');
+
+        if (xtermRef.current) {
+          xtermRef.current.writeln('');
+          xtermRef.current.writeln('\x1b[1;33m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m');
+          xtermRef.current.writeln('\x1b[1;31m  ⚠️  Session Terminated\x1b[0m');
+          xtermRef.current.writeln('\x1b[90m  The tmux session is no longer active.\x1b[0m');
+          xtermRef.current.writeln('\x1b[1;33m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m');
+          xtermRef.current.writeln('');
+        }
+      }
     }
-  }, [tmuxSessionId, isInitialized]);
+  }, [tmuxSessionId, isInitialized, sessionAlive]);
 
   /**
    * Load initial tmux history
@@ -298,7 +366,13 @@ export const TerminalView: React.FC<TerminalViewProps> = ({
       <div className="flex-shrink-0 bg-[#252526] border-b border-[#3E3E42] px-4 py-2">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <div
+              className={`w-2 h-2 rounded-full ${
+                sessionAlive
+                  ? 'bg-green-500 animate-pulse'
+                  : 'bg-red-500'
+              }`}
+            />
             <span className="text-sm font-semibold text-gray-300">
               Terminal: {instanceName}
             </span>
@@ -306,11 +380,36 @@ export const TerminalView: React.FC<TerminalViewProps> = ({
           <span className="text-xs text-gray-500">
             Session: {tmuxSessionId}
           </span>
+          {!sessionAlive && (
+            <span className="text-xs font-medium text-red-400 bg-red-900/30 px-2 py-1 rounded">
+              Session Ended
+            </span>
+          )}
         </div>
       </div>
 
+      {/* Session ended warning */}
+      {!sessionAlive && (
+        <div className="flex-shrink-0 bg-yellow-900/40 border-b border-yellow-700 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-semibold text-yellow-300 text-sm">
+                  Tmux session has ended
+                </span>
+              </div>
+              <p className="text-xs text-yellow-200 leading-relaxed">
+                The terminal session is no longer active. This typically happens when an 'exit' command is executed
+                or the session is killed externally. You can close this window or the agent may restart automatically.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Error display */}
-      {error && (
+      {error && sessionAlive && (
         <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-red-900/30 border-b border-red-800">
           <AlertCircle className="w-4 h-4 text-red-400" />
           <span className="text-sm text-red-300">{error}</span>

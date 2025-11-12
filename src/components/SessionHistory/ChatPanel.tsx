@@ -9,7 +9,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useSessionHistoryStore } from '@/store/sessionHistoryStore';
 import { tauriApi } from '@/services/tauri';
 import type { WorktreeSession, ChatMessage } from '@/types/worktree';
-import { Send, Terminal, User, Bot, AlertCircle, Loader, MessageSquare, SplitSquareHorizontal, MonitorPlay } from 'lucide-react';
+import { Send, Terminal, User, Bot, AlertCircle, Loader, MessageSquare, SplitSquareHorizontal, MonitorPlay, AlertTriangle } from 'lucide-react';
 import { getRuntimeDefinition } from '@/config/runtimes';
 import { TerminalView } from './TerminalView';
 
@@ -29,6 +29,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('chat');
   const [splitPosition, setSplitPosition] = useState(50); // Percentage for split view
+  const [sessionAlive, setSessionAlive] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
@@ -40,6 +41,20 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
   const selectedInstance = session.instances.find(
     (i) => i.instanceId === selectedInstanceId
   );
+
+  /**
+   * Check if error indicates session termination
+   */
+  const isSessionTerminationError = (error: any): boolean => {
+    const errorMessage = error?.message?.toLowerCase() || String(error).toLowerCase();
+    return (
+      errorMessage.includes('session not found') ||
+      errorMessage.includes('no session') ||
+      errorMessage.includes('can\'t find session') ||
+      errorMessage.includes('session has been deleted') ||
+      errorMessage.includes('no such session')
+    );
+  };
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -158,7 +173,25 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
       // Clear input
       setMessage('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send message');
+      console.error('Failed to send message to tmux:', err);
+
+      // Check if session has terminated
+      if (isSessionTerminationError(err)) {
+        setSessionAlive(false);
+        setError('Tmux session has ended (exit command detected or session killed)');
+
+        // Add system message about session termination
+        const systemMessage: ChatMessage = {
+          id: `msg-${Date.now()}-system`,
+          role: 'system',
+          content: '⚠️ Tmux session has ended. The terminal is no longer active.',
+          timestamp: new Date().toISOString(),
+          instanceId: selectedInstanceId || undefined,
+        };
+        await addChatMessage(session.id, systemMessage);
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to send message');
+      }
     } finally {
       setIsSending(false);
     }
@@ -212,6 +245,26 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
 
   return (
     <div className="flex flex-col h-full">
+      {/* Session ended warning banner */}
+      {!sessionAlive && (
+        <div className="flex-shrink-0 bg-yellow-50 border-b border-yellow-300 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-semibold text-yellow-900 text-sm">
+                  Tmux session has ended
+                </span>
+              </div>
+              <p className="text-xs text-yellow-700 leading-relaxed">
+                The terminal session is no longer active. This typically happens when an 'exit' command is executed
+                or the session is killed externally. You can close this window or the agent may restart automatically.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header: Instance Selector + View Mode Switcher */}
       <div className="border-b bg-gray-50 px-4 py-3">
         <div className="flex items-center gap-3 mb-3">
@@ -336,6 +389,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
           selectedInstance={selectedInstance}
           isSending={isSending}
           handleSendMessage={handleSendMessage}
+          sessionAlive={sessionAlive}
         />
       )}
 
@@ -362,6 +416,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
               selectedInstance={selectedInstance}
               isSending={isSending}
               handleSendMessage={handleSendMessage}
+              sessionAlive={sessionAlive}
             />
           </div>
 
@@ -400,6 +455,7 @@ interface ChatViewProps {
   selectedInstance: any;
   isSending: boolean;
   handleSendMessage: () => void;
+  sessionAlive: boolean;
 }
 
 const ChatView: React.FC<ChatViewProps> = ({
@@ -414,6 +470,7 @@ const ChatView: React.FC<ChatViewProps> = ({
   selectedInstance,
   isSending,
   handleSendMessage,
+  sessionAlive,
 }) => {
   return (
     <>
@@ -454,17 +511,27 @@ const ChatView: React.FC<ChatViewProps> = ({
 
       {/* Input Area */}
       <div className="border-t bg-white p-4">
+        {!sessionAlive && (
+          <div className="mb-3 flex items-center gap-2 px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <AlertTriangle className="w-4 h-4 text-yellow-600" />
+            <span className="text-xs text-yellow-700">
+              Session has ended. Commands cannot be sent.
+            </span>
+          </div>
+        )}
         <div className="flex gap-2">
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder={
-              selectedInstance
+              !sessionAlive
+                ? 'Session has ended - input disabled'
+                : selectedInstance
                 ? `Send command to ${selectedInstance.agentName}...`
                 : 'Select an instance to send commands'
             }
-            disabled={!selectedInstance || isSending}
+            disabled={!selectedInstance || isSending || !sessionAlive}
             rows={2}
             className="
               flex-1 px-4 py-2 rounded-lg
@@ -476,7 +543,7 @@ const ChatView: React.FC<ChatViewProps> = ({
           />
           <button
             onClick={handleSendMessage}
-            disabled={!message.trim() || !selectedInstance || isSending}
+            disabled={!message.trim() || !selectedInstance || isSending || !sessionAlive}
             className="
               px-6 py-2 rounded-lg
               bg-blue-500 text-white
@@ -495,7 +562,9 @@ const ChatView: React.FC<ChatViewProps> = ({
           </button>
         </div>
         <p className="text-xs text-gray-500 mt-2">
-          Press Enter to send, Shift+Enter for new line
+          {sessionAlive
+            ? 'Press Enter to send, Shift+Enter for new line'
+            : 'Session has ended - commands disabled'}
         </p>
       </div>
     </>
