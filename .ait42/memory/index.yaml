@@ -1,0 +1,125 @@
+# AIT42 Memory System Index
+# Auto-generated index for fast task and agent lookup
+# Version: 1.0
+
+version: "1.0"
+last_updated: "2025-11-12"
+
+# Quick access indexes
+indexes:
+  # Agent performance index (for fast coordinator selection)
+  agents:
+    high_performers:
+      # Agents with success_rate >= 0.85
+      - backend-developer
+      - frontend-developer
+      - code-reviewer
+      - system-architect
+      - api-developer
+
+    specialists:
+      # Specialized agents by domain
+      design:
+        - ui-ux-designer
+        - api-designer
+        - database-designer
+        - system-architect
+        - security-architect
+        - cloud-architect
+
+      implementation:
+        - backend-developer
+        - frontend-developer
+        - api-developer
+        - database-developer
+        - feature-builder
+        - integration-developer
+
+      qa:
+        - code-reviewer
+        - test-generator
+        - integration-tester
+        - performance-tester
+        - security-tester
+        - mutation-tester
+        - qa-validator
+
+      operations:
+        - devops-engineer
+        - cicd-manager
+        - container-specialist
+        - monitoring-specialist
+        - incident-responder
+        - security-scanner
+
+      meta:
+        - process-optimizer
+        - workflow-coordinator
+        - learning-agent
+        - metrics-collector
+        - knowledge-manager
+
+  # Task type index (for pattern matching)
+  task_patterns:
+    api_implementation:
+      keywords: ["API", "endpoint", "REST", "GraphQL", "WebSocket"]
+      recommended_agents: ["api-developer", "backend-developer"]
+
+    ui_development:
+      keywords: ["UI", "frontend", "React", "Vue", "component"]
+      recommended_agents: ["frontend-developer", "ui-ux-designer"]
+
+    database_work:
+      keywords: ["database", "SQL", "migration", "schema"]
+      recommended_agents: ["database-developer", "database-designer"]
+
+    security:
+      keywords: ["security", "auth", "vulnerability", "encryption"]
+      recommended_agents: ["security-architect", "security-scanner", "security-tester"]
+
+    performance:
+      keywords: ["performance", "optimization", "speed", "latency"]
+      recommended_agents: ["performance-tester", "process-optimizer", "refactor-specialist"]
+
+    testing:
+      keywords: ["test", "testing", "coverage", "validation"]
+      recommended_agents: ["test-generator", "integration-tester", "qa-validator"]
+
+    deployment:
+      keywords: ["deploy", "deployment", "release", "CICD"]
+      recommended_agents: ["devops-engineer", "cicd-manager", "release-manager"]
+
+  # Recent successful task patterns
+  successful_patterns:
+    # Will be populated by learning system
+    # Format: task_type -> agent -> success_count
+    placeholder: true
+
+# Search optimization settings
+search:
+  # Enable fuzzy matching for agent selection
+  fuzzy_matching: true
+  fuzzy_threshold: 0.8
+
+  # Cache agent stats for N seconds
+  cache_ttl_seconds: 300
+
+  # Maximum results to return
+  max_results: 10
+
+# Performance monitoring
+performance:
+  # Track index usage
+  enable_metrics: true
+  metrics_path: ".claude/memory/index-metrics.yaml"
+
+  # Log slow queries (> threshold ms)
+  slow_query_threshold_ms: 100
+  log_slow_queries: true
+
+# Backup settings
+backup:
+  # Auto-backup index when modified
+  auto_backup: true
+  backup_path: ".claude/memory-backup/index/"
+  backup_retention_days: 30

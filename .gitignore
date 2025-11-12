@@ -62,4 +62,12 @@ lerna-debug.log*
 # AIT42 Worktrees
 ait42-worktrees/
 src-tauri/.worktrees/
-.ait42/
+
+# AIT42 Session data (exclude from git)
+.ait42-session/
+.ait42-state/
+.ait42/memory/tasks/*
+!.ait42/memory/tasks/.gitkeep
+.ait42/memory/agents/*
+!.ait42/memory/agents/.gitkeep
+.ait42/.worktrees/

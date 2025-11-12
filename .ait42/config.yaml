@@ -1,0 +1,69 @@
+# AIT42 Unified Configuration
+version: "1.5.0"
+created: "2025-11-10T00:00:00Z"
+
+# Providers設定
+providers:
+  claude:
+    enabled: true
+    api_key_env: "ANTHROPIC_API_KEY"
+    model: "claude-3-5-sonnet-20241022"
+    priority: 1
+    cost_per_1m_tokens: 3.00
+
+  gemini:
+    enabled: true
+    api_key_env: "GOOGLE_AI_API_KEY"
+    model: "gemini-1.5-pro"
+    priority: 2
+    cost_per_1m_tokens: 1.25
+
+  codex:
+    enabled: true
+    api_key_env: "OPENAI_API_KEY"
+    models:
+      - name: "gpt-4"
+        cost_per_1m_tokens: 30.00
+      - name: "gpt-4-turbo"
+        cost_per_1m_tokens: 10.00
+      - name: "gpt-3.5-turbo"
+        cost_per_1m_tokens: 0.50
+    default_model: "gpt-4"
+    priority: 3
+
+# Agent selection strategy
+selection:
+  strategy: "auto"
+  task_preferences:
+    research: ["gemini", "claude", "codex"]
+    implementation: ["claude", "codex", "gemini"]
+    qa: ["claude", "codex", "gemini"]
+    operations: ["claude", "codex", "gemini"]
+    meta: ["gemini", "claude", "codex"]
+  fallback_enabled: true
+  retry_attempts: 2
+  health_check_interval: 60
+
+# Memory system
+memory:
+  max_tasks: 1000
+  retention_days: 90
+  recent_tasks_limit: 10
+  backup_enabled: true
+  backup_interval: 86400
+  providers_enabled: true
+  agent_stats_enabled: true
+
+# Quality gating
+quality:
+  enabled: true
+  accept_threshold: 90
+  improve_threshold: 70
+  reject_threshold: 0
+
+# Logging
+logging:
+  level: "INFO"
+  file: ".ait42/logs/ait42.log"
+  max_size_mb: 100
+  backup_count: 5
