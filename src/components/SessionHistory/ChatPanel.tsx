@@ -9,7 +9,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useSessionHistoryStore } from '@/store/sessionHistoryStore';
 import { tauriApi } from '@/services/tauri';
 import type { WorktreeSession, ChatMessage } from '@/types/worktree';
-import { Send, Terminal, User, Bot, AlertCircle, Loader, MessageSquare, SplitSquareHorizontal, MonitorPlay, AlertTriangle } from 'lucide-react';
+import { Send, Terminal, User, Bot, AlertCircle, Loader, MessageSquare, SplitSquareHorizontal, MonitorPlay, AlertTriangle, Archive } from 'lucide-react';
 import { getRuntimeDefinition } from '@/config/runtimes';
 import { TerminalView } from './TerminalView';
 
@@ -30,6 +30,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('chat');
   const [splitPosition, setSplitPosition] = useState(50); // Percentage for split view
   const [sessionAlive, setSessionAlive] = useState(true);
+  const [isArchived, setIsArchived] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
@@ -41,6 +42,34 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
   const selectedInstance = session.instances.find(
     (i) => i.instanceId === selectedInstanceId
   );
+
+  /**
+   * Check if an instance is archived (read-only)
+   */
+  const isInstanceArchived = (
+    instance: typeof selectedInstance,
+    session: WorktreeSession
+  ): boolean => {
+    if (!instance) return false;
+
+    // 1. Instance status-based archive
+    if (instance.status === 'completed' || instance.status === 'failed') {
+      return true;
+    }
+
+    // 2. Ensemble integration phase archive
+    if (session.type === 'ensemble' && session.integrationPhase === 'completed') {
+      // 統合AI以外のインスタンスはアーカイブ
+      return instance.instanceId !== session.integrationInstanceId;
+    }
+
+    // 3. Session-level completion
+    if (session.status === 'completed' || session.status === 'failed') {
+      return true;
+    }
+
+    return false;
+  };
 
   /**
    * Check if error indicates session termination
@@ -60,6 +89,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [session.chatHistory]);
+
+  // Monitor archive status
+  useEffect(() => {
+    const archived = isInstanceArchived(selectedInstance, session);
+    setIsArchived(archived);
+  }, [selectedInstance, session.status, session.integrationPhase]);
 
   /**
    * Load tmux session history when component mounts or instance changes
@@ -265,6 +300,27 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
         </div>
       )}
 
+      {/* Archive mode warning banner */}
+      {isArchived && (
+        <div className="flex-shrink-0 bg-blue-50 border-b border-blue-300 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <Archive className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-semibold text-blue-900 text-sm">
+                  Archive Mode (Read-Only)
+                </span>
+              </div>
+              <p className="text-xs text-blue-700 leading-relaxed">
+                {session.type === 'ensemble' && session.integrationPhase === 'completed'
+                  ? `This agent's work has been integrated. See "Integration AI" (Instance #${session.integrationInstanceId}) for the final result.`
+                  : 'This session has completed. Chat history is available for reference only.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header: Instance Selector + View Mode Switcher */}
       <div className="border-b bg-gray-50 px-4 py-3">
         <div className="flex items-center gap-3 mb-3">
@@ -292,6 +348,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
               const emoji = runtimeDef?.emoji || '🤖';
               const label = instance.runtimeLabel || instance.agentName;
               const isSelected = selectedInstanceId === instance.instanceId;
+              const archived = isInstanceArchived(instance, session);
 
               return (
                 <button
@@ -299,14 +356,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
                   onClick={() => setSelectedInstanceId(instance.instanceId)}
                   className={`
                     px-4 py-2 rounded-lg text-sm font-medium transition-all
+                    ${archived ? 'opacity-60' : ''}
                     ${
                       isSelected
                         ? 'bg-blue-500 text-white shadow-md'
                         : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                     }
                   `}
-                  title={`Instance ${instance.instanceId} - ${label} (${instance.status})`}
+                  title={`Instance ${instance.instanceId} - ${label} (${instance.status})${archived ? ' - Archived' : ''}`}
                 >
+                  {archived && <span className="text-xs mr-1">📦</span>}
                   <span className="text-lg mr-2">{emoji}</span>
                   {label} #{instance.instanceId}
                 </button>
@@ -390,6 +449,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
           isSending={isSending}
           handleSendMessage={handleSendMessage}
           sessionAlive={sessionAlive}
+          isArchived={isArchived}
         />
       )}
 
@@ -417,6 +477,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
               isSending={isSending}
               handleSendMessage={handleSendMessage}
               sessionAlive={sessionAlive}
+              isArchived={isArchived}
             />
           </div>
 
@@ -456,6 +517,7 @@ interface ChatViewProps {
   isSending: boolean;
   handleSendMessage: () => void;
   sessionAlive: boolean;
+  isArchived: boolean;
 }
 
 const ChatView: React.FC<ChatViewProps> = ({
@@ -471,6 +533,7 @@ const ChatView: React.FC<ChatViewProps> = ({
   isSending,
   handleSendMessage,
   sessionAlive,
+  isArchived,
 }) => {
   return (
     <>
@@ -525,13 +588,15 @@ const ChatView: React.FC<ChatViewProps> = ({
             onChange={(e) => setMessage(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder={
-              !sessionAlive
+              isArchived
+                ? 'Archive mode - read-only'
+                : !sessionAlive
                 ? 'Session has ended - input disabled'
                 : selectedInstance
                 ? `Send command to ${selectedInstance.agentName}...`
                 : 'Select an instance to send commands'
             }
-            disabled={!selectedInstance || isSending || !sessionAlive}
+            disabled={!selectedInstance || isSending || !sessionAlive || isArchived}
             rows={2}
             className="
               flex-1 px-4 py-2 rounded-lg
@@ -543,7 +608,7 @@ const ChatView: React.FC<ChatViewProps> = ({
           />
           <button
             onClick={handleSendMessage}
-            disabled={!message.trim() || !selectedInstance || isSending || !sessionAlive}
+            disabled={!message.trim() || !selectedInstance || isSending || !sessionAlive || isArchived}
             className="
               px-6 py-2 rounded-lg
               bg-blue-500 text-white
@@ -562,7 +627,9 @@ const ChatView: React.FC<ChatViewProps> = ({
           </button>
         </div>
         <p className="text-xs text-gray-500 mt-2">
-          {sessionAlive
+          {isArchived
+            ? '📦 Archive mode: This session is read-only'
+            : sessionAlive
             ? 'Press Enter to send, Shift+Enter for new line'
             : 'Session has ended - commands disabled'}
         </p>

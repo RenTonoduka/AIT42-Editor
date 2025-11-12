@@ -79,6 +79,11 @@ export interface WorktreeSession {
   totalFilesChanged?: number;
   totalLinesAdded?: number;
   totalLinesDeleted?: number;
+
+  // Ensemble mode specific: 統合フェーズの状態
+  integrationPhase?: 'pending' | 'in_progress' | 'completed';
+  // 統合AIのinstance ID
+  integrationInstanceId?: number;
 }
 
 /**
