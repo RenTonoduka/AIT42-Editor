@@ -5,7 +5,7 @@
 
 export type SessionType = 'competition' | 'ensemble' | 'debate';
 export type SessionStatus = 'running' | 'completed' | 'failed' | 'paused';
-export type InstanceStatus = 'idle' | 'running' | 'completed' | 'failed' | 'paused';
+export type InstanceStatus = 'idle' | 'running' | 'completed' | 'failed' | 'paused' | 'archived';
 export type AgentRuntime = 'claude' | 'codex' | 'gemini';
 
 export interface RuntimeAllocation {
@@ -33,6 +33,12 @@ export interface WorktreeInstance {
   runtime?: AgentRuntime;
   model?: string;
   runtimeLabel?: string;
+
+  // Competition evaluation fields
+  testsPassed?: number;
+  testsFailed?: number;
+  codeComplexity?: number;    // 0-100 (lower is better)
+  executionTime?: number;      // seconds
 }
 
 /**
@@ -44,6 +50,49 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
   instanceId?: number; // Which instance this message is for
+}
+
+/**
+ * Evaluation metrics for Competition mode
+ */
+export interface EvaluationMetrics {
+  filesChanged: number;
+  linesAdded: number;
+  linesDeleted: number;
+  executionTime: number;      // seconds
+  testsPassed?: number;        // Optional: from test results
+  testsFailed?: number;        // Optional: from test results
+  codeComplexity?: number;     // Optional: 0-100 (lower is better)
+  successRate: number;         // 0-100 (percentage)
+}
+
+/**
+ * Evaluation score for each instance in Competition mode
+ */
+export interface EvaluationScore {
+  instanceId: number;
+  agentName: string;
+  runtime: string;
+  totalScore: number;          // 0-100
+  metrics: EvaluationMetrics;
+  rank: number;                // 1 = best, 2 = second, etc.
+  isRecommended: boolean;      // Top 3 recommended
+  scoreBreakdown: {
+    testScore: number;         // 0-40 points
+    complexityScore: number;   // 0-30 points
+    efficiencyScore: number;   // 0-20 points
+    changeScore: number;       // 0-10 points
+  };
+}
+
+/**
+ * Competition evaluation result
+ */
+export interface CompetitionEvaluation {
+  competitionId: string;
+  evaluatedAt: string;
+  scores: EvaluationScore[];
+  recommendedWinnerId: number; // Top ranked instance
 }
 
 /**
@@ -73,6 +122,7 @@ export interface WorktreeSession {
 
   // Results (for Competition mode)
   winnerId?: number;
+  evaluation?: CompetitionEvaluation;   // Competition evaluation result
 
   // Statistics
   totalDuration?: number; // seconds

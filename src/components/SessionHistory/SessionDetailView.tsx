@@ -21,6 +21,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import { WorktreeExplorer } from '@/components/Worktree/WorktreeExplorer';
+import { WinnerSelectionPanel } from './WinnerSelectionPanel';
 
 interface SessionDetailViewProps {
   sessionId: string;
@@ -484,8 +485,60 @@ const MetricsTab: React.FC<{ session: WorktreeSession }> = ({ session }) => {
         }, 0) / instancesWithDuration.length
       : 0;
 
+  // Add Winner Selection Panel for Competition mode
+  if (session.type === 'competition') {
+    return (
+      <div className="space-y-6">
+        <WinnerSelectionPanel session={session} />
+
+        {/* Existing Metrics Content */}
+        <div className="border-t pt-6 px-6">
+          <MetricsContent
+            session={session}
+            completedInstances={completedInstances}
+            failedInstances={failedInstances}
+            successRate={successRate}
+            avgDuration={avgDuration}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // For non-competition modes, show regular metrics
   return (
     <div className="p-6 space-y-6">
+      <MetricsContent
+        session={session}
+        completedInstances={completedInstances}
+        failedInstances={failedInstances}
+        successRate={successRate}
+        avgDuration={avgDuration}
+      />
+    </div>
+  );
+};
+
+/**
+ * Metrics Content Component (extracted for reuse)
+ */
+interface MetricsContentProps {
+  session: WorktreeSession;
+  completedInstances: number;
+  failedInstances: number;
+  successRate: number;
+  avgDuration: number;
+}
+
+const MetricsContent: React.FC<MetricsContentProps> = ({
+  session,
+  completedInstances,
+  failedInstances,
+  successRate,
+  avgDuration,
+}) => {
+  return (
+    <div className="space-y-6">
       {/* Summary Cards */}
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Session Summary</h3>
