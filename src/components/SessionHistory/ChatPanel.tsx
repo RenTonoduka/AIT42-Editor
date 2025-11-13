@@ -3,17 +3,21 @@
  *
  * Interactive chat interface for communicating with Claude Code instances
  * Supports message history, tmux integration, and real-time output
+ * Includes split view with terminal integration
  */
 import React, { useState, useRef, useEffect } from 'react';
 import { useSessionHistoryStore } from '@/store/sessionHistoryStore';
 import { tauriApi } from '@/services/tauri';
 import type { WorktreeSession, ChatMessage } from '@/types/worktree';
-import { Send, Terminal, User, Bot, AlertCircle, Loader } from 'lucide-react';
+import { Send, Terminal, User, Bot, AlertCircle, Loader, MessageSquare, SplitSquareHorizontal, MonitorPlay, AlertTriangle, Archive } from 'lucide-react';
 import { getRuntimeDefinition } from '@/config/runtimes';
+import { TerminalView } from './TerminalView';
 
 interface ChatPanelProps {
   session: WorktreeSession;
 }
+
+type ViewMode = 'chat' | 'terminal' | 'split';
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
   const [message, setMessage] = useState('');
@@ -23,7 +27,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('chat');
+  const [splitPosition, setSplitPosition] = useState(50); // Percentage for split view
+  const [sessionAlive, setSessionAlive] = useState(true);
+  const [isArchived, setIsArchived] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const splitContainerRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
   const { addChatMessage } = useSessionHistoryStore();
 
   /**
@@ -33,10 +43,58 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
     (i) => i.instanceId === selectedInstanceId
   );
 
+  /**
+   * Check if an instance is archived (read-only)
+   */
+  const isInstanceArchived = (
+    instance: typeof selectedInstance,
+    session: WorktreeSession
+  ): boolean => {
+    if (!instance) return false;
+
+    // 1. Instance status-based archive
+    if (instance.status === 'completed' || instance.status === 'failed') {
+      return true;
+    }
+
+    // 2. Ensemble integration phase archive
+    if (session.type === 'ensemble' && session.integrationPhase === 'completed') {
+      // 統合AI以外のインスタンスはアーカイブ
+      return instance.instanceId !== session.integrationInstanceId;
+    }
+
+    // 3. Session-level completion
+    if (session.status === 'completed' || session.status === 'failed') {
+      return true;
+    }
+
+    return false;
+  };
+
+  /**
+   * Check if error indicates session termination
+   */
+  const isSessionTerminationError = (error: any): boolean => {
+    const errorMessage = error?.message?.toLowerCase() || String(error).toLowerCase();
+    return (
+      errorMessage.includes('session not found') ||
+      errorMessage.includes('no session') ||
+      errorMessage.includes('can\'t find session') ||
+      errorMessage.includes('session has been deleted') ||
+      errorMessage.includes('no such session')
+    );
+  };
+
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [session.chatHistory]);
+
+  // Monitor archive status
+  useEffect(() => {
+    const archived = isInstanceArchived(selectedInstance, session);
+    setIsArchived(archived);
+  }, [selectedInstance, session.status, session.integrationPhase]);
 
   /**
    * Load tmux session history when component mounts or instance changes
@@ -150,7 +208,25 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
       // Clear input
       setMessage('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send message');
+      console.error('Failed to send message to tmux:', err);
+
+      // Check if session has terminated
+      if (isSessionTerminationError(err)) {
+        setSessionAlive(false);
+        setError('Tmux session has ended (exit command detected or session killed)');
+
+        // Add system message about session termination
+        const systemMessage: ChatMessage = {
+          id: `msg-${Date.now()}-system`,
+          role: 'system',
+          content: '⚠️ Tmux session has ended. The terminal is no longer active.',
+          timestamp: new Date().toISOString(),
+          instanceId: selectedInstanceId || undefined,
+        };
+        await addChatMessage(session.id, systemMessage);
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to send message');
+      }
     } finally {
       setIsSending(false);
     }
@@ -166,11 +242,88 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
     }
   };
 
+  /**
+   * Handle split view resize
+   */
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingRef.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isDraggingRef.current || !splitContainerRef.current) return;
+
+    const containerRect = splitContainerRef.current.getBoundingClientRect();
+    const newPosition = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+
+    // Clamp between 20% and 80%
+    setSplitPosition(Math.max(20, Math.min(80, newPosition)));
+  };
+
+  const handleMouseUp = () => {
+    isDraggingRef.current = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  };
+
+  useEffect(() => {
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
   return (
     <div className="flex flex-col h-full">
-      {/* Instance Selector */}
+      {/* Session ended warning banner */}
+      {!sessionAlive && (
+        <div className="flex-shrink-0 bg-yellow-50 border-b border-yellow-300 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-semibold text-yellow-900 text-sm">
+                  Tmux session has ended
+                </span>
+              </div>
+              <p className="text-xs text-yellow-700 leading-relaxed">
+                The terminal session is no longer active. This typically happens when an 'exit' command is executed
+                or the session is killed externally. You can close this window or the agent may restart automatically.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Archive mode warning banner */}
+      {isArchived && (
+        <div className="flex-shrink-0 bg-blue-50 border-b border-blue-300 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <Archive className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-semibold text-blue-900 text-sm">
+                  Archive Mode (Read-Only)
+                </span>
+              </div>
+              <p className="text-xs text-blue-700 leading-relaxed">
+                {session.type === 'ensemble' && session.integrationPhase === 'completed'
+                  ? `This agent's work has been integrated. See "Integration AI" (Instance #${session.integrationInstanceId}) for the final result.`
+                  : 'This session has completed. Chat history is available for reference only.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header: Instance Selector + View Mode Switcher */}
       <div className="border-b bg-gray-50 px-4 py-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mb-3">
           <Terminal className="w-5 h-5 text-gray-600" />
           <span className="text-sm font-semibold text-gray-800">Send to:</span>
           <div className="flex-1 flex flex-wrap items-center gap-2">
@@ -195,6 +348,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
               const emoji = runtimeDef?.emoji || '🤖';
               const label = instance.runtimeLabel || instance.agentName;
               const isSelected = selectedInstanceId === instance.instanceId;
+              const archived = isInstanceArchived(instance, session);
 
               return (
                 <button
@@ -202,14 +356,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
                   onClick={() => setSelectedInstanceId(instance.instanceId)}
                   className={`
                     px-4 py-2 rounded-lg text-sm font-medium transition-all
+                    ${archived ? 'opacity-60' : ''}
                     ${
                       isSelected
                         ? 'bg-blue-500 text-white shadow-md'
                         : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                     }
                   `}
-                  title={`Instance ${instance.instanceId} - ${label} (${instance.status})`}
+                  title={`Instance ${instance.instanceId} - ${label} (${instance.status})${archived ? ' - Archived' : ''}`}
                 >
+                  {archived && <span className="text-xs mr-1">📦</span>}
                   <span className="text-lg mr-2">{emoji}</span>
                   {label} #{instance.instanceId}
                 </button>
@@ -217,8 +373,170 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
             })}
           </div>
         </div>
+
+        {/* View Mode Switcher */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-600">View:</span>
+          <div className="flex gap-1 bg-white border border-gray-300 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('chat')}
+              className={`
+                px-3 py-1 rounded text-xs font-medium transition-all flex items-center gap-1.5
+                ${
+                  viewMode === 'chat'
+                    ? 'bg-blue-500 text-white shadow-sm'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }
+              `}
+              title="Chat view only"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              Chat
+            </button>
+            <button
+              onClick={() => setViewMode('terminal')}
+              className={`
+                px-3 py-1 rounded text-xs font-medium transition-all flex items-center gap-1.5
+                ${
+                  viewMode === 'terminal'
+                    ? 'bg-blue-500 text-white shadow-sm'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }
+              `}
+              title="Terminal view only"
+              disabled={!selectedInstance?.tmuxSessionId}
+            >
+              <MonitorPlay className="w-3.5 h-3.5" />
+              Terminal
+            </button>
+            <button
+              onClick={() => setViewMode('split')}
+              className={`
+                px-3 py-1 rounded text-xs font-medium transition-all flex items-center gap-1.5
+                ${
+                  viewMode === 'split'
+                    ? 'bg-blue-500 text-white shadow-sm'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }
+              `}
+              title="Split view (Chat + Terminal)"
+              disabled={!selectedInstance?.tmuxSessionId}
+            >
+              <SplitSquareHorizontal className="w-3.5 h-3.5" />
+              Split
+            </button>
+          </div>
+          {!selectedInstance?.tmuxSessionId && (
+            <span className="text-xs text-amber-600">
+              Select an instance with tmux session for terminal view
+            </span>
+          )}
+        </div>
       </div>
 
+      {/* Main Content Area - Conditional Rendering based on viewMode */}
+      {viewMode === 'chat' && (
+        <ChatView
+          isLoadingHistory={isLoadingHistory}
+          filteredMessages={filteredMessages}
+          session={session}
+          error={error}
+          messagesEndRef={messagesEndRef}
+          message={message}
+          setMessage={setMessage}
+          handleKeyPress={handleKeyPress}
+          selectedInstance={selectedInstance}
+          isSending={isSending}
+          handleSendMessage={handleSendMessage}
+          sessionAlive={sessionAlive}
+          isArchived={isArchived}
+        />
+      )}
+
+      {viewMode === 'terminal' && selectedInstance?.tmuxSessionId && (
+        <TerminalView
+          tmuxSessionId={selectedInstance.tmuxSessionId}
+          instanceName={selectedInstance.agentName}
+        />
+      )}
+
+      {viewMode === 'split' && selectedInstance?.tmuxSessionId && (
+        <div ref={splitContainerRef} className="flex-1 flex overflow-hidden">
+          {/* Chat Panel */}
+          <div style={{ width: `${splitPosition}%` }} className="flex flex-col border-r">
+            <ChatView
+              isLoadingHistory={isLoadingHistory}
+              filteredMessages={filteredMessages}
+              session={session}
+              error={error}
+              messagesEndRef={messagesEndRef}
+              message={message}
+              setMessage={setMessage}
+              handleKeyPress={handleKeyPress}
+              selectedInstance={selectedInstance}
+              isSending={isSending}
+              handleSendMessage={handleSendMessage}
+              sessionAlive={sessionAlive}
+              isArchived={isArchived}
+            />
+          </div>
+
+          {/* Resizable Splitter */}
+          <div
+            onMouseDown={handleMouseDown}
+            className="w-1 bg-gray-300 hover:bg-blue-500 cursor-col-resize transition-colors flex-shrink-0"
+            style={{ cursor: 'col-resize' }}
+          />
+
+          {/* Terminal Panel */}
+          <div style={{ width: `${100 - splitPosition}%` }} className="flex flex-col">
+            <TerminalView
+              tmuxSessionId={selectedInstance.tmuxSessionId}
+              instanceName={selectedInstance.agentName}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/**
+ * Chat View Component (Reusable)
+ */
+interface ChatViewProps {
+  isLoadingHistory: boolean;
+  filteredMessages: ChatMessage[];
+  session: WorktreeSession;
+  error: string | null;
+  messagesEndRef: React.RefObject<HTMLDivElement>;
+  message: string;
+  setMessage: (msg: string) => void;
+  handleKeyPress: (e: React.KeyboardEvent) => void;
+  selectedInstance: any;
+  isSending: boolean;
+  handleSendMessage: () => void;
+  sessionAlive: boolean;
+  isArchived: boolean;
+}
+
+const ChatView: React.FC<ChatViewProps> = ({
+  isLoadingHistory,
+  filteredMessages,
+  session,
+  error,
+  messagesEndRef,
+  message,
+  setMessage,
+  handleKeyPress,
+  selectedInstance,
+  isSending,
+  handleSendMessage,
+  sessionAlive,
+  isArchived,
+}) => {
+  return (
+    <>
       {/* Message List */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* Loading History */}
@@ -256,17 +574,29 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
 
       {/* Input Area */}
       <div className="border-t bg-white p-4">
+        {!sessionAlive && (
+          <div className="mb-3 flex items-center gap-2 px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <AlertTriangle className="w-4 h-4 text-yellow-600" />
+            <span className="text-xs text-yellow-700">
+              Session has ended. Commands cannot be sent.
+            </span>
+          </div>
+        )}
         <div className="flex gap-2">
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder={
-              selectedInstance
+              isArchived
+                ? 'Archive mode - read-only'
+                : !sessionAlive
+                ? 'Session has ended - input disabled'
+                : selectedInstance
                 ? `Send command to ${selectedInstance.agentName}...`
                 : 'Select an instance to send commands'
             }
-            disabled={!selectedInstance || isSending}
+            disabled={!selectedInstance || isSending || !sessionAlive || isArchived}
             rows={2}
             className="
               flex-1 px-4 py-2 rounded-lg
@@ -278,7 +608,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
           />
           <button
             onClick={handleSendMessage}
-            disabled={!message.trim() || !selectedInstance || isSending}
+            disabled={!message.trim() || !selectedInstance || isSending || !sessionAlive || isArchived}
             className="
               px-6 py-2 rounded-lg
               bg-blue-500 text-white
@@ -297,10 +627,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ session }) => {
           </button>
         </div>
         <p className="text-xs text-gray-500 mt-2">
-          Press Enter to send, Shift+Enter for new line
+          {isArchived
+            ? '📦 Archive mode: This session is read-only'
+            : sessionAlive
+            ? 'Press Enter to send, Shift+Enter for new line'
+            : 'Session has ended - commands disabled'}
         </p>
       </div>
-    </div>
+    </>
   );
 };
 

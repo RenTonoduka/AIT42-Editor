@@ -15,6 +15,9 @@ export interface WorktreeInfo {
   status: string;
   created_at: string;
   changed_files: number;
+  competition_id?: string; // Optional: For filtering worktrees by session/competition
+  lines_added?: number; // Optional: Number of lines added
+  lines_deleted?: number; // Optional: Number of lines deleted
 }
 
 /**

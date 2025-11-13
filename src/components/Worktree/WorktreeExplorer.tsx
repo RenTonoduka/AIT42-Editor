@@ -187,11 +187,21 @@ export const WorktreeExplorer: React.FC<WorktreeExplorerProps> = ({ competitionI
   // Tab state for right panel
   const [activeTab, setActiveTab] = useState<'preview' | 'diff' | 'compare'>('preview');
 
+  // Filter worktrees by competitionId
+  const filteredWorktrees = useMemo(() => {
+    return worktrees.filter((w) => w.competition_id === competitionId);
+  }, [worktrees, competitionId]);
+
   useEffect(() => {
-    if (competitionId) {
+    // Only fetch from backend if no worktrees exist for this competition
+    // This prevents overwriting data set by setWorktrees (e.g., from SessionDetailView)
+    if (competitionId && filteredWorktrees.length === 0 && !isLoading) {
+      console.log('[WorktreeExplorer] No worktrees found, fetching from backend:', competitionId);
       fetchWorktrees(competitionId);
+    } else {
+      console.log('[WorktreeExplorer] Using existing worktrees:', filteredWorktrees.length);
     }
-  }, [competitionId, fetchWorktrees]);
+  }, [competitionId, filteredWorktrees.length, isLoading]); // Removed fetchWorktrees from deps to avoid infinite loop
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -273,12 +283,12 @@ export const WorktreeExplorer: React.FC<WorktreeExplorerProps> = ({ competitionI
         <div className="sticky top-0 bg-gray-800 border-b border-gray-700 px-4 py-3 z-10">
           <h3 className="text-sm font-semibold text-gray-300 flex items-center">
             <GitBranch className="w-4 h-4 mr-2 text-blue-400" />
-            Worktrees ({worktrees.length})
+            Worktrees ({filteredWorktrees.length})
           </h3>
         </div>
 
         {/* Loading State */}
-        {isLoading && worktrees.length === 0 && (
+        {isLoading && filteredWorktrees.length === 0 && (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="animate-spin text-gray-400" size={24} />
           </div>
@@ -295,7 +305,7 @@ export const WorktreeExplorer: React.FC<WorktreeExplorerProps> = ({ competitionI
         )}
 
         {/* Empty State */}
-        {!isLoading && worktrees.length === 0 && !error && (
+        {!isLoading && filteredWorktrees.length === 0 && !error && (
           <div className="px-4 py-8 text-center">
             <Folder className="w-12 h-12 text-gray-600 mx-auto mb-3" />
             <p className="text-sm text-gray-400">No worktrees found</p>
@@ -307,7 +317,7 @@ export const WorktreeExplorer: React.FC<WorktreeExplorerProps> = ({ competitionI
 
         {/* Worktree Cards */}
         <div className="p-2 space-y-2">
-          {worktrees.map((worktree) => (
+          {filteredWorktrees.map((worktree) => (
             <div
               key={worktree.id}
               onClick={() => selectWorktree(worktree.id)}

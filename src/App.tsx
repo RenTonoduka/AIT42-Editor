@@ -55,6 +55,7 @@ const buildInstancesFromAllocations = (
 
     for (let i = 0; i < allocation.count; i += 1) {
       const index = instances.length + 1;
+      const shortId = competitionId.substring(0, 8); // Match backend's short_id format
       instances.push({
         id: `${competitionId}-${index}`,
         agentName: `${icon} ${shortTask} ${def.emoji} #${index} (${time})`,
@@ -62,7 +63,8 @@ const buildInstancesFromAllocations = (
         status: 'running',
         output: '',
         startTime: new Date().toISOString(),
-        tmuxSessionId: `${allocation.runtime}-${prefix}-${competitionId}-${index}`,
+        // 🔥 FIX: Match backend tmux session ID format (ait42-{runtime}-{mode}-{short_id}-{instance})
+        tmuxSessionId: `ait42-${allocation.runtime}-${mode}-${shortId}-${index}`,
         worktreePath: `/tmp/worktree-${prefix}-${competitionId}-${index}`,
         worktreeBranch: `${allocation.runtime}-${mode}-${competitionId}-${index}`,
         runtime: allocation.runtime,
