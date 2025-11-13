@@ -690,6 +690,31 @@ pub async fn capture_tmux_output(
     _state: State<'_, AppState>,
     session_id: String,
 ) -> Result<String, String> {
+    // First, check if tmux session exists
+    let check_output = Command::new("tmux")
+        .arg("has-session")
+        .arg("-t")
+        .arg(&session_id)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !check_output.status.success() {
+        // Session doesn't exist - try to read from log file instead
+        let log_file = format!("/tmp/ait42-{}.log", session_id);
+        match tokio::fs::read_to_string(&log_file).await {
+            Ok(content) => {
+                tracing::info!("✅ Retrieved output from log file for terminated session: {}", session_id);
+                return Ok(content);
+            }
+            Err(_) => {
+                // Log file also doesn't exist - return a helpful message instead of error
+                tracing::warn!("⚠️ Session {} not found and no log file available", session_id);
+                return Ok(format!("⚠️ Session {} has completed and output is no longer available.\nPlease check the session history for saved results.", session_id));
+            }
+        }
+    }
+
+    // Session exists - capture output normally
     let output = Command::new("tmux")
         .arg("capture-pane")
         .arg("-p")

@@ -270,10 +270,27 @@ const OverviewTab: React.FC<{ session: WorktreeSession }> = ({ session }) => {
                   )}
                 </div>
               )}
+
+              {/* Display instance output if available */}
+              {instance.output && instance.output.trim() && (
+                <details className="mt-3">
+                  <summary className="text-sm font-medium text-blue-600 cursor-pointer hover:text-blue-800">
+                    View Output ({instance.output.length} characters)
+                  </summary>
+                  <pre className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded text-xs font-mono overflow-x-auto max-h-64 overflow-y-auto whitespace-pre-wrap">
+                    {instance.output}
+                  </pre>
+                </details>
+              )}
             </div>
           ))}
         </div>
       </div>
+
+      {/* Winner Selection Panel (for competition mode) */}
+      {session.type === 'competition' && session.status === 'completed' && (
+        <WinnerSelectionPanel session={session} />
+      )}
     </div>
   );
 };

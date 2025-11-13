@@ -1,6 +1,6 @@
 {
   "name": "ait42-editor",
-  "version": "1.0.0",
+  "version": "1.6.0",
   "description": "AIT42 Editor - Modern code editor with AI integration",
   "type": "module",
   "scripts": {
