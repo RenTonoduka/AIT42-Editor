@@ -2055,7 +2055,7 @@ async fn execute_round(
             .arg("send-keys")
             .arg("-t")
             .arg(&session_id)
-            .arg(format!("{} && exit", claude_cmd))
+            .arg(&claude_cmd)
             .arg("Enter")
             .output()
             .map_err(|e| format!("Failed to send command: {}", e))?;
@@ -2895,7 +2895,7 @@ pub async fn start_integration_phase(
     // Step 7: Execute integration command (Claude Code)
     let escaped_prompt = escape_for_shell(&integration_prompt);
     let claude_command = format!(
-        "echo -e '{}' | claude --model sonnet --print --permission-mode bypassPermissions && exit",
+        "echo -e '{}' | claude --model sonnet --print --permission-mode bypassPermissions",
         escaped_prompt
     );
 
