@@ -1,4 +1,5 @@
 use sqlx::{Row, SqlitePool};
+use std::collections::HashMap;
 use tracing::{debug, error};
 
 use crate::error::{Result, SessionError};
@@ -212,7 +213,9 @@ pub async fn get_session(
 }
 
 /// Get all sessions for a workspace
+/// ISSUE #4 FIX: Use batch loading with HashMap to avoid N+1 queries
 pub async fn get_all_sessions(pool: &SqlitePool, workspace_hash: &str) -> Result<Vec<WorktreeSession>> {
+    // Step 1: Load all sessions
     let rows = sqlx::query_as::<_, SessionRow>(
         r#"
         SELECT
@@ -230,15 +233,41 @@ pub async fn get_all_sessions(pool: &SqlitePool, workspace_hash: &str) -> Result
     .fetch_all(pool)
     .await?;
 
-    let mut sessions = Vec::new();
-    for row in rows {
-        let mut session: WorktreeSession = row.into();
-        session.instances = load_instances(pool, &session.id).await?;
-        session.chat_history = load_chat_messages(pool, &session.id).await?;
-        sessions.push(session);
+    if rows.is_empty() {
+        return Ok(Vec::new());
     }
 
-    debug!("Fetched {} sessions for workspace {}", sessions.len(), workspace_hash);
+    // Convert rows to sessions
+    let mut sessions: Vec<WorktreeSession> = rows.into_iter()
+        .map(|row| row.into())
+        .collect();
+
+    // Collect all session IDs
+    let session_ids: Vec<&str> = sessions.iter()
+        .map(|s| s.id.as_str())
+        .collect();
+
+    // Step 2: Batch load all instances for these sessions (single query)
+    let all_instances = batch_load_instances(pool, &session_ids).await?;
+
+    // Step 3: Batch load all chat messages for these sessions (single query)
+    let all_messages = batch_load_chat_messages(pool, &session_ids).await?;
+
+    // Step 4: Assign instances and messages to sessions
+    for session in &mut sessions {
+        session.instances = all_instances
+            .get(session.id.as_str())
+            .cloned()
+            .unwrap_or_default();
+
+        session.chat_history = all_messages
+            .get(session.id.as_str())
+            .cloned()
+            .unwrap_or_default();
+    }
+
+    debug!("Fetched {} sessions for workspace {} (optimized batch loading)",
+           sessions.len(), workspace_hash);
 
     Ok(sessions)
 }
@@ -333,6 +362,55 @@ async fn load_instances(pool: &SqlitePool, session_id: &str) -> Result<Vec<Workt
     Ok(rows.into_iter().map(|r| r.into()).collect())
 }
 
+/// Batch load instances for multiple sessions (Issue #4 fix)
+/// Returns HashMap of session_id -> Vec<WorktreeInstance>
+async fn batch_load_instances(
+    pool: &SqlitePool,
+    session_ids: &[&str],
+) -> Result<HashMap<String, Vec<WorktreeInstance>>> {
+    if session_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    // Build IN clause with placeholders
+    let placeholders = session_ids.iter()
+        .enumerate()
+        .map(|(i, _)| format!("?{}", i + 1))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    let query_str = format!(
+        r#"
+        SELECT
+            id, session_id, instance_id, worktree_path, branch,
+            agent_name, status, tmux_session_id, output,
+            start_time, end_time, files_changed, lines_added,
+            lines_deleted, runtime, model, runtime_label
+        FROM instances
+        WHERE session_id IN ({})
+        ORDER BY session_id, instance_id ASC
+        "#,
+        placeholders
+    );
+
+    let mut query = sqlx::query_as::<_, InstanceRow>(&query_str);
+    for session_id in session_ids {
+        query = query.bind(*session_id);
+    }
+
+    let rows = query.fetch_all(pool).await?;
+
+    // Group instances by session_id
+    let mut grouped: HashMap<String, Vec<WorktreeInstance>> = HashMap::new();
+    for row in rows {
+        let session_id = row.session_id.clone();
+        let instance: WorktreeInstance = row.into();
+        grouped.entry(session_id).or_insert_with(Vec::new).push(instance);
+    }
+
+    Ok(grouped)
+}
+
 /// Update instance status
 pub async fn update_instance_status(
     pool: &SqlitePool,
@@ -423,6 +501,51 @@ async fn load_chat_messages(pool: &SqlitePool, session_id: &str) -> Result<Vec<C
     .await?;
 
     Ok(rows.into_iter().map(|r| r.into()).collect())
+}
+
+/// Batch load chat messages for multiple sessions (Issue #4 fix)
+/// Returns HashMap of session_id -> Vec<ChatMessage>
+async fn batch_load_chat_messages(
+    pool: &SqlitePool,
+    session_ids: &[&str],
+) -> Result<HashMap<String, Vec<ChatMessage>>> {
+    if session_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    // Build IN clause with placeholders
+    let placeholders = session_ids.iter()
+        .enumerate()
+        .map(|(i, _)| format!("?{}", i + 1))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    let query_str = format!(
+        r#"
+        SELECT id, session_id, role, content, timestamp, instance_id
+        FROM chat_messages
+        WHERE session_id IN ({})
+        ORDER BY session_id, timestamp ASC
+        "#,
+        placeholders
+    );
+
+    let mut query = sqlx::query_as::<_, ChatMessageRow>(&query_str);
+    for session_id in session_ids {
+        query = query.bind(*session_id);
+    }
+
+    let rows = query.fetch_all(pool).await?;
+
+    // Group messages by session_id
+    let mut grouped: HashMap<String, Vec<ChatMessage>> = HashMap::new();
+    for row in rows {
+        let session_id = row.session_id.clone();
+        let message: ChatMessage = row.into();
+        grouped.entry(session_id).or_insert_with(Vec::new).push(message);
+    }
+
+    Ok(grouped)
 }
 
 /// Add chat message to session
