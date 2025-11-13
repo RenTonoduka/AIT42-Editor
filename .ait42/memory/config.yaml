@@ -53,3 +53,19 @@ rotation:
 statistics:
   calculate_trends: true
   trend_window_days: 30   # Calculate trends over last 30 days
+
+# Parallel execution optimization (v1.5.2+)
+parallel_execution:
+  enabled: true
+  max_concurrent_agents: 3        # Max agents to run in parallel
+  auto_dependency_resolution: true # Use dependency graph for optimal scheduling
+  prefer_parallel: true            # Prefer parallel over sequential when possible
+  parallel_overhead_threshold_ms: 100  # Only parallelize if tasks take > 100ms
+
+# Performance tuning
+performance:
+  index_cache_enabled: true
+  index_cache_ttl_seconds: 3600    # Cache index for 1 hour
+  agent_stats_cache_enabled: true
+  agent_stats_cache_ttl_seconds: 1800  # Cache agent stats for 30 min
+  lazy_load_agent_details: true    # Only load full agent details when needed

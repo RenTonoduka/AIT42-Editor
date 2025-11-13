@@ -1,6 +1,7 @@
 ---
 name: implementation-assistant
 description: "Implementation specialist for agent architectures and AI systems. Invoked for agent/component implementation, code generation, and pattern implementation following TDD principles."
+tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
 ---
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # AIT42 Tmux Security Module: Command Sanitization
-# Version: 1.0.0
+# Version: 1.0.1
 # Purpose: Prevent command injection attacks
 
 set -euo pipefail
@@ -17,24 +17,42 @@ sanitize_command() {
         return 1
     fi
 
-    # Dangerous character detection
+    # Dangerous character detection (using case for each pattern)
     # Detects: semicolon, pipe, redirect, command substitution
-    if [[ "$cmd" =~ [';|&$`<>(){}] ]]; then
-        echo "Error: Command contains potentially dangerous characters" >&2
-        return 1
-    fi
-
-    # Command substitution detection
-    if [[ "$cmd" =~ \$\( || "$cmd" =~ \` ]]; then
-        echo "Error: Command substitution detected" >&2
-        return 1
-    fi
-
-    # Backtick command substitution
-    if [[ "$cmd" =~ \` ]]; then
-        echo "Error: Backtick command substitution detected" >&2
-        return 1
-    fi
+    case "$cmd" in
+        *\;*)
+            echo "Error: Command contains semicolon" >&2
+            return 1
+            ;;
+        *\|*)
+            echo "Error: Command contains pipe" >&2
+            return 1
+            ;;
+        *\&*)
+            echo "Error: Command contains ampersand" >&2
+            return 1
+            ;;
+        *\$*)
+            echo "Error: Command contains dollar sign (variable expansion)" >&2
+            return 1
+            ;;
+        *\<*|*\>*)
+            echo "Error: Command contains redirect" >&2
+            return 1
+            ;;
+        *\(*)
+            echo "Error: Command contains parenthesis (subshell)" >&2
+            return 1
+            ;;
+        *\{*)
+            echo "Error: Command contains brace expansion" >&2
+            return 1
+            ;;
+        *\`*)
+            echo "Error: Command contains backtick (command substitution)" >&2
+            return 1
+            ;;
+    esac
 
     echo "$cmd"
     return 0

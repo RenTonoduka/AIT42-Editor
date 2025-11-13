@@ -71,3 +71,6 @@ src-tauri/.worktrees/
 .ait42/memory/agents/*
 !.ait42/memory/agents/.gitkeep
 .ait42/.worktrees/
+
+# AIT42 Backups
+.ait42.backup.*/
