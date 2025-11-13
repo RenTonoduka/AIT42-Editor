@@ -1,0 +1,105 @@
+[
+  {
+    "id": "fixture_session_1",
+    "type": "competition",
+    "task": "Implement user authentication",
+    "status": "completed",
+    "createdAt": "2025-01-13T10:00:00Z",
+    "updatedAt": "2025-01-13T12:30:00Z",
+    "completedAt": "2025-01-13T12:30:00Z",
+    "model": "claude-3-5-sonnet-20241022",
+    "totalDuration": 9000,
+    "totalFilesChanged": 15,
+    "totalLinesAdded": 320,
+    "totalLinesDeleted": 85,
+    "instances": [
+      {
+        "instanceId": 0,
+        "worktreePath": "/tmp/worktree_auth_0",
+        "branch": "feature/auth-agent-0",
+        "agentName": "authentication-specialist",
+        "status": "completed",
+        "tmuxSessionId": "ait42_auth_0",
+        "filesChanged": 8,
+        "linesAdded": 180,
+        "linesDeleted": 45,
+        "runtime": "claude",
+        "model": "claude-3-5-sonnet-20241022"
+      },
+      {
+        "instanceId": 1,
+        "worktreePath": "/tmp/worktree_auth_1",
+        "branch": "feature/auth-agent-1",
+        "agentName": "security-tester",
+        "status": "completed",
+        "tmuxSessionId": "ait42_auth_1",
+        "filesChanged": 7,
+        "linesAdded": 140,
+        "linesDeleted": 40,
+        "runtime": "claude",
+        "model": "claude-3-5-sonnet-20241022"
+      }
+    ],
+    "chatHistory": [
+      {
+        "id": "msg_1",
+        "role": "user",
+        "content": "Implement user authentication with JWT tokens",
+        "timestamp": "2025-01-13T10:00:00Z"
+      },
+      {
+        "id": "msg_2",
+        "role": "assistant",
+        "content": "I'll implement JWT-based authentication with secure password hashing.",
+        "timestamp": "2025-01-13T10:00:15Z",
+        "instanceId": 0
+      }
+    ]
+  },
+  {
+    "id": "fixture_session_2",
+    "type": "ensemble",
+    "task": "Refactor database layer",
+    "status": "running",
+    "createdAt": "2025-01-13T14:00:00Z",
+    "updatedAt": "2025-01-13T15:45:00Z",
+    "model": "claude-3-5-sonnet-20241022",
+    "instances": [
+      {
+        "instanceId": 0,
+        "worktreePath": "/tmp/worktree_db_0",
+        "branch": "refactor/db-agent-0",
+        "agentName": "database-architect",
+        "status": "running",
+        "tmuxSessionId": "ait42_db_0",
+        "runtime": "claude",
+        "model": "claude-3-5-sonnet-20241022"
+      }
+    ],
+    "chatHistory": []
+  },
+  {
+    "id": "fixture_session_3",
+    "type": "debate",
+    "task": "Design API architecture",
+    "status": "failed",
+    "createdAt": "2025-01-13T16:00:00Z",
+    "updatedAt": "2025-01-13T16:30:00Z",
+    "completedAt": "2025-01-13T16:30:00Z",
+    "instances": [],
+    "chatHistory": [
+      {
+        "id": "msg_3",
+        "role": "user",
+        "content": "Design a RESTful API for the application",
+        "timestamp": "2025-01-13T16:00:00Z"
+      },
+      {
+        "id": "msg_4",
+        "role": "system",
+        "content": "Session failed due to timeout",
+        "timestamp": "2025-01-13T16:30:00Z"
+      }
+    ]
+  }
+]

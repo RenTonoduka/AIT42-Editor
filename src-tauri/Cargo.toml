@@ -14,6 +14,10 @@ path = "src/lib.rs"
 name = "ait42-editor"
 path = "src/main.rs"
 
+[[bin]]
+name = "migrate"
+path = "src/bin/migrate.rs"
+
 [build-dependencies]
 tauri-build = { version = "1.5", features = [] }
 
@@ -35,6 +39,7 @@ ait42-lsp = { path = "../crates/ait42-lsp" }
 ait42-fs = { path = "../crates/ait42-fs" }
 ait42-config = { path = "../crates/ait42-config" }
 ait42-ait42 = { path = "../crates/ait42-ait42" }
+ait42-session = { path = "../crates/ait42-session" }
 
 # v1.6.0 optimizer crates
 omega-theory = { path = "../crates/omega-theory" }
@@ -65,6 +70,12 @@ xcb = "1.6"
 
 # Hashing for workspace identification
 sha2 = "0.10"
+
+# SQLite database support
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "migrate"] }
+
+# File globbing for migration tool
+glob = "0.3"
 
 [features]
 default = ["custom-protocol", "terminal"]

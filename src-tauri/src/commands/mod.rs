@@ -11,6 +11,7 @@ pub mod ait42;
 pub mod worktree;
 pub mod optimizer;
 pub mod session_history;
+pub mod session_history_sqlite;
 pub mod workspace;
 pub mod system;
 

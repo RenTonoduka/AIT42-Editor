@@ -9,6 +9,8 @@
 
 pub mod ab_test;
 pub mod optimizer;
+pub mod database;
+pub mod tools;
 
 // Re-export commonly used types
 pub use optimizer::{

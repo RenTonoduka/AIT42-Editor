@@ -13,6 +13,7 @@ members = [
     "crates/ait42-config",
     "crates/omega-theory",
     "crates/llm-estimator",
+    "crates/ait42-session",
 ]
 resolver = "2"
 
@@ -78,6 +79,7 @@ ait42-lsp = { path = "crates/ait42-lsp" }
 ait42-ait42 = { path = "crates/ait42-ait42" }
 ait42-fs = { path = "crates/ait42-fs" }
 ait42-config = { path = "crates/ait42-config" }
+ait42-session = { path = "crates/ait42-session" }
 omega-theory = { path = "crates/omega-theory" }
 llm-estimator = { path = "crates/llm-estimator" }
 

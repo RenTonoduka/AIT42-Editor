@@ -55,6 +55,9 @@ pub struct AppState {
 
     /// AIT42 coordinator for intelligent agent selection
     pub coordinator: Arc<tokio::sync::Mutex<Option<Coordinator>>>,
+
+    /// SQLite session repository (optional for gradual migration)
+    pub session_repo: Option<Arc<crate::commands::session_history_sqlite::SessionRepo>>,
 }
 
 impl AppState {
@@ -89,6 +92,11 @@ impl AppState {
         let agent_executor = Arc::new(tokio::sync::Mutex::new(None));
         let coordinator = Arc::new(tokio::sync::Mutex::new(None));
 
+        // Initialize SQLite session repository (async operation - optional)
+        // Note: This is initialized as None for now. In Phase 2, we'll initialize it here.
+        // For Phase 1, we'll initialize it lazily on first use.
+        let session_repo = None;
+
         Ok(Self {
             editor: Arc::new(Mutex::new(editor)),
             editor_state: Arc::new(Mutex::new(editor_state)),
@@ -103,6 +111,7 @@ impl AppState {
             agent_registry,
             agent_executor,
             coordinator,
+            session_repo,
         })
     }
 
