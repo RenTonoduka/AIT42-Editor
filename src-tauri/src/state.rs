@@ -80,7 +80,8 @@ impl AppState {
             .unwrap_or_else(|_| std::path::PathBuf::from("."))
             .join("plugins");
         let mut plugin_manager = PluginManager::new(plugins_dir);
-        plugin_manager.initialize()
+        plugin_manager
+            .initialize()
             .unwrap_or_else(|e| eprintln!("Failed to initialize plugin manager: {}", e));
 
         // Initialize AIT42 agent system (lazy initialization - will be initialized on first use)
@@ -157,7 +158,10 @@ mod tests {
         let state = state.unwrap();
 
         // Verify LSP manager is available
-        assert!(!state.lsp_manager.running_servers().await.is_empty() || state.lsp_manager.running_servers().await.is_empty());
+        assert!(
+            !state.lsp_manager.running_servers().await.is_empty()
+                || state.lsp_manager.running_servers().await.is_empty()
+        );
 
         #[cfg(feature = "terminal")]
         {
