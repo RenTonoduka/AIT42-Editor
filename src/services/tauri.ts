@@ -333,6 +333,27 @@ export interface DebateStatus {
 }
 
 /**
+ * Integration Phase request (Ensemble mode)
+ */
+export interface StartIntegrationPhaseRequest {
+  sessionId: string;
+  workspacePath: string;
+  instanceCount: number;
+  originalTask: string;
+}
+
+/**
+ * Integration Phase result
+ */
+export interface IntegrationPhaseResult {
+  integrationInstanceId: number;
+  tmuxSessionId: string;
+  worktreePath: string;
+  status: string;
+  startedAt: string;
+}
+
+/**
  * Type-safe Tauri command wrappers
  */
 export const tauriApi = {
@@ -1185,6 +1206,27 @@ export const tauriApi = {
       await invoke('cancel_debate', { debateId, cleanupWorktrees });
     } catch (error) {
       throw new Error(`Failed to cancel debate: ${error}`);
+    }
+  },
+
+  // ===== Integration Phase Commands (Ensemble mode) =====
+
+  /**
+   * Start integration phase for Ensemble mode
+   *
+   * Launches an integration agent that synthesizes outputs from all instances
+   */
+  async startIntegrationPhase(
+    request: StartIntegrationPhaseRequest
+  ): Promise<IntegrationPhaseResult> {
+    try {
+      const result = await invoke<IntegrationPhaseResult>(
+        'start_integration_phase',
+        request
+      );
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to start integration phase: ${error}`);
     }
   },
 

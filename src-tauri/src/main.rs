@@ -90,6 +90,7 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::execute_multi_runtime_competition,
             commands::get_competition_status,
             commands::cancel_competition,
+            commands::start_integration_phase,
             // AIT42 Debate operations
             commands::execute_debate,
             commands::get_debate_status,
@@ -211,6 +212,7 @@ fn generate_handler() -> impl Fn(tauri::Invoke) + Send + Sync + 'static {
             commands::execute_multi_runtime_competition,
             commands::get_competition_status,
             commands::cancel_competition,
+            commands::start_integration_phase,
             // AIT42 Debate operations
             commands::execute_debate,
             commands::get_debate_status,

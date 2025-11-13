@@ -21,6 +21,7 @@ import { listen, emit } from '@tauri-apps/api/event'; // 🔥 NEW: Tauri event s
 import { AgentRuntime } from '@/types/worktree';
 import { getRuntimeDefinition } from '@/config/runtimes';
 import { useSessionHistoryStore } from '@/store/sessionHistoryStore'; // 🔥 NEW: For session updates
+import { tauriApi } from '@/services/tauri'; // 🔥 NEW: For integration phase
 
 export interface ClaudeCodeInstance {
   id: string;
@@ -138,6 +139,133 @@ const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({ instances, competitio
   // 🔥 NEW: Auto-update session status when all instances complete
   const { updateSession, getSession } = useSessionHistoryStore();
 
+  // 🔥 NEW: Helper function to identify integration instances
+  const isIntegrationInstance = (instance: ClaudeCodeInstance) => {
+    return (
+      instance.agentName?.includes('Integration') ||
+      instance.agentName?.includes('統合') ||
+      instance.id?.includes('integration')
+    );
+  };
+
+  // 🔥 NEW: Start integration phase
+  const startIntegrationPhase = async () => {
+    if (!competitionId || !workspacePath) {
+      console.warn('[MultiAgentPanel] Cannot start integration: missing competitionId or workspacePath');
+      return;
+    }
+
+    try {
+      console.log('[MultiAgentPanel] Starting integration phase...');
+
+      // 1. Get current session from store
+      const session = await getSession(competitionId);
+      if (!session) {
+        console.warn('[MultiAgentPanel] Session not found:', competitionId);
+        return;
+      }
+
+      // 2. Request integration phase from backend
+      const result = await tauriApi.startIntegrationPhase({
+        sessionId: competitionId,
+        workspacePath,
+        instanceCount: localInstances.length,
+        originalTask: session.task,
+      });
+
+      console.log('[MultiAgentPanel] Integration phase started:', result);
+
+      // 3. Create integration instance object
+      const integrationInstance = {
+        instanceId: result.integrationInstanceId,
+        worktreePath: result.worktreePath,
+        branch: `integration-${competitionId.substring(0, 8)}`,
+        agentName: '🔄 Integration Agent',
+        status: 'running' as const,
+        tmuxSessionId: result.tmuxSessionId,
+        startTime: result.startedAt,
+        output: '',
+      };
+
+      // 4. Update session with integration instance
+      const updatedSession = {
+        ...session,
+        integrationPhase: 'in_progress' as const,
+        integrationInstanceId: result.integrationInstanceId,
+        instances: [...session.instances, integrationInstance],
+        updatedAt: new Date().toISOString(),
+      };
+
+      await updateSession(updatedSession);
+
+      // 5. Update local state
+      setLocalInstances((prev) => [
+        ...prev,
+        {
+          id: `integration-${competitionId}`,
+          agentName: '🔄 Integration Agent',
+          task: session.task,
+          status: 'running',
+          output: '',
+          startTime: result.startedAt,
+          tmuxSessionId: result.tmuxSessionId,
+          worktreePath: result.worktreePath,
+          worktreeBranch: `integration-${competitionId.substring(0, 8)}`,
+        },
+      ]);
+
+      console.log('[MultiAgentPanel] ✅ Integration phase started successfully');
+    } catch (error) {
+      console.error('[MultiAgentPanel] Failed to start integration phase:', error);
+    }
+  };
+
+  // 🔥 NEW: Auto-start integration phase for Ensemble mode
+  useEffect(() => {
+    if (!competitionId || !workspacePath) return;
+    if (localInstances.length === 0) return;
+
+    const checkAndStartIntegration = async () => {
+      try {
+        // Get current session to check type
+        const session = await getSession(competitionId);
+        if (!session) return;
+
+        // Only for Ensemble mode
+        const isEnsemble = session.type === 'ensemble';
+        if (!isEnsemble) return;
+
+        // Check if integration phase already started
+        const hasIntegrationStarted =
+          session.integrationPhase === 'in_progress' ||
+          session.integrationPhase === 'completed';
+        if (hasIntegrationStarted) return;
+
+        // Check if there's already an integration instance
+        const hasIntegrationInstance = localInstances.some(isIntegrationInstance);
+        if (hasIntegrationInstance) return;
+
+        // Check if all non-integration instances are completed or failed
+        const nonIntegrationInstances = localInstances.filter(
+          (inst) => !isIntegrationInstance(inst)
+        );
+        const allCompleted = nonIntegrationInstances.every(
+          (inst) => inst.status === 'completed' || inst.status === 'failed'
+        );
+
+        if (allCompleted && nonIntegrationInstances.length > 0) {
+          console.log('[MultiAgentPanel] 🔥 All instances completed, starting integration phase...');
+          await startIntegrationPhase();
+        }
+      } catch (error) {
+        console.error('[MultiAgentPanel] Error in integration phase check:', error);
+      }
+    };
+
+    checkAndStartIntegration();
+  }, [localInstances, competitionId, workspacePath]);
+
+  // Auto-update session status when all instances complete (including integration)
   useEffect(() => {
     if (!competitionId || !workspacePath || sessionUpdated) return;
     if (localInstances.length === 0) return;
@@ -159,12 +287,18 @@ const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({ instances, competitio
             return;
           }
 
+          // Check if integration instance completed
+          const integrationInstance = localInstances.find(isIntegrationInstance);
+          const isIntegrationCompleted = integrationInstance?.status === 'completed';
+
           // Update session status and instances with output
           const updatedSession = {
             ...session,
             status: 'completed' as const,
             completedAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
+            // If integration completed, mark integration phase as completed
+            integrationPhase: isIntegrationCompleted ? ('completed' as const) : session.integrationPhase,
             instances: session.instances.map((inst, idx) => {
               const localInst = localInstances[idx];
               return {
@@ -348,13 +482,26 @@ const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({ instances, competitio
         {activeTab === 'output' && (
           /* Agent Cards Grid */
           <div className="p-6 space-y-6">
-        {localInstances.map((instance) => (
+        {localInstances.map((instance) => {
+          const isIntegration = isIntegrationInstance(instance);
+          return (
           <div
             key={instance.id}
-            className={`bg-gray-800 rounded-lg border-2 ${getStatusColor(
-              instance.status
-            )} overflow-hidden transition-all duration-300 hover:shadow-2xl hover:scale-[1.01]`}
+            className={`
+              rounded-lg border-2 overflow-hidden transition-all duration-300 hover:shadow-2xl hover:scale-[1.01]
+              ${isIntegration ? 'bg-purple-900/20 border-purple-500' : `bg-gray-800 ${getStatusColor(instance.status)}`}
+            `}
           >
+            {/* 🔥 NEW: Integration Badge */}
+            {isIntegration && (
+              <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-2 flex items-center justify-center space-x-2">
+                <Activity className="w-5 h-5 text-white animate-pulse" />
+                <span className="text-sm font-bold text-white uppercase tracking-wider">
+                  🔄 統合フェーズ - Integration Phase
+                </span>
+              </div>
+            )}
+
             {/* Card Header */}
             <div className="p-6 border-b border-gray-700">
               <div className="flex items-start justify-between">
@@ -362,7 +509,7 @@ const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({ instances, competitio
                 <div className="flex-1">
                   <div className="flex items-center space-x-3 mb-3">
                     {getStatusIcon(instance.status)}
-                    <h3 className="text-xl font-bold text-white">
+                    <h3 className={`text-xl font-bold ${isIntegration ? 'text-purple-300' : 'text-white'}`}>
                       {instance.agentName || 'Unnamed Agent'}
                     </h3>
                     <span
@@ -516,7 +663,8 @@ const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({ instances, competitio
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
           </div>
         )}
 

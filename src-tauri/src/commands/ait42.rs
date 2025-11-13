@@ -2611,3 +2611,336 @@ fn extract_reasoning(output: &str) -> String {
         lines.join(" ").chars().take(200).collect()
     }
 }
+
+//
+// ============================================================
+// Ensemble Integration Phase
+// ============================================================
+//
+
+/// Instance output data for integration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InstanceOutput {
+    pub instance_id: u32,
+    pub runtime: String,
+    pub model: String,
+    pub output: String,
+}
+
+/// Integration phase result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IntegrationPhaseResult {
+    pub integration_instance_id: u32,
+    pub tmux_session_id: String,
+    pub worktree_path: String,
+    pub status: String, // "started"
+    pub started_at: String,
+}
+
+/// Collect outputs from all instances in a competition/ensemble session
+async fn collect_instance_outputs(
+    session_id: &str,
+    instance_count: usize,
+    worktrees_base_dir: &Path,
+) -> Result<Vec<InstanceOutput>, String> {
+    tracing::info!("🔍 Collecting outputs from {} instances for session {}", instance_count, session_id);
+
+    let mut outputs = Vec::new();
+    let short_session_id = &session_id[..8.min(session_id.len())];
+
+    for instance_num in 1..=instance_count {
+        // Log files are stored in worktree directories (matching line 1311-1314 pattern)
+        let worktree_path = worktrees_base_dir
+            .join(format!("competition-{}", short_session_id))
+            .join(format!("instance-{}", instance_num));
+
+        // Try to find log files in worktree directory with different runtime suffixes
+        let possible_log_files = vec![
+            worktree_path.join(format!(".claude-output-{}.log", instance_num)),
+            worktree_path.join(format!(".codex-output-{}.log", instance_num)),
+            worktree_path.join(format!(".gemini-output-{}.log", instance_num)),
+        ];
+
+        let mut output_content = String::new();
+        let mut log_found = false;
+        let mut runtime = "claude".to_string();
+        let mut model = "sonnet".to_string();
+
+        for log_path in &possible_log_files {
+            if let Ok(content) = tokio::fs::read_to_string(log_path).await {
+                tracing::info!("✅ Found log file: {}", log_path.display());
+                output_content = content;
+                log_found = true;
+
+                // Extract runtime from log file name
+                if let Some(file_name) = log_path.file_name() {
+                    let name = file_name.to_string_lossy();
+                    if name.contains("claude") {
+                        runtime = "claude".to_string();
+                    } else if name.contains("codex") {
+                        runtime = "codex".to_string();
+                    } else if name.contains("gemini") {
+                        runtime = "gemini".to_string();
+                    }
+                }
+                break;
+            }
+        }
+
+        if !log_found {
+            tracing::warn!("⚠️ No log file found for instance {} in {}. Tried: {:?}",
+                instance_num, worktree_path.display(), possible_log_files);
+            output_content = format!("⚠️ No output captured for instance {}", instance_num);
+        }
+
+        outputs.push(InstanceOutput {
+            instance_id: instance_num as u32,
+            runtime,
+            model,
+            output: output_content,
+        });
+    }
+
+    tracing::info!("✅ Collected {} instance outputs", outputs.len());
+    Ok(outputs)
+}
+
+/// Generate integration prompt from instance outputs
+fn generate_integration_prompt(task: &str, outputs: &[InstanceOutput]) -> String {
+    let mut prompt = format!(
+        "あなたは統合AI（Integration Agent）です。\n\
+        Ensembleモードで実行された{}個のClaude Codeインスタンスの出力を統合してください。\n\n\
+        ## 元のタスク\n\
+        {}\n\n\
+        ## 各インスタンスの出力\n\n",
+        outputs.len(),
+        task
+    );
+
+    for output in outputs {
+        prompt.push_str(&format!(
+            "### インスタンス {} (Runtime: {}, Model: {})\n\
+            ```\n\
+            {}\n\
+            ```\n\n",
+            output.instance_id,
+            output.runtime,
+            output.model,
+            output.output.chars().take(5000).collect::<String>() // Limit to 5000 chars per instance
+        ));
+    }
+
+    prompt.push_str(
+        "## 統合タスク\n\
+        1. 各インスタンスの成果物と提案を分析\n\
+        2. 重複する実装を統一\n\
+        3. 矛盾する提案を調整\n\
+        4. 最適な統合案を生成\n\
+        5. 統合結果をMarkdownで出力\n\n\
+        ## 出力形式\n\
+        - 統合された実装案\n\
+        - 各インスタンスの優れた点\n\
+        - 統合における判断根拠\n\
+        - 最終的な推奨事項\n\n\
+        統合を開始してください。質問はせず、直接実装してください。"
+    );
+
+    prompt
+}
+
+/// Start integration phase for ensemble mode
+///
+/// Collects outputs from all instances and launches an integration AI
+#[tauri::command]
+pub async fn start_integration_phase(
+    app_handle: tauri::AppHandle,
+    state: State<'_, AppState>,
+    session_id: String,
+    workspace_path: String,
+    instance_count: usize,
+    original_task: String,
+) -> Result<IntegrationPhaseResult, String> {
+    tracing::info!(
+        "🚀 Starting integration phase for session {} with {} instances",
+        session_id,
+        instance_count
+    );
+
+    if instance_count == 0 {
+        return Err("Instance count must be greater than 0".to_string());
+    }
+
+    if original_task.trim().is_empty() {
+        return Err("Original task cannot be empty".to_string());
+    }
+
+    // Get project root and worktrees directory
+    let working_dir = state.working_dir.lock().await;
+    let project_root = working_dir.clone();
+    drop(working_dir);
+
+    let ait42_worktrees = project_root.join("src-tauri").join(".worktrees");
+
+    // Step 1: Collect outputs from all instances
+    let outputs = collect_instance_outputs(&session_id, instance_count, &ait42_worktrees).await?;
+
+    // Step 2: Generate integration prompt
+    let integration_prompt = generate_integration_prompt(&original_task, &outputs);
+    tracing::info!("✅ Generated integration prompt ({} chars)", integration_prompt.len());
+
+    // Step 3: Prepare workspace
+    let workspace = PathBuf::from(&workspace_path);
+    if !workspace.exists() {
+        return Err(format!("Workspace path does not exist: {}", workspace_path));
+    }
+
+    // Use same worktrees directory structure (already obtained above)
+    let short_id = &session_id[..8.min(session_id.len())];
+    let integration_dir = ait42_worktrees
+        .join(format!("competition-{}", short_id))
+        .join("integration");
+
+    tracing::info!("📁 Creating integration worktree at {}", integration_dir.display());
+    std::fs::create_dir_all(&integration_dir).map_err(|e| {
+        format!("Failed to create integration directory: {}", e)
+    })?;
+
+    // Step 4: Create git worktree for integration
+    let branch_name = format!("integration-{}", short_id);
+    let mut cmd = Command::new("git");
+    cmd.arg("worktree")
+        .arg("add")
+        .arg("-b")
+        .arg(&branch_name)
+        .arg(&integration_dir)
+        .current_dir(&project_root);
+
+    let output = cmd.output().map_err(|e| {
+        format!("Failed to create integration worktree: {}", e)
+    })?;
+
+    if !output.status.success() {
+        let error = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to create integration worktree: {}", error));
+    }
+
+    tracing::info!("✅ Created integration worktree with branch {}", branch_name);
+
+    // Step 5: Install AIT42 in integration worktree
+    let source_ait42 = if let Ok(custom_path) = std::env::var("AIT42_SOURCE_PATH") {
+        PathBuf::from(custom_path)
+    } else {
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+        PathBuf::from(&home).join(".ait42")
+    };
+
+    let installer = AIT42Installer::new(source_ait42.clone());
+    tracing::info!("🚀 Installing AIT42 in integration worktree");
+
+    match installer.install_to_workspace(integration_dir.as_path()) {
+        Ok(result) => {
+            if result.success {
+                tracing::info!(
+                    "✅ AIT42 installed in integration worktree ({} agents, {} SOPs)",
+                    result.agents_installed,
+                    result.sops_installed
+                );
+            } else {
+                tracing::warn!("⚠️ AIT42 installation partially failed: {:?}", result.errors);
+            }
+        }
+        Err(e) => {
+            tracing::warn!("⚠️ Failed to install AIT42 in integration worktree: {}", e);
+        }
+    }
+
+    // Step 6: Create tmux session for integration
+    let tmux_session_id = format!("ait42-integration-{}", short_id);
+    let log_file_path = integration_dir.join(".integration-output.log");
+    let log_file_str = log_file_path.to_string_lossy().to_string();
+
+    tracing::info!("🎬 Creating tmux session: {}", tmux_session_id);
+
+    let tmux_output = Command::new("tmux")
+        .arg("new-session")
+        .arg("-d")
+        .arg("-s")
+        .arg(&tmux_session_id)
+        .arg("-c")
+        .arg(&integration_dir)
+        .output()
+        .map_err(|e| format!("Failed to create tmux session: {}", e))?;
+
+    if !tmux_output.status.success() {
+        let error = String::from_utf8_lossy(&tmux_output.stderr);
+        return Err(format!("Failed to create tmux session: {}", error));
+    }
+
+    // Configure pipe-pane for logging
+    let pipe_output = Command::new("tmux")
+        .arg("pipe-pane")
+        .arg("-t")
+        .arg(&tmux_session_id)
+        .arg("-o")
+        .arg(format!("cat >> {}", log_file_str))
+        .output()
+        .map_err(|e| format!("Failed to configure pipe-pane: {}", e))?;
+
+    if !pipe_output.status.success() {
+        let error = String::from_utf8_lossy(&pipe_output.stderr);
+        tracing::warn!("Failed to enable pipe-pane: {}", error);
+    }
+
+    // Step 7: Execute integration command (Claude Code)
+    let escaped_prompt = escape_for_shell(&integration_prompt);
+    let claude_command = format!(
+        "echo -e '{}' | claude --model sonnet --print --permission-mode bypassPermissions && exit",
+        escaped_prompt
+    );
+
+    tracing::info!("🤖 Launching integration AI with Claude Code");
+
+    let send_output = Command::new("tmux")
+        .arg("send-keys")
+        .arg("-t")
+        .arg(&tmux_session_id)
+        .arg(&claude_command)
+        .arg("Enter")
+        .output()
+        .map_err(|e| format!("Failed to send command: {}", e))?;
+
+    if !send_output.status.success() {
+        let error = String::from_utf8_lossy(&send_output.stderr);
+        return Err(format!("Failed to send command to tmux: {}", error));
+    }
+
+    // Step 8: Start monitoring the integration session
+    let app_clone = app_handle.clone();
+    let monitor_session_id = tmux_session_id.clone();
+    let monitor_log_path = log_file_str.clone();
+    let integration_instance_id = instance_count as u32 + 1; // Use next instance number
+
+    tauri::async_runtime::spawn(async move {
+        tracing::info!("🔍 Starting monitoring for integration session");
+        monitor_tmux_session(
+            app_clone,
+            monitor_session_id,
+            integration_instance_id as usize,
+            monitor_log_path,
+        )
+        .await;
+    });
+
+    let started_at = chrono::Utc::now();
+
+    tracing::info!("✅ Integration phase started successfully");
+
+    Ok(IntegrationPhaseResult {
+        integration_instance_id,
+        tmux_session_id,
+        worktree_path: integration_dir.to_string_lossy().to_string(),
+        status: "started".to_string(),
+        started_at: started_at.to_rfc3339(),
+    })
+}
