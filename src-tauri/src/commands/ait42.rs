@@ -1356,7 +1356,7 @@ async fn run_multi_runtime_competition(
             .arg("send-keys")
             .arg("-t")
             .arg(&session_id)
-            .arg(format!("{} && exit", runtime_command))
+            .arg(&runtime_command)
             .arg("Enter")
             .output()
             .map_err(|e| format!("Failed to send command: {}", e))?;
