@@ -505,7 +505,11 @@ function App() {
         {/* Multi-Agent View Mode */}
         {viewMode === 'multi-agent' && (
           <div className="flex-1 bg-gray-900">
-            <MultiAgentPanel instances={claudeInstances} competitionId={activeCompetitionId ||undefined} />
+            <MultiAgentPanel
+              instances={claudeInstances}
+              competitionId={activeCompetitionId || undefined}
+              workspacePath={workspacePath}
+            />
           </div>
         )}
 

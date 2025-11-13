@@ -20,6 +20,7 @@ import WorktreeExplorer from '@/components/Worktree/WorktreeExplorer';
 import { listen, emit } from '@tauri-apps/api/event'; // 🔥 NEW: Tauri event system
 import { AgentRuntime } from '@/types/worktree';
 import { getRuntimeDefinition } from '@/config/runtimes';
+import { useSessionHistoryStore } from '@/store/sessionHistoryStore'; // 🔥 NEW: For session updates
 
 export interface ClaudeCodeInstance {
   id: string;
@@ -41,13 +42,15 @@ export interface ClaudeCodeInstance {
 export interface MultiAgentPanelProps {
   instances: ClaudeCodeInstance[];
   competitionId?: string;
+  workspacePath?: string; // 🔥 NEW: For session history updates
 }
 
-const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({ instances, competitionId }) => {
+const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({ instances, competitionId, workspacePath }) => {
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
   const [ensembleMode, setEnsembleMode] = useState(false);
   const [activeTab, setActiveTab] = useState<'output' | 'worktrees'>('output');
   const [localInstances, setLocalInstances] = useState<ClaudeCodeInstance[]>(instances); // 🔥 NEW: Local state for instances with outputs
+  const [sessionUpdated, setSessionUpdated] = useState(false); // 🔥 NEW: Track if session was updated to completed
 
   // 🔥 NEW: Sync local instances when prop changes
   useEffect(() => {
@@ -131,6 +134,63 @@ const MultiAgentPanel: React.FC<MultiAgentPanelProps> = ({ instances, competitio
       }
     };
   }, [competitionId]);
+
+  // 🔥 NEW: Auto-update session status when all instances complete
+  const { updateSession, getSession } = useSessionHistoryStore();
+
+  useEffect(() => {
+    if (!competitionId || !workspacePath || sessionUpdated) return;
+    if (localInstances.length === 0) return;
+
+    // Check if all instances are completed or failed
+    const allCompleted = localInstances.every(
+      (inst) => inst.status === 'completed' || inst.status === 'failed'
+    );
+
+    if (allCompleted) {
+      console.log('[MultiAgentPanel] All instances completed, updating session status...');
+
+      const updateSessionStatus = async () => {
+        try {
+          // Get current session from store
+          const session = await getSession(competitionId);
+          if (!session) {
+            console.warn('[MultiAgentPanel] Session not found:', competitionId);
+            return;
+          }
+
+          // Update session status and instances with output
+          const updatedSession = {
+            ...session,
+            status: 'completed' as const,
+            completedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            instances: session.instances.map((inst, idx) => {
+              const localInst = localInstances[idx];
+              return {
+                ...inst,
+                status: localInst?.status || inst.status,
+                output: localInst?.output || inst.output,
+                endTime: localInst?.endTime
+                  ? (typeof localInst.endTime === 'string'
+                      ? localInst.endTime
+                      : new Date(localInst.endTime).toISOString())
+                  : inst.endTime,
+              };
+            }),
+          };
+
+          await updateSession(updatedSession);
+          setSessionUpdated(true);
+          console.log('[MultiAgentPanel] ✅ Session status updated to completed');
+        } catch (error) {
+          console.error('[MultiAgentPanel] Failed to update session:', error);
+        }
+      };
+
+      updateSessionStatus();
+    }
+  }, [localInstances, competitionId, workspacePath, sessionUpdated, updateSession, getSession]);
 
   // Status color mapping
   const getStatusColor = (status: string) => {
