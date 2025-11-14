@@ -1,6 +1,6 @@
-use sqlx::{Row, SqlitePool};
+use sqlx::SqlitePool;
 use std::collections::HashMap;
-use tracing::{debug, error};
+use tracing::debug;
 
 use crate::error::{Result, SessionError};
 use crate::models::{
@@ -38,7 +38,7 @@ pub async fn upsert_workspace(pool: &SqlitePool, workspace_path: &str) -> Result
 // ===================================
 
 /// Create a new session
-pub async fn create_session(pool: &SqlitePool, mut session: WorktreeSession) -> Result<WorktreeSession> {
+pub async fn create_session(pool: &SqlitePool, session: WorktreeSession) -> Result<WorktreeSession> {
     let mut tx = pool.begin().await?;
 
     // Ensure workspace_hash is set
@@ -98,12 +98,12 @@ pub async fn create_session(pool: &SqlitePool, mut session: WorktreeSession) -> 
 
     // Insert instances
     for instance in &session.instances {
-        insert_instance(&mut *tx, &session.id, instance).await?;
+        insert_instance(&mut tx, &session.id, instance).await?;
     }
 
     // Insert chat messages
     for message in &session.chat_history {
-        insert_chat_message(&mut *tx, &session.id, message).await?;
+        insert_chat_message(&mut tx, &session.id, message).await?;
     }
 
     tx.commit().await?;
@@ -158,15 +158,15 @@ pub async fn update_session(pool: &SqlitePool, session: &WorktreeSession) -> Res
     }
 
     // Delete and re-insert instances
-    delete_instances(&mut *tx, &session.id).await?;
+    delete_instances(&mut tx, &session.id).await?;
     for instance in &session.instances {
-        insert_instance(&mut *tx, &session.id, instance).await?;
+        insert_instance(&mut tx, &session.id, instance).await?;
     }
 
     // Delete and re-insert chat messages
-    delete_chat_messages(&mut *tx, &session.id).await?;
+    delete_chat_messages(&mut tx, &session.id).await?;
     for message in &session.chat_history {
-        insert_chat_message(&mut *tx, &session.id, message).await?;
+        insert_chat_message(&mut tx, &session.id, message).await?;
     }
 
     tx.commit().await?;
@@ -297,7 +297,7 @@ pub async fn delete_session(pool: &SqlitePool, workspace_hash: &str, session_id:
 // ===================================
 
 async fn insert_instance(
-    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    tx: &mut sqlx::SqliteConnection,
     session_id: &str,
     instance: &WorktreeInstance,
 ) -> Result<()> {
@@ -327,16 +327,16 @@ async fn insert_instance(
     .bind(&instance.runtime)
     .bind(&instance.model)
     .bind(&instance.runtime_label)
-    .execute(&mut **tx)
+    .execute(tx)
     .await?;
 
     Ok(())
 }
 
-async fn delete_instances(tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>, session_id: &str) -> Result<()> {
+async fn delete_instances(tx: &mut sqlx::SqliteConnection, session_id: &str) -> Result<()> {
     sqlx::query("DELETE FROM instances WHERE session_id = ?")
         .bind(session_id)
-        .execute(&mut **tx)
+        .execute(tx)
         .await?;
 
     Ok(())
@@ -456,7 +456,7 @@ pub async fn update_instance_status(
 // ===================================
 
 async fn insert_chat_message(
-    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    tx: &mut sqlx::SqliteConnection,
     session_id: &str,
     message: &ChatMessage,
 ) -> Result<()> {
@@ -472,16 +472,16 @@ async fn insert_chat_message(
     .bind(&message.content)
     .bind(&message.timestamp)
     .bind(message.instance_id.map(|v| v as i64))
-    .execute(&mut **tx)
+    .execute(tx)
     .await?;
 
     Ok(())
 }
 
-async fn delete_chat_messages(tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>, session_id: &str) -> Result<()> {
+async fn delete_chat_messages(tx: &mut sqlx::SqliteConnection, session_id: &str) -> Result<()> {
     sqlx::query("DELETE FROM chat_messages WHERE session_id = ?")
         .bind(session_id)
-        .execute(&mut **tx)
+        .execute(tx)
         .await?;
 
     Ok(())

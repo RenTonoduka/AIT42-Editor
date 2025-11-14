@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use std::sync::Arc;
-use tracing::debug;
 
 use crate::db::{queries, DbPool};
 use crate::error::Result;
@@ -42,7 +41,7 @@ impl SqliteSessionRepository {
 
 #[async_trait]
 impl SessionRepository for SqliteSessionRepository {
-    async fn create_session(&self, mut session: WorktreeSession) -> Result<WorktreeSession> {
+    async fn create_session(&self, session: WorktreeSession) -> Result<WorktreeSession> {
         // Ensure workspace_hash is set
         if session.workspace_hash.is_none() {
             return Err(crate::error::SessionError::Validation(

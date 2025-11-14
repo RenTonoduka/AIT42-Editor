@@ -89,7 +89,22 @@ async fn test_foreign_keys_enabled() {
 #[tokio::test]
 async fn test_journal_mode_wal() {
     // ============ ARRANGE ============
-    let pool = create_test_pool().await;
+    // Note: WAL mode requires file-based database, not in-memory
+    // Create temporary file-based database for this test
+    let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
+    let db_path = temp_dir.path().join("test.db");
+
+    let options = sqlx::sqlite::SqliteConnectOptions::new()
+        .filename(&db_path)
+        .create_if_missing(true)
+        .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
+        .foreign_keys(true);
+
+    let pool = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(options)
+        .await
+        .expect("Failed to create file-based test pool");
 
     // ============ ACT ============
     let journal_mode: String = sqlx::query_scalar("PRAGMA journal_mode")

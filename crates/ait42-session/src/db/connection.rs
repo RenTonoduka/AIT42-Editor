@@ -1,4 +1,5 @@
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions, SqliteSynchronous};
+use sqlx::ConnectOptions;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::Duration;

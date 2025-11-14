@@ -23,7 +23,7 @@ async fn test_create_and_get_session() {
 
     // Get session
     let fetched = repo
-        .get_session("test_workspace", &session.id)
+        .get_session("test_workspace_hash", &session.id)
         .await
         .unwrap();
     assert_eq!(fetched.id, session.id);
@@ -50,7 +50,7 @@ async fn test_get_all_sessions() {
     }
 
     // Get all sessions
-    let sessions = repo.get_all_sessions("test_workspace").await.unwrap();
+    let sessions = repo.get_all_sessions("test_workspace_hash").await.unwrap();
     assert_eq!(sessions.len(), 5);
 }
 
@@ -102,12 +102,12 @@ async fn test_delete_session() {
     repo.create_session(session.clone()).await.unwrap();
 
     // Delete session
-    repo.delete_session("test_workspace", &session.id)
+    repo.delete_session("test_workspace_hash", &session.id)
         .await
         .unwrap();
 
     // Verify deletion
-    let result = repo.get_session("test_workspace", &session.id).await;
+    let result = repo.get_session("test_workspace_hash", &session.id).await;
     assert!(result.is_err());
 }
 
@@ -172,7 +172,7 @@ async fn test_session_with_instances() {
 
     // Get session and verify instances
     let fetched = repo
-        .get_session("test_workspace", &session.id)
+        .get_session("test_workspace_hash", &session.id)
         .await
         .unwrap();
     assert_eq!(fetched.instances.len(), 2);
@@ -221,7 +221,7 @@ async fn test_session_with_chat_messages() {
 
     // Get session and verify messages
     let fetched = repo
-        .get_session("test_workspace", &session.id)
+        .get_session("test_workspace_hash", &session.id)
         .await
         .unwrap();
     assert_eq!(fetched.chat_history.len(), 2);
@@ -263,7 +263,7 @@ async fn test_add_chat_message() {
 
     // Get session and verify message was added
     let fetched = repo
-        .get_session("test_workspace", &created.id)
+        .get_session("test_workspace_hash", &created.id)
         .await
         .unwrap();
     assert_eq!(fetched.chat_history.len(), 1);
@@ -315,7 +315,7 @@ async fn test_update_instance_status() {
 
     // Verify status was updated
     let fetched = repo
-        .get_session("test_workspace", &created.id)
+        .get_session("test_workspace_hash", &created.id)
         .await
         .unwrap();
     assert_eq!(fetched.instances[0].status, "completed");

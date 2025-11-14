@@ -186,7 +186,7 @@ pub mod factories {
             let now = Utc::now().to_rfc3339();
             Self {
                 id: Uuid::new_v4().to_string(),
-                workspace_hash: "test_workspace".to_string(),
+                workspace_hash: "workspace_1".to_string(),
                 session_type: "competition".to_string(),
                 task: "Test task".to_string(),
                 status: "running".to_string(),
