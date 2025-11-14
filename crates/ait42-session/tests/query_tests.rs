@@ -429,7 +429,7 @@ async fn test_search_by_task_like() {
         "Fix bug in authentication",
         "Add unit tests for login",
         "Refactor database layer",
-        "Implement logout feature",
+        "Add login page UI",
     ];
 
     for (i, task) in tasks.iter().enumerate() {

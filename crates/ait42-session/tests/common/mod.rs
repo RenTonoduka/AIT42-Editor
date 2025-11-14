@@ -23,7 +23,7 @@ pub async fn create_test_pool() -> SqlitePool {
         .foreign_keys(true);
 
     SqlitePoolOptions::new()
-        .max_connections(1)
+        .max_connections(2)  // Increased to 2 for transaction tests
         .acquire_timeout(Duration::from_secs(3))
         .connect_with(options)
         .await
